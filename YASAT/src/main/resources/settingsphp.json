@@ -1,0 +1,16 @@
+{
+  "fileExtensions": "php",
+  "specification": {
+    "fileName": "example1.php",
+    "funcOrMethodName": "first",
+    "taintedArguments": [
+      "$id"
+    ],
+    "sensitiveFunctions": [
+      "mysql_query"
+    ],
+    "sanitizationFunctions": [
+      "another_function"
+    ]
+  }
+}

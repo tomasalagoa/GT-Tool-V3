@@ -1,0 +1,56 @@
+{
+  "vulnerabilities": [
+    {
+      "line": 58,
+      "vulnerableMethod": "append",
+      "functionCallStack": [],
+      "conditions": []
+    },
+    {
+      "line": 70,
+      "vulnerableMethod": "output",
+      "functionCallStack": [],
+      "conditions": [
+        {
+          "line": 66,
+          "condition": "field1.toLowerCase().matches(\"<script>.*(console\\\\.log\\\\(.*\\\\)|alert\\\\(.*\\\\))<\\\\/script>\")"
+        },
+        {
+          "line": 69,
+          "condition": "field1.toLowerCase().contains(\"console.log\")"
+        }
+      ]
+    },
+    {
+      "line": 78,
+      "vulnerableMethod": "output",
+      "functionCallStack": [],
+      "conditions": []
+    },
+    {
+      "line": 72,
+      "vulnerableMethod": "output",
+      "functionCallStack": [],
+      "conditions": [
+        {
+          "line": 66,
+          "condition": "field1.toLowerCase().matches(\"<script>.*(console\\\\.log\\\\(.*\\\\)|alert\\\\(.*\\\\))<\\\\/script>\")"
+        }
+      ]
+    },
+    {
+      "line": 57,
+      "vulnerableMethod": "append",
+      "functionCallStack": [],
+      "conditions": []
+    },
+    {
+      "line": 59,
+      "vulnerableMethod": "append",
+      "functionCallStack": [],
+      "conditions": []
+    }
+  ],
+  "timeToProcessMilliseconds": 2074
+}
+

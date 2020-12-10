@@ -1,0 +1,27 @@
+{
+  "fileExtensions": "java",
+  "dynamicallyTyped": false,
+  "specification": {
+    "fileName": "CrossSiteScriptingLesson5a.java",
+    "funcOrMethodName": "completed",
+    "className": "CrossSiteScriptingLesson5a",
+    "taintedArguments": [
+      "QTY1",
+      "QTY2",
+      "QTY3",
+      "QTY4",
+      "field1",
+      "field2"
+    ],
+    "sensitiveFunctions": [
+      "executeQuery",
+      "append",
+      "output",
+      "executeUpdate"
+    ],
+    "sanitizationFunctions": [
+
+    ],
+    "returnTaintedIfTaintedSource": true
+  }
+}
