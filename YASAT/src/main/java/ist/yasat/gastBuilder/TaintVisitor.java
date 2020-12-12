@@ -10,6 +10,7 @@ import ist.yasat.util.*;
 import lombok.Data;
 
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Data
@@ -44,10 +45,21 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
     }
 
     public void start() {
+        if (spec.isAllFiles()) {
+            for (File file1 : files) {
+                file = file1;
+                file1.accept(this);
+            }
+            return;
+        }
         file.accept(this);
     }
 
     private void initAstTaintState(TaintSpecification specification) {
+        if (spec.isAllFiles()) {
+            return;
+        }
+
         file = files.stream().filter(file1 -> file1.getName().equals(specification.getFileName())).findFirst().orElseThrow();
 
         if (spec.isRootSpecification()) {
@@ -115,13 +127,12 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
     }
 
     private void processFunction(Function function, FunctionCall functionCall, File file, Class clazz) {
-        Function funcClone = Util.cloneObject(function);
-        for (int i = 0; i < funcClone.getParameters().size() && i < functionCall.getMembers().size(); i++) {
+        for (int i = 0; i < function.getParameters().size() && i < functionCall.getMembers().size(); i++) {
             functionCall.getMembers().get(i).accept(this);
-            funcClone.getParameters().getElement(i).setTainted(functionCall.getMembers().get(i).isTainted());
+            function.getParameters().getElement(i).setTainted(functionCall.getMembers().get(i).isTainted());
         }
-        funcClone.accept(new TaintVisitor(files, spec, functionNames, file, clazz));
-        functionCall.setTainted(funcClone.getCodeBlock().isReturnTainted());
+        function.accept(new TaintVisitor(files, spec, functionNames, file, clazz));
+        functionCall.setTainted(function.getCodeBlock().isReturnTainted());
     }
 
 
@@ -175,6 +186,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
 
     @Override
     public void visit(ReturnStatement stmt) {
+        if (stmt.getExpression() == null)
+            return;
         stmt.getExpression().accept(this);
         functions.peek().getCodeBlock().setHasReturn(true);
         functions.peek().getCodeBlock().setReturnTainted(functions.peek().getCodeBlock().isReturnTainted() || stmt.getExpression().isTainted());
@@ -190,6 +203,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
             var.setType(currentPathVariables.get(var.getName()).getType());
             return;
         }
+
 
         if (!functions.empty()) {
             var param = functions.peek().getParameters().getOrDefault(var.getName(), null);
@@ -217,7 +231,13 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
             currentPathVariables.put(var.getName(), variable);
             return;
         }
-
+        if (spec.isAllFiles() && !spec.getGlobalTaintVariableRegex().isEmpty()) {
+            for (String regex : spec.getGlobalTaintVariableRegex()) {
+                if (Pattern.matches(regex, var.getName())) {
+                    var.setTainted(true);
+                }
+            }
+        }
         currentPathVariables.put(var.getName(), var);
     }
 
@@ -262,6 +282,14 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
 
     @Override
     public void visit(File file) {
+        if (spec.isAllFiles()) {
+            if (file.getRootFunc() != null) {
+                file.getRootFunc().accept(this);
+            }
+            file.getFunctions().forEach((s, function) -> function.accept(this));
+            file.getClasses().forEach((s, aClass) -> aClass.getMethods().forEach((name, method) -> method.accept(this)));
+            return;
+        }
         if (spec.isRootSpecification()) {
             file.getRootFunc().accept(this);
             return;

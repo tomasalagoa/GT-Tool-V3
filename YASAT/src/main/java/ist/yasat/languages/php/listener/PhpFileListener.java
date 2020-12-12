@@ -5,6 +5,7 @@ import ist.yasat.languages.php.parser.PhpParser;
 import ist.yasat.languages.php.parser.PhpParserBaseListener;
 import ist.yasat.model.Class;
 import ist.yasat.model.*;
+import ist.yasat.util.Util;
 import lombok.Data;
 
 
@@ -59,7 +60,10 @@ public class PhpFileListener extends PhpParserBaseListener {
 
     @Override
     public void enterFunctionCall(PhpParser.FunctionCallContext ctx) {
-        gastBuilder.addFunctionCall(ctx, ctx.functionCallName().qualifiedNamespaceName().namespaceNameList().identifier(0).getText());
+        var name = Util.getPropSafe(() -> ctx.functionCallName().classConstant().identifier().getText());
+        if (name == null)
+            name = Util.getPropSafe(() -> ctx.functionCallName().qualifiedNamespaceName().namespaceNameList().identifier(0).getText());
+        gastBuilder.addFunctionCall(ctx, name);
     }
 
     @Override
@@ -150,18 +154,23 @@ public class PhpFileListener extends PhpParserBaseListener {
 
     @Override
     public void enterForStatement(PhpParser.ForStatementContext ctx) {
+        gastBuilder.addConditionalStatement(ctx);
     }
 
     @Override
     public void exitForStatement(PhpParser.ForStatementContext ctx) {
+        gastBuilder.exitConditionalStatement();
+
     }
 
     @Override
     public void enterForeachStatement(PhpParser.ForeachStatementContext ctx) {
+        gastBuilder.addConditionalStatement(ctx);
     }
 
     @Override
     public void exitForeachStatement(PhpParser.ForeachStatementContext ctx) {
+        gastBuilder.exitConditionalStatement();
     }
 
     @Override
@@ -176,10 +185,12 @@ public class PhpFileListener extends PhpParserBaseListener {
 
     @Override
     public void enterDoWhileStatement(PhpParser.DoWhileStatementContext ctx) {
+        gastBuilder.addConditionalStatement(ctx);
     }
 
     @Override
     public void exitDoWhileStatement(PhpParser.DoWhileStatementContext ctx) {
+        gastBuilder.exitConditionalStatement();
     }
 
     @Override
@@ -206,7 +217,7 @@ public class PhpFileListener extends PhpParserBaseListener {
     public void enterClassStatement(PhpParser.ClassStatementContext ctx) {
         if (ctx.methodBody() != null)
             gastBuilder.addFunction(ctx, ctx.identifier().getText());
-        else if (ctx.variableInitializer() != null) {
+        else if (ctx.variableInitializer() != null && !ctx.variableInitializer().isEmpty()) {
             gastBuilder.addAttribute(ctx, ctx.variableInitializer().get(0).VarName().getText());
         }
     }
@@ -215,7 +226,7 @@ public class PhpFileListener extends PhpParserBaseListener {
     public void exitClassStatement(PhpParser.ClassStatementContext ctx) {
         if (ctx.methodBody() != null)
             gastBuilder.exitFunctionOrMethodDeclaration();
-        else if (ctx.variableInitializer() != null) {
+        else if (ctx.variableInitializer() != null && !ctx.variableInitializer().isEmpty()) {
             gastBuilder.exitStatementOrExpression();
         }
     }

@@ -19,9 +19,12 @@ public class GastBuilder {
     private final Stack<Class> classes = new Stack<>();
     private final Stack<TryCatch> tryCatches = new Stack<>();
 
+    private <E> void popIfNotEmpty(Stack<E> stack) {
+        if (!stack.empty())
+            stack.pop();
+    }
 
     public void addImportedFile(String fileName) {
-
         file.getImportedFiles().add(Util.removeQuotes(fileName));
     }
 
@@ -32,12 +35,12 @@ public class GastBuilder {
 
     public void exitFunctionOrMethodDeclaration() {
         currentFunction = file.getRootFunc();
-        codeBlocks.pop();
+        popIfNotEmpty(codeBlocks);
     }
 
     public void exitConditionalStatement() {
-        codeBlocks.pop();
-        statements.pop();
+        popIfNotEmpty(codeBlocks);
+        popIfNotEmpty(statements);
     }
 
     public void enterElseStatement(ParserRuleContext ctx) {
@@ -46,7 +49,7 @@ public class GastBuilder {
     }
 
     public void exitElseIfOrElseStatement() {
-        codeBlocks.pop();
+        popIfNotEmpty(codeBlocks);
     }
 
     public void exitIfStatement() {
@@ -55,7 +58,7 @@ public class GastBuilder {
     }
 
     public void exitStatementOrExpression() {
-        statements.pop();
+        popIfNotEmpty(statements);
     }
 
     public void exitClass() {
@@ -69,14 +72,14 @@ public class GastBuilder {
     }
 
     public void enterCatchBlock() {
-        codeBlocks.pop();
+        popIfNotEmpty(codeBlocks);
         CodeBlock block = new CodeBlock();
         tryCatches.peek().getCatchBlock().add(block);
         codeBlocks.push(block);
     }
 
     public void exitCatchBlock() {
-        codeBlocks.pop();
+        popIfNotEmpty(codeBlocks);
     }
 
     public void exitTryCatchBlock() {

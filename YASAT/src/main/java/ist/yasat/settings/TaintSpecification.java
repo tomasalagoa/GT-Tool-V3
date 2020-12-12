@@ -16,6 +16,8 @@ public class TaintSpecification {
     private List<FuncDefinition> sanitizationFunctions = new ArrayList<>();
     private List<String> taintedAttributes = new ArrayList<>();
     private boolean returnTaintedIfTaintedSource;
+    private boolean allFiles;
+    private List<String> globalTaintVariableRegex = new ArrayList<>();
 
 
     public TaintSpecification(FuncDefinition function, List<String> taintedArguments, List<FuncDefinition> sensitiveFunctions, List<FuncDefinition> sanitizationFunctions) {

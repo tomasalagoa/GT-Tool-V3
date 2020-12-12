@@ -1,16 +1,17 @@
 {
-  "fileExtensions": "php",
+  "fileExtension": "php",
+  "directory": "C:/Users/Mihail/Desktop/squirrelmail-master",
   "specification": {
-    "fileName": "example1.php",
-    "funcOrMethodName": "first",
-    "taintedArguments": [
-      "$id"
+    "allFiles": true,
+    "globalTaintVariableRegex": [
+      "\\$_GET\\[*\\]*",
+      "\\$_POST\\[*\\]*",
+      "\\$_REQUEST\\[.*\\].*"
     ],
     "sensitiveFunctions": [
-      "mysql_query"
-    ],
-    "sanitizationFunctions": [
-      "another_function"
+      {
+        "name": "mysql_query"
+      }
     ]
   }
 }

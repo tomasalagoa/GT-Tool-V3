@@ -9,6 +9,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 @Data
 @NoArgsConstructor
@@ -22,18 +23,18 @@ public class Function extends Element {
     private CodeBlock codeBlock = new CodeBlock();
     private String returnType;
 
-    public Function(@NonNull String functionName) {
+    public Function(String functionName) {
         this.name = functionName;
     }
 
-    public Function(@NonNull String functionName, ParserRuleContext ctx) {
+    public Function(String functionName, ParserRuleContext ctx) {
         super(ctx);
-        this.name = functionName;
+        this.name = Objects.requireNonNullElse(functionName, "lambda");
     }
 
     public Function(ParserRuleContext ctx, @NonNull String name, String returnType) {
         super(ctx);
-        this.name = name;
+        this.name = Objects.requireNonNullElse(name, "lambda");
         this.returnType = returnType;
     }
 

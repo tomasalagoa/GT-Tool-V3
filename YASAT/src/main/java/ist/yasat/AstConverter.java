@@ -38,7 +38,7 @@ import java.util.stream.Stream;
 @Data
 public class AstConverter {
 
-    private static final String reportFilePath = "src/main/resources/report.json";
+    private static final String reportFilePath = "YASAT/src/main/resources/report.json";
 
     private static final ObjectMapper jsonMapper = new ObjectMapper();
     public static Report report = new Report();
@@ -55,7 +55,7 @@ public class AstConverter {
             case "php" -> {
                 CommonTokenStream tokens = new CommonTokenStream(new PhpLexer(input));
                 PhpParser parser = new PhpParser(tokens);
-                PhpParser.PhpBlockContext tree = parser.phpBlock();
+                PhpParser.HtmlElementOrPhpBlockContext tree = parser.htmlElementOrPhpBlock();
                 var listener = new PhpFileListener(path.getFileName().toString());
                 walker.walk(listener, tree);
                 return listener.getGastBuilder().getFile();
@@ -105,14 +105,14 @@ public class AstConverter {
         return files;
     }
 
-    public static void analyseAndProduceReport(String directoryPath, String settingsPath) throws Exception {
+    public static void analyseAndProduceReport(String settingsPath) throws Exception {
         Settings settings = jsonMapper.readValue(new FileInputStream(settingsPath), Settings.class);
-        analyseAndProduceReport(directoryPath, settings);
+        analyseAndProduceReport(settings);
     }
 
-    public static void analyseAndProduceReport(String directoryPath, Settings settings) throws Exception {
+    public static void analyseAndProduceReport(Settings settings) throws Exception {
         AstConverter.clearReport();
-        analyse(directoryPath, settings);
+        analyse(settings.getDirectory(), settings);
         writeReport();
     }
 

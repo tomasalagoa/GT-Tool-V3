@@ -6,6 +6,8 @@ import lombok.NoArgsConstructor;
 import lombok.NonNull;
 import org.antlr.v4.runtime.ParserRuleContext;
 
+import java.util.Objects;
+
 @Data
 @NoArgsConstructor
 
@@ -14,10 +16,9 @@ public class FunctionCall extends Expression {
     private String functionName;
     private String returnType;
 
-    public FunctionCall(ParserRuleContext ctx, @NonNull String functionName) {
+    public FunctionCall(ParserRuleContext ctx, String functionName) {
         super(ctx);
-        this.functionName = functionName;
-    }
+        this.functionName = Objects.requireNonNullElse(functionName, "lambda");    }
 
     @Override
     public void accept(AstBuilderVisitorInterface visitor) {
