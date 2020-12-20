@@ -1,9 +1,9 @@
-package ist.yasat.languages.java.listener;
+package ist.gt.languages.java.listener;
 
-import ist.yasat.gastBuilder.GastBuilder;
-import ist.yasat.languages.java.parser.Java8Parser;
-import ist.yasat.languages.java.parser.Java8ParserBaseListener;
-import ist.yasat.model.FunctionCall;
+import ist.gt.gastBuilder.GastBuilder;
+import ist.gt.languages.java.parser.Java8Parser;
+import ist.gt.languages.java.parser.Java8ParserBaseListener;
+import ist.gt.model.FunctionCall;
 import lombok.Data;
 
 import java.util.Stack;

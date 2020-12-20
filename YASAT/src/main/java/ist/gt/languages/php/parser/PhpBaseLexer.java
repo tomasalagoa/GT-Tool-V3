@@ -1,4 +1,4 @@
-package ist.yasat.languages.php.parser;/*
+package ist.gt.languages.php.parser;/*
 PHP grammar.
 The MIT License (MIT).
 Copyright (c) 2015-2019, Ivan Kochurkin (kvanttt@gmail.com), Positive Technologies.

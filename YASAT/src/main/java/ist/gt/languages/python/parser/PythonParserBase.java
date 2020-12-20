@@ -1,4 +1,4 @@
-package ist.yasat.languages.python.parser;
+package ist.gt.languages.python.parser;
 
 import org.antlr.v4.runtime.Parser;
 import org.antlr.v4.runtime.TokenStream;

@@ -1,4 +1,4 @@
-package ist.yasat.util;
+package ist.gt.util;
 
 import org.apache.commons.lang3.SerializationUtils;
 

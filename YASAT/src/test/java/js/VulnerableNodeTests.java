@@ -1,16 +1,13 @@
 package js;
 
-import ist.yasat.AstConverter;
-import ist.yasat.settings.FuncDefinition;
-import ist.yasat.settings.Settings;
-import ist.yasat.settings.TaintSpecification;
-import ist.yasat.util.PropertySafe;
-import ist.yasat.util.Util;
+import ist.gt.AstConverter;
+import ist.gt.settings.FuncDefinition;
+import ist.gt.settings.Settings;
+import ist.gt.settings.TaintSpecification;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

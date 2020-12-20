@@ -1,5 +1,5 @@
 // Generated from C:/Users/mihail/Desktop/Tese/master-thesis/YASAT/src/main/resources/grammars/python\PythonParser.g4 by ANTLR 4.8
-package ist.yasat.languages.python.parser;
+package ist.gt.languages.python.parser;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
 /**

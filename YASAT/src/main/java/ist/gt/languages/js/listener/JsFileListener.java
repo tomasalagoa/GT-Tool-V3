@@ -1,11 +1,9 @@
-package ist.yasat.languages.js.listener;
+package ist.gt.languages.js.listener;
 
-import ist.yasat.gastBuilder.GastBuilder;
-import ist.yasat.languages.js.parser.JavaScriptParser;
-import ist.yasat.languages.js.parser.JavaScriptParserBaseListener;
-import ist.yasat.model.*;
-import ist.yasat.model.Class;
-import ist.yasat.util.Util;
+import ist.gt.gastBuilder.GastBuilder;
+import ist.gt.languages.js.parser.JavaScriptParser;
+import ist.gt.languages.js.parser.JavaScriptParserBaseListener;
+import ist.gt.util.Util;
 import lombok.Data;
 
 @Data

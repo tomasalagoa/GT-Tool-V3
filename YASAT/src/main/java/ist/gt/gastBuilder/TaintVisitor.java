@@ -1,12 +1,12 @@
-package ist.yasat.gastBuilder;
+package ist.gt.gastBuilder;
 
-import ist.yasat.AstConverter;
-import ist.yasat.exceptions.ReturnFoundException;
-import ist.yasat.model.Class;
-import ist.yasat.model.*;
-import ist.yasat.settings.Settings;
-import ist.yasat.settings.TaintSpecification;
-import ist.yasat.util.*;
+import ist.gt.AstConverter;
+import ist.gt.exceptions.ReturnFoundException;
+import ist.gt.model.Class;
+import ist.gt.model.*;
+import ist.gt.settings.Settings;
+import ist.gt.settings.TaintSpecification;
+import ist.gt.util.*;
 import lombok.Data;
 
 import java.util.*;

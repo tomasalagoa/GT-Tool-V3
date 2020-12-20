@@ -1,10 +1,8 @@
-package ist.yasat.languages.python.listener;
+package ist.gt.languages.python.listener;
 
-import ist.yasat.gastBuilder.GastBuilder;
-import ist.yasat.languages.python.parser.PythonParser;
-import ist.yasat.languages.python.parser.PythonParserBaseListener;
-import ist.yasat.model.*;
-import ist.yasat.model.Class;
+import ist.gt.gastBuilder.GastBuilder;
+import ist.gt.languages.python.parser.PythonParser;
+import ist.gt.languages.python.parser.PythonParserBaseListener;
 import lombok.Data;
 
 @Data

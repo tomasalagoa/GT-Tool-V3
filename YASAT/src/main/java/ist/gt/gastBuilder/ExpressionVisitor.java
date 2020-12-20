@@ -1,7 +1,7 @@
-package ist.yasat.gastBuilder;
+package ist.gt.gastBuilder;
 
-import ist.yasat.model.Class;
-import ist.yasat.model.*;
+import ist.gt.model.Class;
+import ist.gt.model.*;
 
 public class ExpressionVisitor implements AstBuilderVisitorInterface {
     private final Expression expr;

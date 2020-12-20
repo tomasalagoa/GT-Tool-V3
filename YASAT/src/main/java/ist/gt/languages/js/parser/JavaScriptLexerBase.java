@@ -1,4 +1,4 @@
-package ist.yasat.languages.js.parser;
+package ist.gt.languages.js.parser;
 
 import org.antlr.v4.runtime.*;
 

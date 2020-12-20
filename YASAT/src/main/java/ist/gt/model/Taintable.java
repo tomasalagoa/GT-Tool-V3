@@ -1,4 +1,4 @@
-package ist.yasat.model;
+package ist.gt.model;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;

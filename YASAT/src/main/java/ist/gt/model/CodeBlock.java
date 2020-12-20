@@ -1,14 +1,12 @@
-package ist.yasat.model;
+package ist.gt.model;
 
-import ist.yasat.gastBuilder.AstBuilderVisitorInterface;
+import ist.gt.gastBuilder.AstBuilderVisitorInterface;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.antlr.v4.runtime.ParserRuleContext;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 @Data
 @NoArgsConstructor

@@ -1,5 +1,5 @@
 // Generated from C:/Users/mihail/Desktop/Tese/master-thesis/YASAT/src/main/resources/grammars/js\JavaScriptParser.g4 by ANTLR 4.8
-package ist.yasat.languages.js.parser;
+package ist.gt.languages.js.parser;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;

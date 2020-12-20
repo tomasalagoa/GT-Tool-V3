@@ -1,4 +1,4 @@
-package ist.yasat;
+package ist.gt;
 
 public class ParserRun {
 

@@ -1,8 +1,8 @@
-package ist.yasat.gastBuilder;
+package ist.gt.gastBuilder;
 
-import ist.yasat.model.Class;
-import ist.yasat.model.*;
-import ist.yasat.util.Util;
+import ist.gt.model.Class;
+import ist.gt.model.*;
+import ist.gt.util.Util;
 import lombok.Data;
 import org.antlr.v4.runtime.ParserRuleContext;
 

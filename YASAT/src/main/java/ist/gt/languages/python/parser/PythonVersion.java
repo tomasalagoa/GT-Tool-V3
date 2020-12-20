@@ -1,4 +1,4 @@
-package ist.yasat.languages.python.parser;
+package ist.gt.languages.python.parser;
 
 public enum PythonVersion {
     Autodetect(0),

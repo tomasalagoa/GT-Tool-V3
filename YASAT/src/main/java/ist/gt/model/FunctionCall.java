@@ -1,6 +1,6 @@
-package ist.yasat.model;
+package ist.gt.model;
 
-import ist.yasat.gastBuilder.AstBuilderVisitorInterface;
+import ist.gt.gastBuilder.AstBuilderVisitorInterface;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.NonNull;

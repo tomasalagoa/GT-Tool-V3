@@ -1,4 +1,4 @@
-package ist.yasat.settings;
+package ist.gt.settings;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;

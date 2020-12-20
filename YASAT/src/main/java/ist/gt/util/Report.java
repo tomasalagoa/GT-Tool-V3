@@ -1,4 +1,4 @@
-package ist.yasat.util;
+package ist.gt.util;
 
 import lombok.Data;
 

@@ -1,8 +1,8 @@
-package ist.yasat.util;
+package ist.gt.util;
 
-import ist.yasat.model.File;
-import ist.yasat.model.Class;
-import ist.yasat.model.Function;
+import ist.gt.model.File;
+import ist.gt.model.Class;
+import ist.gt.model.Function;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 

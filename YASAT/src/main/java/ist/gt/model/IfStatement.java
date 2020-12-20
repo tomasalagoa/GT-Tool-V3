@@ -1,7 +1,7 @@
-package ist.yasat.model;
+package ist.gt.model;
 
 
-import ist.yasat.gastBuilder.AstBuilderVisitorInterface;
+import ist.gt.gastBuilder.AstBuilderVisitorInterface;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.antlr.v4.runtime.ParserRuleContext;

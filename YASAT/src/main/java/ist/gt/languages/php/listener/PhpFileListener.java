@@ -1,11 +1,9 @@
-package ist.yasat.languages.php.listener;
+package ist.gt.languages.php.listener;
 
-import ist.yasat.gastBuilder.GastBuilder;
-import ist.yasat.languages.php.parser.PhpParser;
-import ist.yasat.languages.php.parser.PhpParserBaseListener;
-import ist.yasat.model.Class;
-import ist.yasat.model.*;
-import ist.yasat.util.Util;
+import ist.gt.gastBuilder.GastBuilder;
+import ist.gt.languages.php.parser.PhpParser;
+import ist.gt.languages.php.parser.PhpParserBaseListener;
+import ist.gt.util.Util;
 import lombok.Data;
 
 
