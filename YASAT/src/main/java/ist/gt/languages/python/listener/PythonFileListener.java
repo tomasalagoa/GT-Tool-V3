@@ -79,7 +79,7 @@ public class PythonFileListener extends PythonParserBaseListener {
 
     @Override
     public void enterDef_parameter(PythonParser.Def_parameterContext ctx) {
-        gastBuilder.addParameter(ctx, ctx.named_parameter().getText());
+        gastBuilder.addParameter(ctx, ctx.named_parameter().name().getText());
     }
 
     @Override
