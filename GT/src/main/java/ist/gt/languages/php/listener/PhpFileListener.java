@@ -76,7 +76,7 @@ public class PhpFileListener extends PhpParserBaseListener {
 
     @Override
     public void enterKeyedVariable(PhpParser.KeyedVariableContext ctx) {
-        gastBuilder.addVariable(ctx, ctx.getText());
+        gastBuilder.addVariable(ctx, ctx.getText().startsWith("$") ? ctx.getText() : "$"+ctx.getText());
     }
 
     @Override
