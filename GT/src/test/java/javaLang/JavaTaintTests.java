@@ -104,4 +104,20 @@ public class JavaTaintTests {
         AstConverter.analyse("src/test/java/javaLang/includefilesnottainted", settings);
         assertEquals(AstConverter.report.getVulnerabilities().size(), 0);
     }
+
+    @Test
+    public void simple_if_taint_propagation() throws Exception {
+        spec.setFileName("Simple_If_Taint_Propagation.java");
+        spec.getFunction().setType(spec.getFileName().replace(".java", ""));
+        AstConverter.analyse("src/test/java/javaLang/simpleiftaintpropagation", settings);
+        assertEquals(AstConverter.report.getVulnerabilities().size(), 2);
+    }
+
+    @Test
+    public void simple_conditional_expression() throws Exception {
+        spec.setFileName("Simple_Conditional_Expression.java");
+        spec.getFunction().setType(spec.getFileName().replace(".java", ""));
+        AstConverter.analyse("src/test/java/javaLang/simpleconditionalexpression", settings);
+        assertEquals(AstConverter.report.getVulnerabilities().size(), 1);
+    }
 }
