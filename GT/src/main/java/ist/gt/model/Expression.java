@@ -15,7 +15,13 @@ public class Expression extends Statement {
         super(ctx);
     }
 
+    public Expression(ParserRuleContext ctx, String value){
+        super(ctx);
+        this.trackedValue = value;
+    }
+
     private List<Expression> members = new ArrayList<>();
+    private String trackedValue;
 
     public void accept(AstBuilderVisitorInterface visitor) {
         visitor.visit(this);

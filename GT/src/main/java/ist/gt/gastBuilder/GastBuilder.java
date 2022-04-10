@@ -4,6 +4,8 @@ import ist.gt.model.Class;
 import ist.gt.model.*;
 import ist.gt.util.Util;
 import lombok.Data;
+
+import org.antlr.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.ParserRuleContext;
 
 import java.util.Stack;
@@ -120,6 +122,11 @@ public class GastBuilder {
 
     public Variable addVariable(ParserRuleContext ctx, String name) {
         Variable var = new Variable(ctx, name);
+        //Update var's tracked value info in case the variable was
+        //already analysed
+        if(currentFunction.getVariables().containsKey(var.getName())){
+            var = currentFunction.getVariables().get(var.getName());
+        }
         currentFunction.getVariables().putIfAbsent(var.getName(), var);
         processExpression(var);
         return var;
@@ -273,5 +280,105 @@ public class GastBuilder {
         var attribute = addAttribute(ctx, name);
         attribute.setType(type);
         return attribute;
+    }
+
+    
+    /* NEW FUNCTIONS FOR VALUE TRACKING
+    */
+    public void evaluateRelationalExpression(ParserRuleContext ctx, String operator){
+        //Think what to do about both sides of the expression
+        Expression expression;
+        String leftValue, rightValue;
+        Boolean result;
+        switch(operator){
+            case ">":
+                //Do something
+                System.out.println("GT Expression");
+                expression = (Expression) statements.pop();
+                //System.out.println(expression.getMembers().get(0).toString());
+                //System.out.println(expression.getMembers().get(1).toString());
+                leftValue = expression.getMembers().get(0).getTrackedValue();
+                rightValue = expression.getMembers().get(1).getTrackedValue();
+                result = Double.valueOf(leftValue) > Double.valueOf(rightValue);
+                expression.setTrackedValue(result.toString());
+                statements.push(expression);
+                return;
+            case ">=":
+                //Do something
+                System.out.println("GE Expression");
+                expression = (Expression) statements.pop();
+                //System.out.println(expression.getMembers().get(0).toString());
+                //System.out.println(expression.getMembers().get(1).toString());
+                leftValue = expression.getMembers().get(0).getTrackedValue();
+                rightValue = expression.getMembers().get(1).getTrackedValue();
+                result = Double.valueOf(leftValue) >= Double.valueOf(rightValue);
+                expression.setTrackedValue(result.toString());
+                statements.push(expression);
+                return;
+            case "<":
+                //Do something
+                System.out.println("LT Expression");
+                expression = (Expression) statements.pop();
+                //System.out.println(expression.getMembers().get(0).toString());
+                //System.out.println(expression.getMembers().get(1).toString());
+                leftValue = expression.getMembers().get(0).getTrackedValue();
+                rightValue = expression.getMembers().get(1).getTrackedValue();
+                result = Double.valueOf(leftValue) < Double.valueOf(rightValue);
+                expression.setTrackedValue(result.toString());
+                statements.push(expression);
+                return;
+            case "<=":
+                //Do something
+                System.out.println("LE Expression");
+                expression = (Expression) statements.pop();
+                //System.out.println(expression.getMembers().get(0).toString());
+                //System.out.println(expression.getMembers().get(1).toString());
+                leftValue = expression.getMembers().get(0).getTrackedValue();
+                rightValue = expression.getMembers().get(1).getTrackedValue();
+                result = Double.valueOf(leftValue) <= Double.valueOf(rightValue);
+                expression.setTrackedValue(result.toString());
+                statements.push(expression);
+                return;
+            //TODO Should I care about this one? Instanceof seems a tough nut to crack
+            case "instanceof":
+                //Do something
+                System.out.println("INSTANCEOF Expression");
+                expression = (Expression) statements.pop();
+                //System.out.println(expression.getMembers().get(0).toString());
+                //System.out.println(expression.getMembers().get(1).toString());
+                leftValue = expression.getMembers().get(0).getTrackedValue();
+                rightValue = expression.getMembers().get(1).getTrackedValue();
+                //result = Double.valueOf(leftValue) instanceof Double.valueOf(rightValue);
+                //expression.setTrackedValue(result.toString());
+                statements.push(expression);
+                return;
+            default:
+                System.out.println("Unknown operator: " + operator);
+                return;
+        }
+    
+    }
+
+
+    public void trackLeftVariableValue(){
+        //Updating left variable value in assignment and in current function
+        Assignment assignment = (Assignment) statements.pop();
+        Variable tmpVar = (Variable) assignment.getLeft();
+        Variable var = currentFunction.getVariables().get(tmpVar.getName());
+        var.setTrackedValue(assignment.getRight().getTrackedValue());
+        currentFunction.getVariables().replace(var.getName(), var);
+        assignment.setLeft(var);
+        statements.push(assignment);
+    }
+
+
+    public void trackExpressionValue(){
+        Expression expression = (Expression) statements.pop();
+        //Most likely this expression only has one element
+        if(expression.getTrackedValue() == null && expression.getMembers().size() > 0){
+            expression.setTrackedValue(expression.getMembers().get(0).getTrackedValue());
+            //System.out.println(expression.getTrackedValue());
+        }
+        statements.push(expression);
     }
 }

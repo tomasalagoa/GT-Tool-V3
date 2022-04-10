@@ -9,11 +9,13 @@ import org.antlr.v4.runtime.ParserRuleContext;
 @NoArgsConstructor
 public class Constant extends Expression {
     public Constant(ParserRuleContext ctx, Object value) {
-        super(ctx);
+        super(ctx, value.toString());
         this.value = value;
+        this.trackedValue = value.toString();
     }
 
     public Object value;
+    public String trackedValue;
 
     @Override
     public void accept(AstBuilderVisitorInterface visitor) {

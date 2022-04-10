@@ -8,10 +8,13 @@ import lombok.Data;
 
 import java.util.Stack;
 
+import org.antlr.v4.runtime.tree.ParseTree;
+
 @Data
 public class JavaFileListener extends Java8ParserBaseListener {
 
     private final Stack<Boolean> primaries = new Stack<>();
+    private boolean wasConditionalExpr;
     private final GastBuilder gastBuilder;
     private final Stack<FunctionCall> expressionAfterPrimaryEnd = new Stack<>();
 
@@ -47,16 +50,37 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void enterLiteral(Java8Parser.LiteralContext ctx) {
         gastBuilder.addConstant(ctx, ctx.getText());
+        
     }
 
     @Override
     public void enterConditionalExpression(Java8Parser.ConditionalExpressionContext ctx) {
-        gastBuilder.addExpression(ctx);
+        //gastBuilder.addExpression(ctx);
+        if(isConditionalExpression(ctx)){
+            gastBuilder.addExpression(ctx);
+        }
     }
 
     @Override
     public void exitConditionalExpression(Java8Parser.ConditionalExpressionContext ctx) {
-        gastBuilder.exitStatementOrExpression();
+        //System.out.println("Removing Conditional Expression? " + isConditionalExpression(ctx) + " -> " + ctx.getText());
+        if(isConditionalExpression(ctx)){
+            gastBuilder.exitStatementOrExpression();
+            //System.out.println("Removed from stack");
+        }
+    }
+
+    /*  Experimental function: ConditionalExpression is of the form: expression ? expression : expression;
+        However, it also appears in other expressions for some reason and adds noise to the analysis sometimes
+    */
+    public boolean isConditionalExpression(Java8Parser.ConditionalExpressionContext ctx){
+        if(ctx.getToken(Java8Parser.QUESTION, 0) != null && ctx.getToken(Java8Parser.COLON, 0) != null){
+            //System.out.println("A conditional expression was found -> " + ctx.getText());
+            return true;
+        }
+
+        //System.out.println("Well, not a conditional expression after all -> " + ctx.getText());
+        return false;
     }
 
     @Override
@@ -66,6 +90,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void exitExpression(Java8Parser.ExpressionContext ctx) {
+        gastBuilder.trackExpressionValue();
         gastBuilder.exitStatementOrExpression();
     }
 
@@ -82,6 +107,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void exitLocalVariableDeclarationStatement(Java8Parser.LocalVariableDeclarationStatementContext ctx) {
+        gastBuilder.trackLeftVariableValue();
         gastBuilder.exitStatementOrExpression();
     }
 
@@ -224,6 +250,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void exitAssignment(Java8Parser.AssignmentContext ctx) {
+        gastBuilder.trackLeftVariableValue();
         gastBuilder.exitStatementOrExpression();
     }
 
@@ -411,5 +438,25 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void exitCatchClause(Java8Parser.CatchClauseContext ctx) {
         gastBuilder.exitCatchBlock();
+    }
+
+    /*@Override
+    public void enterRelationalExpression(Java8Parser.RelationalExpressionContext ctx){
+    }*/
+
+    @Override
+    public void exitRelationalExpression(Java8Parser.RelationalExpressionContext ctx){
+        if(ctx.GE() != null){
+            gastBuilder.evaluateRelationalExpression(ctx, ctx.GE().getText());
+        } else if(ctx.GT() != null){
+            gastBuilder.evaluateRelationalExpression(ctx, ctx.GT().getText());
+        } else if(ctx.LE() != null){
+            gastBuilder.evaluateRelationalExpression(ctx, ctx.LE().getText());
+        } else if(ctx.LT() != null){
+            gastBuilder.evaluateRelationalExpression(ctx, ctx.LT().getText());
+        } else if(ctx.INSTANCEOF() != null){
+            gastBuilder.evaluateRelationalExpression(ctx, ctx.INSTANCEOF().getText());
+        }
+        System.out.println("Exiting relational expr");
     }
 }
