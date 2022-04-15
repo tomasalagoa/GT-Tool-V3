@@ -10,7 +10,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 public class Variable extends Expression {
     @NonNull
     private String name;
-    private String type;
+    //private String type;
 
     public Variable(@NonNull String name) {
         this.name = name;
@@ -22,15 +22,15 @@ public class Variable extends Expression {
     }
 
     public Variable(ParserRuleContext ctx, @NonNull String name, String type) {
-        super(ctx);
+        super(ctx, type);
         this.name = name;
-        this.type = type;
+        //this.type = type;
     }
 
-    public void setType(String type) {
+    /*public void setType(String type) {
         if (type != null)
             this.type = type;
-    }
+    }*/
 
     @Override
     public void accept(AstBuilderVisitorInterface visitor) {

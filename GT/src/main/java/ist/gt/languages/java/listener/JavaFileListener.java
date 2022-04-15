@@ -49,7 +49,35 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterLiteral(Java8Parser.LiteralContext ctx) {
-        gastBuilder.addConstant(ctx, ctx.getText());
+        if(ctx.BooleanLiteral() != null){
+            System.out.println("Boolean");
+            System.out.println(ctx.BooleanLiteral().getText());
+            gastBuilder.addConstant(ctx, ctx.getText(), "boolean");
+        } else if(ctx.IntegerLiteral() != null){
+            System.out.println("Integer");
+            System.out.println(ctx.IntegerLiteral().getText());
+            gastBuilder.addConstant(ctx, ctx.getText(), "int");
+        } else if(ctx.FloatingPointLiteral() != null){
+            System.out.println("Float/Double");
+            System.out.println(ctx.FloatingPointLiteral().getText());
+            gastBuilder.addConstant(ctx, ctx.getText(), "double");
+        } else if(ctx.CharacterLiteral() != null){
+            System.out.println("Char");
+            System.out.println(ctx.CharacterLiteral().getText());
+            gastBuilder.addConstant(ctx, ctx.getText(), "char");
+        } else if(ctx.StringLiteral() != null){
+            System.out.println("String");
+            System.out.println(ctx.getText());
+            //Remove quotes from ctx text due to the appearance of double quotes later on
+            String rmvQuotes = ctx.getText().substring(1, ctx.getText().length()-1).replace("\"\"", "\"");
+            System.out.println(rmvQuotes);
+            gastBuilder.addConstant(ctx, rmvQuotes, "String");
+        } else if(ctx.NullLiteral() != null){
+            System.out.println("Null");
+            System.out.println(ctx.NullLiteral().getText());
+            gastBuilder.addConstant(ctx, ctx.getText(), null);
+        }
+        //gastBuilder.addConstant(ctx, ctx.getText());
         
     }
 
@@ -440,9 +468,6 @@ public class JavaFileListener extends Java8ParserBaseListener {
         gastBuilder.exitCatchBlock();
     }
 
-    /*@Override
-    public void enterRelationalExpression(Java8Parser.RelationalExpressionContext ctx){
-    }*/
 
     @Override
     public void exitRelationalExpression(Java8Parser.RelationalExpressionContext ctx){
@@ -458,5 +483,37 @@ public class JavaFileListener extends Java8ParserBaseListener {
             gastBuilder.evaluateRelationalExpression(ctx, ctx.INSTANCEOF().getText());
         }
         System.out.println("Exiting relational expr");
+    }
+
+    @Override
+    public void exitMultiplicativeExpression(Java8Parser.MultiplicativeExpressionContext ctx){
+        if(ctx.MUL() != null){
+            gastBuilder.evaluateMultiplicativeExpression(ctx, ctx.MUL().getText());
+        } else if(ctx.DIV() != null){
+            gastBuilder.evaluateMultiplicativeExpression(ctx, ctx.DIV().getText());
+        } else if(ctx.MOD() != null){
+            gastBuilder.evaluateMultiplicativeExpression(ctx, ctx.MOD().getText());
+        }
+        System.out.println("Exiting multiplicative expr");
+    }
+
+    @Override
+    public void exitEqualityExpression(Java8Parser.EqualityExpressionContext ctx){
+        if(ctx.EQUAL() != null){
+            gastBuilder.evaluateEqualityExpression(ctx, ctx.EQUAL().getText());
+        } else if(ctx.NOTEQUAL() != null){
+            gastBuilder.evaluateEqualityExpression(ctx, ctx.NOTEQUAL().getText());
+        }
+        System.out.println("Exiting equality expr");
+    }
+
+    @Override
+    public void exitAdditiveExpression(Java8Parser.AdditiveExpressionContext ctx){
+        if(ctx.ADD() != null){
+            gastBuilder.evaluateAdditiveExpression(ctx, ctx.ADD().getText());
+        } else if(ctx.SUB() != null){
+            gastBuilder.evaluateAdditiveExpression(ctx, ctx.SUB().getText());
+        }
+        System.out.println("Exiting additive expr");
     }
 }

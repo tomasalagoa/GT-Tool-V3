@@ -15,13 +15,26 @@ public class Expression extends Statement {
         super(ctx);
     }
 
-    public Expression(ParserRuleContext ctx, String value){
+    public Expression(ParserRuleContext ctx, String value, String type){
         super(ctx);
         this.trackedValue = value;
+        this.type = type;
+    }
+
+    public Expression(ParserRuleContext ctx, String type){
+        super(ctx);
+        this.type = type;
     }
 
     private List<Expression> members = new ArrayList<>();
     private String trackedValue;
+    //Mostly used for Constants & Variables, helping in value tracking
+    private String type;
+
+    public void setType(String type) {
+        if (type != null)
+            this.type = type;
+    }
 
     public void accept(AstBuilderVisitorInterface visitor) {
         visitor.visit(this);

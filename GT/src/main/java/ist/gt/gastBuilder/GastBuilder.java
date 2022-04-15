@@ -127,6 +127,12 @@ public class GastBuilder {
         if(currentFunction.getVariables().containsKey(var.getName())){
             var = currentFunction.getVariables().get(var.getName());
         }
+        //In case a parameter's value is overriden (with an assignment), we will
+        //not know its type unless we retrieve it 
+        else if(!currentFunction.getVariables().containsKey(var.getName()) &&
+        currentFunction.getParameters().containsKey(var.getName())){
+            var = currentFunction.getParameters().get(var.getName());
+            }
         currentFunction.getVariables().putIfAbsent(var.getName(), var);
         processExpression(var);
         return var;
@@ -152,8 +158,8 @@ public class GastBuilder {
         return parameter;
     }
 
-    public Constant addConstant(ParserRuleContext ctx, String value) {
-        var constant = new Constant(ctx, value);
+    public Constant addConstant(ParserRuleContext ctx, String value, String type) {
+        var constant = new Constant(ctx, value, type);
         processExpression(constant);
         return constant;
     }
@@ -285,8 +291,8 @@ public class GastBuilder {
     
     /* NEW FUNCTIONS FOR VALUE TRACKING
     */
+    //TODO Verify if it is possible to make the code cleaner later
     public void evaluateRelationalExpression(ParserRuleContext ctx, String operator){
-        //Think what to do about both sides of the expression
         Expression expression;
         String leftValue, rightValue;
         Boolean result;
@@ -295,12 +301,11 @@ public class GastBuilder {
                 //Do something
                 System.out.println("GT Expression");
                 expression = (Expression) statements.pop();
-                //System.out.println(expression.getMembers().get(0).toString());
-                //System.out.println(expression.getMembers().get(1).toString());
                 leftValue = expression.getMembers().get(0).getTrackedValue();
                 rightValue = expression.getMembers().get(1).getTrackedValue();
                 result = Double.valueOf(leftValue) > Double.valueOf(rightValue);
                 expression.setTrackedValue(result.toString());
+                expression.setType("boolean");
                 statements.push(expression);
                 return;
             case ">=":
@@ -313,6 +318,7 @@ public class GastBuilder {
                 rightValue = expression.getMembers().get(1).getTrackedValue();
                 result = Double.valueOf(leftValue) >= Double.valueOf(rightValue);
                 expression.setTrackedValue(result.toString());
+                expression.setType("boolean");
                 statements.push(expression);
                 return;
             case "<":
@@ -325,6 +331,7 @@ public class GastBuilder {
                 rightValue = expression.getMembers().get(1).getTrackedValue();
                 result = Double.valueOf(leftValue) < Double.valueOf(rightValue);
                 expression.setTrackedValue(result.toString());
+                expression.setType("boolean");
                 statements.push(expression);
                 return;
             case "<=":
@@ -337,6 +344,7 @@ public class GastBuilder {
                 rightValue = expression.getMembers().get(1).getTrackedValue();
                 result = Double.valueOf(leftValue) <= Double.valueOf(rightValue);
                 expression.setTrackedValue(result.toString());
+                expression.setType("boolean");
                 statements.push(expression);
                 return;
             //TODO Should I care about this one? Instanceof seems a tough nut to crack
@@ -353,10 +361,176 @@ public class GastBuilder {
                 statements.push(expression);
                 return;
             default:
-                System.out.println("Unknown operator: " + operator);
+                System.out.println("Unknown Relational operator: " + operator);
                 return;
         }
     
+    }
+
+
+    public void evaluateMultiplicativeExpression(ParserRuleContext ctx, String operator){
+        Expression expression;
+        String leftValue, rightValue;
+        Double result;
+
+        switch(operator){
+            case "*":
+                //Do something
+                System.out.println("MUL Expression");
+                expression = (Expression) statements.pop();
+                leftValue = expression.getMembers().get(0).getTrackedValue();
+                rightValue = expression.getMembers().get(1).getTrackedValue();
+                result = Double.valueOf(leftValue) * Double.valueOf(rightValue);
+                expression.setTrackedValue(result.toString());
+                expression.setType("double");
+                statements.push(expression);
+                return;
+            case "/":
+                //Do something
+                System.out.println("DIV Expression");
+                expression = (Expression) statements.pop();
+                leftValue = expression.getMembers().get(0).getTrackedValue();
+                rightValue = expression.getMembers().get(1).getTrackedValue();
+                result = Double.valueOf(leftValue) / Double.valueOf(rightValue);
+                expression.setTrackedValue(result.toString());
+                expression.setType("double");
+                statements.push(expression);
+                return;
+            case "%":
+                //Do something
+                System.out.println("MOD Expression");
+                expression = (Expression) statements.pop();
+                leftValue = expression.getMembers().get(0).getTrackedValue();
+                rightValue = expression.getMembers().get(1).getTrackedValue();
+                result = Double.valueOf(leftValue) % Double.valueOf(rightValue);
+                expression.setTrackedValue(result.toString());
+                expression.setType("double");
+                statements.push(expression);
+                return;
+            default:
+                System.out.println("Unknown Multiplicative operator: " + operator);
+                return;
+        }
+    }
+
+
+    public void evaluateAdditiveExpression(ParserRuleContext ctx, String operator){
+        Expression expression;
+        String leftValue, rightValue;
+        Object result = null;
+        String type = null;
+
+        switch(operator){
+            case "+":
+                //Do something
+                System.out.println("ADD Expression");
+                expression = (Expression) statements.pop();
+                Expression expr1 = expression.getMembers().get(0);
+                Expression expr2 = expression.getMembers().get(1);
+                if((expr1.getType().equals("int") ||
+                expr1.getType().equals("double") || expr1.getType().equals("char")) && 
+                (expr2.getType().equals("int") || expr2.getType().equals("double") ||
+                expr2.getType().equals("char"))){
+                    Double value, anotherValue;
+                    value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
+                    anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
+                    result = value + anotherValue;
+                    type = "double"; 
+                } else if(expr1.getType().equals("String") || expr2.getType().equals("String")){
+                    result = expr1.getTrackedValue() + expr2.getTrackedValue();
+                    System.out.println(result.toString());
+                    type = "String";
+                } else {
+                    statements.push(expression);
+                    return;
+                }
+
+                expression.setTrackedValue(result.toString());
+                expression.setType(type);
+                statements.push(expression);
+                return;
+            case "-":
+                //Do something
+                System.out.println("SUB Expression");
+                expression = (Expression) statements.pop();
+                leftValue = expression.getMembers().get(0).getTrackedValue();
+                rightValue = expression.getMembers().get(1).getTrackedValue();
+                result = Double.valueOf(leftValue) - Double.valueOf(rightValue);
+                expression.setTrackedValue(result.toString());
+                expression.setType("double");
+                statements.push(expression);
+                return;
+            default:
+                System.out.println("Unknown Additive operator: " + operator);
+                return;
+        }
+    }
+
+
+    public void evaluateEqualityExpression(ParserRuleContext ctx, String operator){
+        Expression expression = (Expression) statements.pop();
+        Expression expr1 = expression.getMembers().get(0);
+        Expression expr2 = expression.getMembers().get(1); 
+        Object result;
+        double epsilon = 0.000001d;
+        switch(operator){
+            case "==":
+                System.out.println("EQUALS");
+                if((expr1.getType().equals("int") ||
+                expr1.getType().equals("double") || expr1.getType().equals("char")) && 
+                (expr2.getType().equals("int") || expr2.getType().equals("double") ||
+                expr2.getType().equals("char"))){
+                    Double value, anotherValue;
+                    value = expr1.getType().equals("char") ? 
+                    (char)expr1.getTrackedValue().toCharArray()[1] : 
+                    Double.valueOf(expr1.getTrackedValue());
+                    anotherValue = expr2.getType().equals("char") ? 
+                    (char)expr2.getTrackedValue().toCharArray()[1] : 
+                    Double.valueOf(expr2.getTrackedValue());
+                    result = Math.abs(value - anotherValue) < epsilon;
+                } else if(expr1.getType().equals("boolean") && expr2.getType().equals("boolean")){
+                    result = Boolean.valueOf(expr1.getTrackedValue()) == Boolean.valueOf(expr2.getTrackedValue());
+                } else if(expr1.getType().equals("String") && expr2.getType().equals("String")){
+                    result = expr1.getTrackedValue().equals(expr2.getTrackedValue());
+                } else {
+                    statements.push(expression);
+                    return;
+                }
+                expression.setTrackedValue(result.toString());
+                expression.setType("boolean");
+                statements.push(expression);
+                return;
+            case "!=":
+                System.out.println("NOTEQUALS");
+                if((expr1.getType().equals("int") ||
+                expr1.getType().equals("double") || expr1.getType().equals("char")) && 
+                (expr2.getType().equals("int") || expr2.getType().equals("double") ||
+                expr2.getType().equals("char"))){
+                    Double value, anotherValue;
+                    value = expr1.getType().equals("char") ? 
+                    (char)expr1.getTrackedValue().toCharArray()[1] : 
+                    Double.valueOf(expr1.getTrackedValue());
+                    anotherValue = expr2.getType().equals("char") ? 
+                    (char)expr2.getTrackedValue().toCharArray()[1] : 
+                    Double.valueOf(expr2.getTrackedValue());
+                    result = Math.abs(value - anotherValue) >= epsilon;
+                } else if(expr1.getType().equals("boolean") && expr2.getType().equals("boolean")){
+                    result = Boolean.valueOf(expr1.getTrackedValue()) != Boolean.valueOf(expr2.getTrackedValue());
+                } else if(expr1.getType().equals("String") && expr2.getType().equals("String")){
+                    result = !expr1.getTrackedValue().equals(expr2.getTrackedValue());
+                } else {
+                    statements.push(expression);
+                    return;
+                }
+                expression.setTrackedValue(result.toString());
+                expression.setType("boolean");
+                statements.push(expression);
+                return;
+            default:
+                System.out.println("Unknown Equality operator: " + operator);
+                statements.push(expression);
+                return;
+        }
     }
 
 
@@ -375,9 +549,9 @@ public class GastBuilder {
     public void trackExpressionValue(){
         Expression expression = (Expression) statements.pop();
         //Most likely this expression only has one element
-        if(expression.getTrackedValue() == null && expression.getMembers().size() > 0){
+        if(expression.getTrackedValue() == null && expression.getMembers().size() == 1){
             expression.setTrackedValue(expression.getMembers().get(0).getTrackedValue());
-            //System.out.println(expression.getTrackedValue());
+            expression.setType(expression.getMembers().get(0).getType());
         }
         statements.push(expression);
     }

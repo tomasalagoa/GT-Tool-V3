@@ -8,8 +8,8 @@ import org.antlr.v4.runtime.ParserRuleContext;
 @Data
 @NoArgsConstructor
 public class Constant extends Expression {
-    public Constant(ParserRuleContext ctx, Object value) {
-        super(ctx, value.toString());
+    public Constant(ParserRuleContext ctx, Object value, String type) {
+        super(ctx, value.toString(), type);
         this.value = value;
         this.trackedValue = value.toString();
     }
