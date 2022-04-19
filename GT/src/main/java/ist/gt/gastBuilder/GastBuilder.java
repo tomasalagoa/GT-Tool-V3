@@ -132,7 +132,7 @@ public class GastBuilder {
         else if(!currentFunction.getVariables().containsKey(var.getName()) &&
         currentFunction.getParameters().containsKey(var.getName())){
             var = currentFunction.getParameters().get(var.getName());
-            }
+        }
         currentFunction.getVariables().putIfAbsent(var.getName(), var);
         processExpression(var);
         return var;
@@ -289,21 +289,28 @@ public class GastBuilder {
     }
 
     
-    /* NEW FUNCTIONS FOR VALUE TRACKING
+    /* NEW FUNCTIONS FOR VALUE TRACKING (Java only for now)
     */
     //TODO Verify if it is possible to make the code cleaner later
     public void evaluateRelationalExpression(ParserRuleContext ctx, String operator){
-        Expression expression;
-        String leftValue, rightValue;
+        Expression expression = (Expression) statements.pop();
+        Expression expr1 = expression.getMembers().get(0);
+        Expression expr2 = expression.getMembers().get(1);
         Boolean result;
+        Double value, anotherValue;
+
+        if(expr1.getTrackedValue() == null || expr2.getTrackedValue() == null){
+            statements.push(expression);
+            return;
+        }
+
         switch(operator){
             case ">":
                 //Do something
                 System.out.println("GT Expression");
-                expression = (Expression) statements.pop();
-                leftValue = expression.getMembers().get(0).getTrackedValue();
-                rightValue = expression.getMembers().get(1).getTrackedValue();
-                result = Double.valueOf(leftValue) > Double.valueOf(rightValue);
+                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
+                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
+                result = value > anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("boolean");
                 statements.push(expression);
@@ -311,12 +318,9 @@ public class GastBuilder {
             case ">=":
                 //Do something
                 System.out.println("GE Expression");
-                expression = (Expression) statements.pop();
-                //System.out.println(expression.getMembers().get(0).toString());
-                //System.out.println(expression.getMembers().get(1).toString());
-                leftValue = expression.getMembers().get(0).getTrackedValue();
-                rightValue = expression.getMembers().get(1).getTrackedValue();
-                result = Double.valueOf(leftValue) >= Double.valueOf(rightValue);
+                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
+                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
+                result = value >= anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("boolean");
                 statements.push(expression);
@@ -324,12 +328,9 @@ public class GastBuilder {
             case "<":
                 //Do something
                 System.out.println("LT Expression");
-                expression = (Expression) statements.pop();
-                //System.out.println(expression.getMembers().get(0).toString());
-                //System.out.println(expression.getMembers().get(1).toString());
-                leftValue = expression.getMembers().get(0).getTrackedValue();
-                rightValue = expression.getMembers().get(1).getTrackedValue();
-                result = Double.valueOf(leftValue) < Double.valueOf(rightValue);
+                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
+                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
+                result = value < anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("boolean");
                 statements.push(expression);
@@ -337,12 +338,9 @@ public class GastBuilder {
             case "<=":
                 //Do something
                 System.out.println("LE Expression");
-                expression = (Expression) statements.pop();
-                //System.out.println(expression.getMembers().get(0).toString());
-                //System.out.println(expression.getMembers().get(1).toString());
-                leftValue = expression.getMembers().get(0).getTrackedValue();
-                rightValue = expression.getMembers().get(1).getTrackedValue();
-                result = Double.valueOf(leftValue) <= Double.valueOf(rightValue);
+                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
+                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
+                result = value <= anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("boolean");
                 statements.push(expression);
@@ -351,13 +349,6 @@ public class GastBuilder {
             case "instanceof":
                 //Do something
                 System.out.println("INSTANCEOF Expression");
-                expression = (Expression) statements.pop();
-                //System.out.println(expression.getMembers().get(0).toString());
-                //System.out.println(expression.getMembers().get(1).toString());
-                leftValue = expression.getMembers().get(0).getTrackedValue();
-                rightValue = expression.getMembers().get(1).getTrackedValue();
-                //result = Double.valueOf(leftValue) instanceof Double.valueOf(rightValue);
-                //expression.setTrackedValue(result.toString());
                 statements.push(expression);
                 return;
             default:
@@ -369,18 +360,23 @@ public class GastBuilder {
 
 
     public void evaluateMultiplicativeExpression(ParserRuleContext ctx, String operator){
-        Expression expression;
-        String leftValue, rightValue;
-        Double result;
+        Expression expression = (Expression) statements.pop();
+        Expression expr1 = expression.getMembers().get(0);
+        Expression expr2 = expression.getMembers().get(1);
+        Double result, value, anotherValue;
+
+        if(expr1.getTrackedValue() == null || expr2.getTrackedValue() == null){
+            statements.push(expression);
+            return;
+        }
 
         switch(operator){
             case "*":
                 //Do something
                 System.out.println("MUL Expression");
-                expression = (Expression) statements.pop();
-                leftValue = expression.getMembers().get(0).getTrackedValue();
-                rightValue = expression.getMembers().get(1).getTrackedValue();
-                result = Double.valueOf(leftValue) * Double.valueOf(rightValue);
+                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
+                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
+                result = value * anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("double");
                 statements.push(expression);
@@ -388,10 +384,9 @@ public class GastBuilder {
             case "/":
                 //Do something
                 System.out.println("DIV Expression");
-                expression = (Expression) statements.pop();
-                leftValue = expression.getMembers().get(0).getTrackedValue();
-                rightValue = expression.getMembers().get(1).getTrackedValue();
-                result = Double.valueOf(leftValue) / Double.valueOf(rightValue);
+                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
+                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
+                result = value / anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("double");
                 statements.push(expression);
@@ -399,10 +394,9 @@ public class GastBuilder {
             case "%":
                 //Do something
                 System.out.println("MOD Expression");
-                expression = (Expression) statements.pop();
-                leftValue = expression.getMembers().get(0).getTrackedValue();
-                rightValue = expression.getMembers().get(1).getTrackedValue();
-                result = Double.valueOf(leftValue) % Double.valueOf(rightValue);
+                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
+                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
+                result = value % anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("double");
                 statements.push(expression);
@@ -415,23 +409,26 @@ public class GastBuilder {
 
 
     public void evaluateAdditiveExpression(ParserRuleContext ctx, String operator){
-        Expression expression;
-        String leftValue, rightValue;
+        Expression expression = (Expression) statements.pop();
+        Expression expr1 = expression.getMembers().get(0);
+        Expression expr2 = expression.getMembers().get(1);
+        Double value, anotherValue;
         Object result = null;
         String type = null;
+
+        if(expr1.getTrackedValue() == null || expr2.getTrackedValue() == null){
+            statements.push(expression);
+            return;
+        }
 
         switch(operator){
             case "+":
                 //Do something
                 System.out.println("ADD Expression");
-                expression = (Expression) statements.pop();
-                Expression expr1 = expression.getMembers().get(0);
-                Expression expr2 = expression.getMembers().get(1);
                 if((expr1.getType().equals("int") ||
                 expr1.getType().equals("double") || expr1.getType().equals("char")) && 
                 (expr2.getType().equals("int") || expr2.getType().equals("double") ||
                 expr2.getType().equals("char"))){
-                    Double value, anotherValue;
                     value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
                     anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
                     result = value + anotherValue;
@@ -452,10 +449,9 @@ public class GastBuilder {
             case "-":
                 //Do something
                 System.out.println("SUB Expression");
-                expression = (Expression) statements.pop();
-                leftValue = expression.getMembers().get(0).getTrackedValue();
-                rightValue = expression.getMembers().get(1).getTrackedValue();
-                result = Double.valueOf(leftValue) - Double.valueOf(rightValue);
+                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
+                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());    
+                result = value - anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("double");
                 statements.push(expression);
@@ -473,6 +469,12 @@ public class GastBuilder {
         Expression expr2 = expression.getMembers().get(1); 
         Object result;
         double epsilon = 0.000001d;
+
+        if(expr1.getTrackedValue() == null || expr2.getTrackedValue() == null){
+            statements.push(expression);
+            return;
+        }
+
         switch(operator){
             case "==":
                 System.out.println("EQUALS");
@@ -537,11 +539,13 @@ public class GastBuilder {
     public void trackLeftVariableValue(){
         //Updating left variable value in assignment and in current function
         Assignment assignment = (Assignment) statements.pop();
-        Variable tmpVar = (Variable) assignment.getLeft();
-        Variable var = currentFunction.getVariables().get(tmpVar.getName());
-        var.setTrackedValue(assignment.getRight().getTrackedValue());
-        currentFunction.getVariables().replace(var.getName(), var);
-        assignment.setLeft(var);
+        if(assignment.getRight() != null){
+            Variable tmpVar = (Variable) assignment.getLeft();
+            Variable var = currentFunction.getVariables().get(tmpVar.getName());
+            var.setTrackedValue(assignment.getRight().getTrackedValue());
+            currentFunction.getVariables().replace(var.getName(), var);
+            assignment.setLeft(var);
+        }
         statements.push(assignment);
     }
 

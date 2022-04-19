@@ -320,15 +320,31 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
         if (statement.getStatement() != null) //TODO happens because in php assignments go under this
             statement.getStatement().accept(this);
     }
-
+    //TODO: Changed this function
     @Override
     public void visit(IfStatement ifStatement) {
+        Expression ifExpr = ifStatement.getExpression();
+        boolean conditionFulfilled = false;
         if (!ifStatement.isFullyExplored()) {
-            currentPath.add(ifStatement);
-            codeBlocks.forEach(codeBlock -> codeBlock.setFullyExplored(false));
-            ifStatement.getCodeBlock().accept(this);
-            currentPath.remove(ifStatement);
-            return;
+            if(ifExpr.getTrackedValue() != null || 
+            ifExpr.getType().equals("boolean")){
+                if(Boolean.parseBoolean(ifExpr.getTrackedValue())){
+                    conditionFulfilled = true;
+                    currentPath.add(ifStatement);
+                    ifStatement.getCodeBlock().accept(this);
+                    currentPath.remove(ifStatement);
+                    return;
+                } else{
+                    conditionFulfilled = false;
+                    ifStatement.getCodeBlock().setFullyExplored(true);
+                }
+            } else {
+                currentPath.add(ifStatement);
+                codeBlocks.forEach(codeBlock -> codeBlock.setFullyExplored(false));
+                ifStatement.getCodeBlock().accept(this);
+                currentPath.remove(ifStatement);
+                return;
+            }
         }
 
         IfStatement firstNotExploredElseIf = ifStatement.getElseIfs().stream().filter(stmt -> !stmt.isFullyExplored()).findFirst().orElse(null);
@@ -338,7 +354,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
             return;
         }
 
-        if (ifStatement.getElseBlock() != null && !ifStatement.getElseBlock().isFullyExplored()) {
+        if (ifStatement.getElseBlock() != null && !ifStatement.getElseBlock().isFullyExplored()
+        && !conditionFulfilled) {
             ifStatement.getElseBlock().accept(this);
         }
     }
