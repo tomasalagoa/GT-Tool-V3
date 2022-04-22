@@ -320,13 +320,15 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
         if (statement.getStatement() != null) //TODO happens because in php assignments go under this
             statement.getStatement().accept(this);
     }
-    //TODO: Changed this function
+
+    //TODO: Check if code can be cleaner
     @Override
     public void visit(IfStatement ifStatement) {
         Expression ifExpr = ifStatement.getExpression();
         boolean conditionFulfilled = false;
+
         if (!ifStatement.isFullyExplored()) {
-            if(ifExpr.getTrackedValue() != null || 
+            if(ifExpr.getTrackedValue() != null && 
             ifExpr.getType().equals("boolean")){
                 if(Boolean.parseBoolean(ifExpr.getTrackedValue())){
                     conditionFulfilled = true;
@@ -347,15 +349,39 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
             }
         }
 
-        IfStatement firstNotExploredElseIf = ifStatement.getElseIfs().stream().filter(stmt -> !stmt.isFullyExplored()).findFirst().orElse(null);
+        /*IfStatement firstNotExploredElseIf = ifStatement.getElseIfs().stream().filter(stmt -> !stmt.isFullyExplored()).findFirst().orElse(null);
 
         if (firstNotExploredElseIf != null) {
             firstNotExploredElseIf.accept(this);
             return;
+        }*/
+        //Check all else if statements until a condition is evaluated to true.
+        //Will still have some impossible paths in more complex and difficult to
+        //analyse conditions.
+        if(ifStatement.getElseIfs() != null && ifStatement.getElseIfs().size() > 0){
+            for(IfStatement elseIf : ifStatement.getElseIfs()){
+                if(!elseIf.isFullyExplored()){
+                    if(elseIf.getExpression().getTrackedValue() != null && 
+                    elseIf.getExpression().getType().equals("boolean")){
+                        //Found an else if with a true condition
+                        if(Boolean.parseBoolean(elseIf.getExpression().getTrackedValue())){
+                            conditionFulfilled = true;
+                            elseIf.accept(this);
+                            return;
+                        } else{
+                            conditionFulfilled = false;
+                            elseIf.getCodeBlock().setFullyExplored(true);
+                        }
+                    } else{
+                        elseIf.accept(this);
+                        return;
+                    }
+                }
+            }
         }
 
         if (ifStatement.getElseBlock() != null && !ifStatement.getElseBlock().isFullyExplored()
-        && !conditionFulfilled) {
+        && ifStatement.getElseBlock().getStatements().size() > 0 && !conditionFulfilled) {
             ifStatement.getElseBlock().accept(this);
         }
     }

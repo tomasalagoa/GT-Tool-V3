@@ -75,7 +75,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
         } else if(ctx.NullLiteral() != null){
             System.out.println("Null");
             System.out.println(ctx.NullLiteral().getText());
-            gastBuilder.addConstant(ctx, ctx.getText(), null);
+            gastBuilder.addConstant(ctx, ctx.getText(), "null");
         }
         //gastBuilder.addConstant(ctx, ctx.getText());
         
