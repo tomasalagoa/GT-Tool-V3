@@ -8,8 +8,6 @@ import lombok.Data;
 
 import java.util.Stack;
 
-import org.antlr.v4.runtime.tree.ParseTree;
-
 @Data
 public class JavaFileListener extends Java8ParserBaseListener {
 
@@ -50,40 +48,25 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void enterLiteral(Java8Parser.LiteralContext ctx) {
         if(ctx.BooleanLiteral() != null){
-            System.out.println("Boolean");
-            System.out.println(ctx.BooleanLiteral().getText());
             gastBuilder.addConstant(ctx, ctx.getText(), "boolean");
         } else if(ctx.IntegerLiteral() != null){
-            System.out.println("Integer");
-            System.out.println(ctx.IntegerLiteral().getText());
             gastBuilder.addConstant(ctx, ctx.getText(), "int");
         } else if(ctx.FloatingPointLiteral() != null){
-            System.out.println("Float/Double");
-            System.out.println(ctx.FloatingPointLiteral().getText());
             gastBuilder.addConstant(ctx, ctx.getText(), "double");
         } else if(ctx.CharacterLiteral() != null){
-            System.out.println("Char");
-            System.out.println(ctx.CharacterLiteral().getText());
             gastBuilder.addConstant(ctx, ctx.getText(), "char");
         } else if(ctx.StringLiteral() != null){
-            System.out.println("String");
-            System.out.println(ctx.getText());
             //Remove quotes from ctx text due to the appearance of double quotes later on
             String rmvQuotes = ctx.getText().substring(1, ctx.getText().length()-1).replace("\"\"", "\"");
-            System.out.println(rmvQuotes);
             gastBuilder.addConstant(ctx, rmvQuotes, "String");
         } else if(ctx.NullLiteral() != null){
-            System.out.println("Null");
-            System.out.println(ctx.NullLiteral().getText());
             gastBuilder.addConstant(ctx, ctx.getText(), "null");
         }
-        //gastBuilder.addConstant(ctx, ctx.getText());
         
     }
 
     @Override
     public void enterConditionalExpression(Java8Parser.ConditionalExpressionContext ctx) {
-        //gastBuilder.addExpression(ctx);
         if(isConditionalExpression(ctx)){
             gastBuilder.addExpression(ctx);
         }
@@ -91,23 +74,18 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void exitConditionalExpression(Java8Parser.ConditionalExpressionContext ctx) {
-        //System.out.println("Removing Conditional Expression? " + isConditionalExpression(ctx) + " -> " + ctx.getText());
         if(isConditionalExpression(ctx)){
             gastBuilder.exitStatementOrExpression();
-            //System.out.println("Removed from stack");
         }
     }
 
     /*  Experimental function: ConditionalExpression is of the form: expression ? expression : expression;
-        However, it also appears in other expressions for some reason and adds noise to the analysis sometimes
     */
     public boolean isConditionalExpression(Java8Parser.ConditionalExpressionContext ctx){
         if(ctx.getToken(Java8Parser.QUESTION, 0) != null && ctx.getToken(Java8Parser.COLON, 0) != null){
-            //System.out.println("A conditional expression was found -> " + ctx.getText());
             return true;
         }
 
-        //System.out.println("Well, not a conditional expression after all -> " + ctx.getText());
         return false;
     }
 
@@ -472,48 +450,48 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void exitRelationalExpression(Java8Parser.RelationalExpressionContext ctx){
         if(ctx.GE() != null){
-            gastBuilder.evaluateRelationalExpression(ctx, ctx.GE().getText());
+            gastBuilder.addExpressionOperator(ctx.GE().getText());
         } else if(ctx.GT() != null){
-            gastBuilder.evaluateRelationalExpression(ctx, ctx.GT().getText());
+            gastBuilder.addExpressionOperator(ctx.GT().getText());
         } else if(ctx.LE() != null){
-            gastBuilder.evaluateRelationalExpression(ctx, ctx.LE().getText());
+            gastBuilder.addExpressionOperator(ctx.LE().getText());
         } else if(ctx.LT() != null){
-            gastBuilder.evaluateRelationalExpression(ctx, ctx.LT().getText());
+            gastBuilder.addExpressionOperator(ctx.LT().getText());
         } else if(ctx.INSTANCEOF() != null){
-            gastBuilder.evaluateRelationalExpression(ctx, ctx.INSTANCEOF().getText());
+            gastBuilder.addExpressionOperator(ctx.INSTANCEOF().getText());
         }
-        System.out.println("Exiting relational expr");
+        //System.out.println("Exiting relational expr");
     }
 
     @Override
     public void exitMultiplicativeExpression(Java8Parser.MultiplicativeExpressionContext ctx){
         if(ctx.MUL() != null){
-            gastBuilder.evaluateMultiplicativeExpression(ctx, ctx.MUL().getText());
+            gastBuilder.addExpressionOperator(ctx.MUL().getText());
         } else if(ctx.DIV() != null){
-            gastBuilder.evaluateMultiplicativeExpression(ctx, ctx.DIV().getText());
+            gastBuilder.addExpressionOperator(ctx.DIV().getText());
         } else if(ctx.MOD() != null){
-            gastBuilder.evaluateMultiplicativeExpression(ctx, ctx.MOD().getText());
+            gastBuilder.addExpressionOperator(ctx.MOD().getText());
         }
-        System.out.println("Exiting multiplicative expr");
+        //System.out.println("Exiting multiplicative expr");
     }
 
     @Override
     public void exitEqualityExpression(Java8Parser.EqualityExpressionContext ctx){
         if(ctx.EQUAL() != null){
-            gastBuilder.evaluateEqualityExpression(ctx, ctx.EQUAL().getText());
+            gastBuilder.addExpressionOperator(ctx.EQUAL().getText());
         } else if(ctx.NOTEQUAL() != null){
-            gastBuilder.evaluateEqualityExpression(ctx, ctx.NOTEQUAL().getText());
+            gastBuilder.addExpressionOperator(ctx.NOTEQUAL().getText());
         }
-        System.out.println("Exiting equality expr");
+        //System.out.println("Exiting equality expr");
     }
 
     @Override
     public void exitAdditiveExpression(Java8Parser.AdditiveExpressionContext ctx){
         if(ctx.ADD() != null){
-            gastBuilder.evaluateAdditiveExpression(ctx, ctx.ADD().getText());
+            gastBuilder.addExpressionOperator(ctx.ADD().getText());
         } else if(ctx.SUB() != null){
-            gastBuilder.evaluateAdditiveExpression(ctx, ctx.SUB().getText());
+            gastBuilder.addExpressionOperator(ctx.SUB().getText());
         }
-        System.out.println("Exiting additive expr");
+        //System.out.println("Exiting additive expr");
     }
 }

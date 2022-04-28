@@ -5,7 +5,6 @@ import ist.gt.model.*;
 import ist.gt.util.Util;
 import lombok.Data;
 
-import org.antlr.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.ParserRuleContext;
 
 import java.util.Stack;
@@ -289,257 +288,12 @@ public class GastBuilder {
     }
 
     
-    /* NEW FUNCTIONS FOR VALUE TRACKING (Java only for now)
+    /* New functions for value tracking (Java only for now)
     */
-    //TODO Verify if it is possible to make the code cleaner later
-    public void evaluateRelationalExpression(ParserRuleContext ctx, String operator){
-        Expression expression = (Expression) statements.pop();
-        Expression expr1 = expression.getMembers().get(0);
-        Expression expr2 = expression.getMembers().get(1);
-        Boolean result;
-        Double value, anotherValue;
-
-        if(expr1.getTrackedValue() == null || expr2.getTrackedValue() == null){
-            statements.push(expression);
-            return;
-        }
-
-        switch(operator){
-            case ">":
-                //Do something
-                System.out.println("GT Expression");
-                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
-                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
-                result = value > anotherValue;
-                expression.setTrackedValue(result.toString());
-                expression.setType("boolean");
-                statements.push(expression);
-                return;
-            case ">=":
-                //Do something
-                System.out.println("GE Expression");
-                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
-                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
-                result = value >= anotherValue;
-                expression.setTrackedValue(result.toString());
-                expression.setType("boolean");
-                statements.push(expression);
-                return;
-            case "<":
-                //Do something
-                System.out.println("LT Expression");
-                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
-                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
-                result = value < anotherValue;
-                expression.setTrackedValue(result.toString());
-                expression.setType("boolean");
-                statements.push(expression);
-                return;
-            case "<=":
-                //Do something
-                System.out.println("LE Expression");
-                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
-                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
-                result = value <= anotherValue;
-                expression.setTrackedValue(result.toString());
-                expression.setType("boolean");
-                statements.push(expression);
-                return;
-            //TODO Should I care about this one? Instanceof seems a tough nut to crack
-            case "instanceof":
-                //Do something
-                System.out.println("INSTANCEOF Expression");
-                statements.push(expression);
-                return;
-            default:
-                System.out.println("Unknown Relational operator: " + operator);
-                return;
-        }
-    
-    }
-
-
-    public void evaluateMultiplicativeExpression(ParserRuleContext ctx, String operator){
-        Expression expression = (Expression) statements.pop();
-        Expression expr1 = expression.getMembers().get(0);
-        Expression expr2 = expression.getMembers().get(1);
-        Double result, value, anotherValue;
-
-        if(expr1.getTrackedValue() == null || expr2.getTrackedValue() == null){
-            statements.push(expression);
-            return;
-        }
-
-        switch(operator){
-            case "*":
-                //Do something
-                System.out.println("MUL Expression");
-                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
-                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
-                result = value * anotherValue;
-                expression.setTrackedValue(result.toString());
-                expression.setType("double");
-                statements.push(expression);
-                return;
-            case "/":
-                //Do something
-                System.out.println("DIV Expression");
-                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
-                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
-                result = value / anotherValue;
-                expression.setTrackedValue(result.toString());
-                expression.setType("double");
-                statements.push(expression);
-                return;
-            case "%":
-                //Do something
-                System.out.println("MOD Expression");
-                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
-                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
-                result = value % anotherValue;
-                expression.setTrackedValue(result.toString());
-                expression.setType("double");
-                statements.push(expression);
-                return;
-            default:
-                System.out.println("Unknown Multiplicative operator: " + operator);
-                return;
-        }
-    }
-
-
-    public void evaluateAdditiveExpression(ParserRuleContext ctx, String operator){
-        Expression expression = (Expression) statements.pop();
-        Expression expr1 = expression.getMembers().get(0);
-        Expression expr2 = expression.getMembers().get(1);
-        Double value, anotherValue;
-        Object result = null;
-        String type = null;
-
-        if(expr1.getTrackedValue() == null || expr2.getTrackedValue() == null){
-            statements.push(expression);
-            return;
-        }
-
-        switch(operator){
-            case "+":
-                //Do something
-                System.out.println("ADD Expression");
-                if((expr1.getType().equals("int") ||
-                expr1.getType().equals("double") || expr1.getType().equals("char")) && 
-                (expr2.getType().equals("int") || expr2.getType().equals("double") ||
-                expr2.getType().equals("char"))){
-                    value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
-                    anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
-                    result = value + anotherValue;
-                    type = "double"; 
-                } else if(expr1.getType().equals("String") || expr2.getType().equals("String")){
-                    result = expr1.getTrackedValue() + expr2.getTrackedValue();
-                    System.out.println(result.toString());
-                    type = "String";
-                } else {
-                    statements.push(expression);
-                    return;
-                }
-
-                expression.setTrackedValue(result.toString());
-                expression.setType(type);
-                statements.push(expression);
-                return;
-            case "-":
-                //Do something
-                System.out.println("SUB Expression");
-                value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
-                anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());    
-                result = value - anotherValue;
-                expression.setTrackedValue(result.toString());
-                expression.setType("double");
-                statements.push(expression);
-                return;
-            default:
-                System.out.println("Unknown Additive operator: " + operator);
-                return;
-        }
-    }
-
-
-    public void evaluateEqualityExpression(ParserRuleContext ctx, String operator){
-        Expression expression = (Expression) statements.pop();
-        Expression expr1 = expression.getMembers().get(0);
-        Expression expr2 = expression.getMembers().get(1); 
-        Object result;
-        double epsilon = 0.000001d;
-
-        if(expr1.getTrackedValue() == null || expr2.getTrackedValue() == null){
-            statements.push(expression);
-            return;
-        }
-
-        switch(operator){
-            case "==":
-                System.out.println("EQUALS");
-                if((expr1.getType().equals("int") ||
-                expr1.getType().equals("double") || expr1.getType().equals("char")) && 
-                (expr2.getType().equals("int") || expr2.getType().equals("double") ||
-                expr2.getType().equals("char"))){
-                    Double value, anotherValue;
-                    value = expr1.getType().equals("char") ? 
-                    (char)expr1.getTrackedValue().toCharArray()[1] : 
-                    Double.valueOf(expr1.getTrackedValue());
-                    anotherValue = expr2.getType().equals("char") ? 
-                    (char)expr2.getTrackedValue().toCharArray()[1] : 
-                    Double.valueOf(expr2.getTrackedValue());
-                    result = Math.abs(value - anotherValue) < epsilon;
-                } else if(expr1.getType().equals("boolean") && expr2.getType().equals("boolean")){
-                    result = Boolean.valueOf(expr1.getTrackedValue()) == Boolean.valueOf(expr2.getTrackedValue());
-                } else if(expr1.getType().equals("String") && expr2.getType().equals("String")){
-                    result = expr1.getTrackedValue().equals(expr2.getTrackedValue());
-                } else {
-                    statements.push(expression);
-                    return;
-                }
-                expression.setTrackedValue(result.toString());
-                expression.setType("boolean");
-                statements.push(expression);
-                return;
-            case "!=":
-                System.out.println("NOTEQUALS");
-                if((expr1.getType().equals("int") ||
-                expr1.getType().equals("double") || expr1.getType().equals("char")) && 
-                (expr2.getType().equals("int") || expr2.getType().equals("double") ||
-                expr2.getType().equals("char"))){
-                    Double value, anotherValue;
-                    value = expr1.getType().equals("char") ? 
-                    (char)expr1.getTrackedValue().toCharArray()[1] : 
-                    Double.valueOf(expr1.getTrackedValue());
-                    anotherValue = expr2.getType().equals("char") ? 
-                    (char)expr2.getTrackedValue().toCharArray()[1] : 
-                    Double.valueOf(expr2.getTrackedValue());
-                    result = Math.abs(value - anotherValue) >= epsilon;
-                } else if(expr1.getType().equals("boolean") && expr2.getType().equals("boolean")){
-                    result = Boolean.valueOf(expr1.getTrackedValue()) != Boolean.valueOf(expr2.getTrackedValue());
-                } else if(expr1.getType().equals("String") && expr2.getType().equals("String")){
-                    result = !expr1.getTrackedValue().equals(expr2.getTrackedValue());
-                } else {
-                    statements.push(expression);
-                    return;
-                }
-                expression.setTrackedValue(result.toString());
-                expression.setType("boolean");
-                statements.push(expression);
-                return;
-            default:
-                System.out.println("Unknown Equality operator: " + operator);
-                statements.push(expression);
-                return;
-        }
-    }
-
-
     public void trackLeftVariableValue(){
         //Updating left variable value in assignment and in current function
         Assignment assignment = (Assignment) statements.pop();
-        if(assignment.getRight() != null){
+        if(assignment.getRight() != null && assignment.getRight().getType() != null){
             Variable tmpVar = (Variable) assignment.getLeft();
             Variable var = currentFunction.getVariables().get(tmpVar.getName());
             var.setTrackedValue(assignment.getRight().getTrackedValue());
@@ -552,11 +306,19 @@ public class GastBuilder {
 
     public void trackExpressionValue(){
         Expression expression = (Expression) statements.pop();
+
         //Most likely this expression only has one element
         if(expression.getTrackedValue() == null && expression.getMembers().size() == 1){
             expression.setTrackedValue(expression.getMembers().get(0).getTrackedValue());
             expression.setType(expression.getMembers().get(0).getType());
         }
+
+        statements.push(expression);
+    }
+
+    public void addExpressionOperator(String operator){
+        Expression expression = (Expression) statements.pop();
+        expression.setOperator(operator);
         statements.push(expression);
     }
 }

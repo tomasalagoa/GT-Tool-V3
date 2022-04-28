@@ -1,6 +1,7 @@
 package ist.gt.model;
 
 import ist.gt.gastBuilder.AstBuilderVisitorInterface;
+import ist.gt.gastBuilder.ValueTrackingInterface;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -28,6 +29,7 @@ public class Expression extends Statement {
 
     private List<Expression> members = new ArrayList<>();
     private String trackedValue;
+    private String operator;
     //Mostly used for Constants & Variables, helping in value tracking
     private String type;
 
@@ -38,5 +40,10 @@ public class Expression extends Statement {
 
     public void accept(AstBuilderVisitorInterface visitor) {
         visitor.visit(this);
+    }
+
+    @Override
+    public void addValue(ValueTrackingInterface tracker) {
+        tracker.track(this);
     }
 }

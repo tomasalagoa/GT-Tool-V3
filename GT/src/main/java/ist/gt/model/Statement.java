@@ -1,6 +1,7 @@
 package ist.gt.model;
 
 import ist.gt.gastBuilder.AstBuilderVisitorInterface;
+import ist.gt.gastBuilder.ValueTrackingInterface;
 import lombok.NoArgsConstructor;
 import org.antlr.v4.runtime.ParserRuleContext;
 
@@ -13,4 +14,6 @@ public abstract class Statement extends Taintable {
     public void accept(AstBuilderVisitorInterface visitor) {
 
     }
+
+    public abstract void addValue(ValueTrackingInterface tracker);
 }

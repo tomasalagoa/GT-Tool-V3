@@ -1,6 +1,7 @@
 package ist.gt.model;
 
 import ist.gt.gastBuilder.AstBuilderVisitorInterface;
+import ist.gt.gastBuilder.ValueTrackingInterface;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -32,5 +33,9 @@ public class ConditionalStatement extends Statement {
     @Override
     public void accept(AstBuilderVisitorInterface visitor) {
         visitor.visit(this);
+    }
+
+    public void addValue(ValueTrackingInterface tracker){
+        //Nothing to track here
     }
 }

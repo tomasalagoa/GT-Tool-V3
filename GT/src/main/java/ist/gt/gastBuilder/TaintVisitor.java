@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Data
-public class TaintVisitor implements AstBuilderVisitorInterface {
+public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingInterface {
 
     private final List<File> files;
     private final Stack<CodeBlock> codeBlocks = new Stack<>();
@@ -130,6 +130,12 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
         for (int i = 0; i < function.getParameters().size() && i < functionCall.getMembers().size(); i++) {
             functionCall.getMembers().get(i).accept(this);
             function.getParameters().getElement(i).setTainted(functionCall.getMembers().get(i).isTainted());
+            //Value tracking of parameters
+            Expression parameter = functionCall.getMembers().get(i);
+            if(parameter.getType() != null){
+                function.getParameters().getElement(i).setTrackedValue(parameter.getTrackedValue());
+                function.getParameters().getElement(i).setType(parameter.getType());
+            }
         }
         function.accept(new TaintVisitor(files, spec, functionNames, file, clazz));
         functionCall.setTainted(function.getCodeBlock().isReturnTainted());
@@ -179,6 +185,10 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
         if (assignment.getRight() == null) //when is only a var declaration
             return;
         assignment.getRight().accept(this);
+
+        //Perform value tracking
+        assignment.addValue(this);
+
         propagateSetTainted(assignment.getLeft(), assignment.getRight().isTainted());
         assignment.setTainted(assignment.getRight().isTainted());
         assignment.getLeft().setTainted(assignment.getRight().isTainted());
@@ -327,6 +337,10 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
         Expression ifExpr = ifStatement.getExpression();
         boolean conditionFulfilled = false;
 
+        if(ifExpr.getOperator() != null){
+            ifExpr.addValue(this);
+        }
+
         if (!ifStatement.isFullyExplored()) {
             if(ifExpr.getTrackedValue() != null && 
             ifExpr.getType().equals("boolean")){
@@ -349,18 +363,16 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
             }
         }
 
-        /*IfStatement firstNotExploredElseIf = ifStatement.getElseIfs().stream().filter(stmt -> !stmt.isFullyExplored()).findFirst().orElse(null);
-
-        if (firstNotExploredElseIf != null) {
-            firstNotExploredElseIf.accept(this);
-            return;
-        }*/
         //Check all else if statements until a condition is evaluated to true.
         //Will still have some impossible paths in more complex and difficult to
         //analyse conditions.
         if(ifStatement.getElseIfs() != null && ifStatement.getElseIfs().size() > 0){
             for(IfStatement elseIf : ifStatement.getElseIfs()){
                 if(!elseIf.isFullyExplored()){
+                    if(elseIf.getExpression().getOperator() != null){
+                        elseIf.getExpression().addValue(this);
+                    }
+
                     if(elseIf.getExpression().getTrackedValue() != null && 
                     elseIf.getExpression().getType().equals("boolean")){
                         //Found an else if with a true condition
@@ -511,7 +523,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
         } catch (Exception e) {
             tryCatch.getCatchBlock().forEach(block -> block.accept(this));
             tryCatch.getFinallyBlock().accept(this);
-            System.out.println("Fount return statement in catch clause " + e.getMessage());
+            System.out.println("Found return statement in catch clause " + e.getMessage());
         }
     }
 
@@ -535,6 +547,178 @@ public class TaintVisitor implements AstBuilderVisitorInterface {
         for (Expression expr : expression.getMembers()) {
             propagateSetTainted(expr, taint);
         }
+    }
+
+    /*
+     * New functions to help with value tracking
+     */
+    @Override
+    public void track(Assignment assignment){
+        if(assignment.getRight() != null){
+            Expression expression = assignment.getRight();
+            Variable variable = (Variable) assignment.getLeft();
+            
+            //Get expression's value
+            if(expression.getOperator() != null){
+                expression.addValue(this);
+            }
+
+            variable.setTrackedValue(expression.getTrackedValue());
+            variable.setType(expression.getType());
+            assignment.setLeft(variable);
+
+            if(currentPathVariables.containsKey(variable.getName())){
+                currentPathVariables.replace(variable.getName(), variable);
+            } else {
+                currentPathVariables.put(variable.getName(), variable);
+            }
+
+            if(functions.peek().getVariables().containsKey(variable.getName())){
+                functions.peek().getVariables().replace(variable.getName(), variable);
+            } 
+        }
+    }
+    //This will only be invoked if an expression has an operator
+    //TODO Check if case code can be cleaner
+    @Override
+    public void track(Expression expression){
+        Object result;
+        double value = 0.0, anotherValue = 0.0;
+        double epsilon = 0.000001d;
+        
+        //Check if its members also possess operators
+        for(Expression expr : expression.getMembers()){
+            if(expr.getOperator() != null){
+                expr.addValue(this);
+            }
+        }
+
+        Expression expr1 = expression.getMembers().get(0);
+        Expression expr2 = expression.getMembers().get(1);
+        if(expr1.getTrackedValue() == null || expr2.getTrackedValue() == null){
+            expression.setTrackedValue(null);
+            expression.setType("null");
+            return;
+        }
+
+        if((expr1.getType().equals("int") ||
+        expr1.getType().equals("double") || expr1.getType().equals("char")) && 
+        (expr2.getType().equals("int") || expr2.getType().equals("double") ||
+        expr2.getType().equals("char"))){
+            value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
+            anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
+        }
+        switch(expression.getOperator()){
+            case ">":
+                System.out.println("GT Expression");
+                result = value > anotherValue;
+                expression.setTrackedValue(result.toString());
+                expression.setType("boolean");
+                return;
+            case ">=":
+                System.out.println("GE Expression");
+                result = value >= anotherValue;
+                expression.setTrackedValue(result.toString());
+                expression.setType("boolean");
+                return;
+            case "<":
+                System.out.println("LT Expression");
+                result = value < anotherValue;
+                expression.setTrackedValue(result.toString());
+                expression.setType("boolean");
+                return;
+            case "<=":
+                System.out.println("LE Expression");
+                result = value <= anotherValue;
+                expression.setTrackedValue(result.toString());
+                expression.setType("boolean");
+                return;
+            case "*":
+                System.out.println("MUL Expression");
+                result = value * anotherValue;
+                expression.setTrackedValue(result.toString());
+                expression.setType("double");
+                return;
+            case "/":
+                System.out.println("DIV Expression");
+                result = value / anotherValue;
+                expression.setTrackedValue(result.toString());
+                expression.setType("double");
+                return;
+            case "%":
+                System.out.println("MOD Expression");
+                result = value % anotherValue;
+                expression.setTrackedValue(result.toString());
+                expression.setType("double");
+                return;
+            case "+":
+                System.out.println("ADD Expression");
+                if((expr1.getType().equals("int") ||
+                expr1.getType().equals("double") || expr1.getType().equals("char")) && 
+                (expr2.getType().equals("int") || expr2.getType().equals("double") ||
+                expr2.getType().equals("char"))){
+                    result = value + anotherValue;
+                    expression.setTrackedValue(result.toString());
+                    expression.setType("double"); 
+                } else if(expr1.getType().equals("String") || expr2.getType().equals("String")){
+                    result = expr1.getTrackedValue() + expr2.getTrackedValue();
+                    expression.setTrackedValue(result.toString());
+                    expression.setType("String");
+                }
+                return;
+            case "-":
+                System.out.println("SUB Expression");
+                result = value - anotherValue;
+                expression.setTrackedValue(result.toString());
+                expression.setType("double");
+                return;
+            case "==":
+                System.out.println("EQUALS");
+                if((expr1.getType().equals("int") ||
+                expr1.getType().equals("double") || expr1.getType().equals("char")) && 
+                (expr2.getType().equals("int") || expr2.getType().equals("double") ||
+                expr2.getType().equals("char"))){
+                    result = Math.abs(value - anotherValue) < epsilon;
+                    expression.setTrackedValue(result.toString());
+                    expression.setType("boolean");
+                } else if(expr1.getType().equals("boolean") && expr2.getType().equals("boolean")){
+                    result = Boolean.valueOf(expr1.getTrackedValue()) == Boolean.valueOf(expr2.getTrackedValue());
+                    expression.setTrackedValue(result.toString());
+                    expression.setType("boolean");
+                } else if(expr1.getType().equals("String") && expr2.getType().equals("String")){
+                    result = expr1.getTrackedValue().equals(expr2.getTrackedValue());
+                    expression.setTrackedValue(result.toString());
+                    expression.setType("boolean");
+                }
+                return;
+            case "!=":
+                System.out.println("NOTEQUALS");
+                if((expr1.getType().equals("int") ||
+                expr1.getType().equals("double") || expr1.getType().equals("char")) && 
+                (expr2.getType().equals("int") || expr2.getType().equals("double") ||
+                expr2.getType().equals("char"))){
+                    result = Math.abs(value - anotherValue) >= epsilon;
+                    expression.setTrackedValue(result.toString());
+                    expression.setType("boolean");
+                } else if(expr1.getType().equals("boolean") && expr2.getType().equals("boolean")){
+                    result = Boolean.valueOf(expr1.getTrackedValue()) != Boolean.valueOf(expr2.getTrackedValue());
+                    expression.setTrackedValue(result.toString());
+                    expression.setType("boolean");
+                } else if(expr1.getType().equals("String") && expr2.getType().equals("String")){
+                    result = !expr1.getTrackedValue().equals(expr2.getTrackedValue());
+                    expression.setTrackedValue(result.toString());
+                    expression.setType("boolean");
+                }
+                return;
+            default:
+            System.out.println("Unknown operator: " + expression.getOperator());
+            return;
+        }
+    }
+
+    @Override
+    public void track(Variable variable){
+        
     }
 
 }
