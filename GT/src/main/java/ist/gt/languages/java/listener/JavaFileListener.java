@@ -8,11 +8,14 @@ import lombok.Data;
 
 import java.util.Stack;
 
+import org.antlr.v4.runtime.ParserRuleContext;
+
 @Data
 public class JavaFileListener extends Java8ParserBaseListener {
 
     private final Stack<Boolean> primaries = new Stack<>();
     private boolean wasConditionalExpr;
+    private boolean wasAssignmentNeeded;
     private final GastBuilder gastBuilder;
     private final Stack<FunctionCall> expressionAfterPrimaryEnd = new Stack<>();
 
@@ -114,13 +117,15 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void exitLocalVariableDeclarationStatement(Java8Parser.LocalVariableDeclarationStatementContext ctx) {
         gastBuilder.trackLeftVariableValue();
+        //Used in situations where assignment has +=, -=, *=, /=, %=
+        gastBuilder.modifyAssignmentWithOperator();
         gastBuilder.exitStatementOrExpression();
     }
 
     @Override
     public void enterExpressionName(Java8Parser.ExpressionNameContext ctx) {
         if (ctx.ambiguousName() != null) {
-            gastBuilder.addMethodCall(ctx);
+            //gastBuilder.addMethodCall(ctx); TODO Still havent realized what a method call is doing here
             gastBuilder.addVariable(ctx, ctx.ambiguousName().Identifier().getText());
             gastBuilder.addAttributeAccess(ctx, ctx.Identifier().getText());
             gastBuilder.exitStatementOrExpression();
@@ -257,6 +262,8 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void exitAssignment(Java8Parser.AssignmentContext ctx) {
         gastBuilder.trackLeftVariableValue();
+        //Used in situations where assignment has +=, -=, *=, /=, %=
+        gastBuilder.modifyAssignmentWithOperator();
         gastBuilder.exitStatementOrExpression();
     }
 
@@ -446,7 +453,16 @@ public class JavaFileListener extends Java8ParserBaseListener {
         gastBuilder.exitCatchBlock();
     }
 
-
+    /*==================================================================* 
+     *      New functions for value tracking (Java only for now)        *
+     *==================================================================*/
+    /**
+     * @function exitRelationalExpression
+     * 
+     * Checks if the parser sent a relational expression by verifying if it 
+     * possesses one of the following operators: <, <=, >, >=. Instanceof is not
+     * supported at the moment.
+     */
     @Override
     public void exitRelationalExpression(Java8Parser.RelationalExpressionContext ctx){
         if(ctx.GE() != null){
@@ -460,9 +476,14 @@ public class JavaFileListener extends Java8ParserBaseListener {
         } else if(ctx.INSTANCEOF() != null){
             gastBuilder.addExpressionOperator(ctx.INSTANCEOF().getText());
         }
-        //System.out.println("Exiting relational expr");
     }
 
+    /**
+     * @function exitMultiplicativeExpression
+     * 
+     * Checks if the parser sent a multiplicative expression by verifying if it 
+     * possesses one of the following operators: *, /, %.
+     */
     @Override
     public void exitMultiplicativeExpression(Java8Parser.MultiplicativeExpressionContext ctx){
         if(ctx.MUL() != null){
@@ -472,9 +493,14 @@ public class JavaFileListener extends Java8ParserBaseListener {
         } else if(ctx.MOD() != null){
             gastBuilder.addExpressionOperator(ctx.MOD().getText());
         }
-        //System.out.println("Exiting multiplicative expr");
     }
 
+    /**
+     * @function exitEqualityExpression
+     * 
+     * Checks if the parser sent an equality expression by verifying if it 
+     * possesses one of the following operators: ==, !=.
+     */
     @Override
     public void exitEqualityExpression(Java8Parser.EqualityExpressionContext ctx){
         if(ctx.EQUAL() != null){
@@ -482,9 +508,14 @@ public class JavaFileListener extends Java8ParserBaseListener {
         } else if(ctx.NOTEQUAL() != null){
             gastBuilder.addExpressionOperator(ctx.NOTEQUAL().getText());
         }
-        //System.out.println("Exiting equality expr");
     }
 
+    /**
+     * @function exitAdditiveExpression
+     * 
+     * Checks if the parser sent an additive expression by verifying if it 
+     * possesses one of the following operators: +, -.
+     */
     @Override
     public void exitAdditiveExpression(Java8Parser.AdditiveExpressionContext ctx){
         if(ctx.ADD() != null){
@@ -492,6 +523,104 @@ public class JavaFileListener extends Java8ParserBaseListener {
         } else if(ctx.SUB() != null){
             gastBuilder.addExpressionOperator(ctx.SUB().getText());
         }
-        //System.out.println("Exiting additive expr");
+    }
+    
+    /**
+     * @function exitPreIncrementExpression
+     * 
+     * Checks if the parser sent a pre-increment expression, e.g, ++x or y = ++x.
+     */
+    @Override
+    public void exitPreIncrementExpression(Java8Parser.PreIncrementExpressionContext ctx){
+        if(ctx.INC() != null){
+            gastBuilder.normalIncrementDecrementExpression(ctx, "+", "pre");
+        }
+    }
+
+    /**
+     * @function exitPreDecrementExpression
+     * 
+     * Checks if the parser sent a pre-decrement expression, e.g, --x or y = --x.
+     */
+    @Override
+    public void exitPreDecrementExpression(Java8Parser.PreDecrementExpressionContext ctx){
+        if(ctx.DEC() != null){
+            gastBuilder.normalIncrementDecrementExpression(ctx, "-", "pre");
+        }
+    }
+
+    /**
+     * @function exitPostIncrementExpression
+     * 
+     * Checks if the parser sent a post-increment expression, e.g, x++.
+     */
+    @Override
+    public void exitPostIncrementExpression(Java8Parser.PostIncrementExpressionContext ctx){
+        if(ctx.INC() != null){
+            gastBuilder.normalIncrementDecrementExpression(ctx, "+", "post");
+        }
+    }
+
+    /**
+     * @function exitPostDecrementExpression
+     * 
+     * Checks if the parser sent a post-decrement expression, e.g, x--.
+     */
+    @Override
+    public void exitPostDecrementExpression(Java8Parser.PostDecrementExpressionContext ctx){
+        if(ctx.DEC() != null){
+            gastBuilder.normalIncrementDecrementExpression(ctx, "-", "post");
+        }
+    }
+
+    /**
+     * @function exitPostIncrementExpression_lf_postfixExpression
+     * 
+     * Checks if the parser sent a post-increment expression used in an
+     * assignment, e.g, y = x++.
+     */
+    @Override
+    public void exitPostIncrementExpression_lf_postfixExpression(Java8Parser.
+    PostIncrementExpression_lf_postfixExpressionContext ctx){
+        if(ctx.INC() != null){
+            gastBuilder.assignmentIncrementDecrementExpression(ctx, "+", "post");
+        }
+    }
+
+    /**
+     * @function exitPostDecrementExpression_lf_postfixExpression
+     * 
+     * Checks if the parser sent a post-decrement expression used in an
+     * assignment, e.g, y = x--.
+     */
+    @Override
+    public void exitPostDecrementExpression_lf_postfixExpression(Java8Parser.
+    PostDecrementExpression_lf_postfixExpressionContext ctx){
+        if(ctx.DEC() != null){
+            gastBuilder.assignmentIncrementDecrementExpression(ctx, "-", "post");
+        }
+    }
+
+    /**
+     * @function exitAssignmentOperator
+     * 
+     * Checks the operator associated with the current Assignment being analyzed.
+     * The operators supported are: +=, -=, *=, /=, %= and =.
+     */
+    @Override
+    public void exitAssignmentOperator(Java8Parser.AssignmentOperatorContext ctx){
+        if(ctx.ASSIGN() != null){
+            gastBuilder.addAssignmentOperator("=");    
+        } else if (ctx.ADD_ASSIGN() != null){
+            gastBuilder.addAssignmentOperator("+=");
+        } else if(ctx.SUB_ASSIGN() != null){
+            gastBuilder.addAssignmentOperator("-=");
+        } else if(ctx.MUL_ASSIGN() != null){
+            gastBuilder.addAssignmentOperator("*=");
+        } else if(ctx.DIV_ASSIGN() != null){
+            gastBuilder.addAssignmentOperator("/=");
+        } else if(ctx.MOD_ASSIGN() != null){
+            gastBuilder.addAssignmentOperator("%=");
+        }
     }
 }

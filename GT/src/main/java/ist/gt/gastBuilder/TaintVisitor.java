@@ -549,9 +549,9 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
     }
 
-    /*
-     * New functions to help with value tracking
-     */
+    /*==================================================================* 
+     *      New functions for value tracking (Java only for now)        *
+     *==================================================================*/
     @Override
     public void track(Assignment assignment){
         if(assignment.getRight() != null){
@@ -561,6 +561,12 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             //Get expression's value
             if(expression.getOperator() != null){
                 expression.addValue(this);
+            }
+            //Case where the expression has only 1 element (parameter) whose value 
+            //isn't known until it arrives to this stage (TaintVisitor), e.g, var = param;
+            if(expression.getTrackedValue() == null && expression.getMembers().size() == 1){
+                expression.setType(expression.getMembers().get(0).getType());
+                expression.setTrackedValue(expression.getMembers().get(0).getTrackedValue());
             }
 
             variable.setTrackedValue(expression.getTrackedValue());

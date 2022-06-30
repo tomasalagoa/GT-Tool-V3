@@ -12,6 +12,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 public class Assignment extends Statement {
     private Expression left;
     private Expression right;
+    private String operator;
 
     public Assignment(ParserRuleContext ctx) {
         super(ctx);
