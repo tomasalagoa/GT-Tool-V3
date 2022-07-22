@@ -550,7 +550,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     }
 
     /*==================================================================* 
-     *      New functions for value tracking (Java only for now)        *
+     *      New functions for value tracking                            *
      *==================================================================*/
     @Override
     public void track(Assignment assignment){
@@ -564,13 +564,71 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             }
             //Case where the expression has only 1 element (parameter) whose value 
             //isn't known until it arrives to this stage (TaintVisitor), e.g, var = param;
-            if(expression.getTrackedValue() == null && expression.getMembers().size() == 1){
+            if(expression.getTrackedValue() == null && expression.getMembers().size() == 1
+                && expression.getClassReference() == null){
                 expression.setType(expression.getMembers().get(0).getType());
                 expression.setTrackedValue(expression.getMembers().get(0).getTrackedValue());
             }
 
-            variable.setTrackedValue(expression.getTrackedValue());
-            variable.setType(expression.getType());
+            if(expression.getTrackedValue() != null){
+                if(variable.getClassReference() == null){
+                    variable.setTrackedValue(expression.getTrackedValue());
+                    variable.setType(expression.getType());
+                } else{
+                    String leftAttribute = assignment.getLeft().getSelectedAttribute();
+                    variable.getClassReference().getAttributes().get(leftAttribute)
+                    .setTrackedValue(expression.getTrackedValue());
+                    variable.getClassReference().getAttributes().get(leftAttribute)
+                    .setType(expression.getType());
+                }
+            }
+            
+            else if(expression.getClassReference() != null){
+                /*Same as in GastBuilder's @function trackLeftVariableValue. 
+                 * Have to watch out for the following cases: left-side is a simple variable so it becomes 
+                 * a class instance if right-side does not access any attribute OR 
+                 * left-side still is a simple variable but right-side accesses an attribute OR 
+                 * left-side accesses an attribute but right-side doesnt so that attribute is a class instance OR 
+                 * left-side & right-side both access an attribute
+                 */
+                if(expression.getSelectedAttribute() == null){
+                    if(variable.getClassReference() != null && 
+                    variable.getSelectedAttribute() != null){
+                        String leftAttribute = expression.getSelectedAttribute();
+                        variable.getClassReference().getAttributes().get(leftAttribute)
+                        .setClassReference(expression.getClassReference());
+                        
+                        variable.getClassReference().getAttributes().get(leftAttribute)
+                        .setType(expression.getType());
+                    }
+                    else{
+                        variable.setClassReference(expression.getClassReference());
+                        variable.setType(expression.getType());
+                    }
+                }
+                else{
+                    if(variable.getClassReference() != null && 
+                    variable.getSelectedAttribute() != null){
+                        String leftAttribute = variable.getSelectedAttribute();
+                        String rightAttribute = expression.getSelectedAttribute();
+                        variable.getClassReference().getAttributes().get(leftAttribute)
+                        .setTrackedValue(expression.getClassReference()
+                        .getAttributes().get(rightAttribute).getTrackedValue());
+                        
+                        variable.getClassReference().getAttributes().get(leftAttribute)
+                        .setType(expression.getClassReference()
+                        .getAttributes().get(rightAttribute).getType());
+                    } 
+                    else{
+                        String rightAttribute = expression.getSelectedAttribute();
+                        variable.setTrackedValue(expression.getClassReference()
+                        .getAttributes().get(rightAttribute).getTrackedValue());
+                        variable.setType(expression.getClassReference()
+                        .getAttributes().get(rightAttribute).getType());
+                    }
+                }
+            }
+
             assignment.setLeft(variable);
 
             if(currentPathVariables.containsKey(variable.getName())){
@@ -601,18 +659,33 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
         Expression expr1 = expression.getMembers().get(0);
         Expression expr2 = expression.getMembers().get(1);
-        if(expr1.getTrackedValue() == null || expr2.getTrackedValue() == null){
+        if((expr1.getTrackedValue() == null && expr1.getClassReference() == null) 
+        || (expr2.getTrackedValue() == null && expr2.getClassReference() == null)){
             expression.setTrackedValue(null);
             expression.setType("null");
             return;
         }
 
-        if((expr1.getType().equals("int") ||
+        //Have to check if any of the expressions is an attribute access
+        if(expr1.getClassReference() != null && expr1.getSelectedAttribute() != null){
+            expr1 = (Expression) expr1.getClassReference().getAttributes().get(expr1.getSelectedAttribute());
+        }
+
+        if(expr2.getClassReference() != null && expr2.getSelectedAttribute() != null){
+            expr2 = (Expression) expr2.getClassReference().getAttributes().get(expr2.getSelectedAttribute());
+        }
+
+        //Clean code a bit or if statements get way too big
+        boolean areNumbers = (expr1.getType().equals("int") ||
         expr1.getType().equals("double") || expr1.getType().equals("char")) && 
         (expr2.getType().equals("int") || expr2.getType().equals("double") ||
-        expr2.getType().equals("char"))){
-            value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] : Double.valueOf(expr1.getTrackedValue());
-            anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue().toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
+        expr2.getType().equals("char"));
+
+        if(areNumbers){
+            value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] 
+            : Double.valueOf(expr1.getTrackedValue());
+            anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue()
+            .toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
         }
         switch(expression.getOperator()){
             case ">":
@@ -659,10 +732,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 return;
             case "+":
                 System.out.println("ADD Expression");
-                if((expr1.getType().equals("int") ||
-                expr1.getType().equals("double") || expr1.getType().equals("char")) && 
-                (expr2.getType().equals("int") || expr2.getType().equals("double") ||
-                expr2.getType().equals("char"))){
+                if(areNumbers){
                     result = value + anotherValue;
                     expression.setTrackedValue(result.toString());
                     expression.setType("double"); 
@@ -680,10 +750,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 return;
             case "==":
                 System.out.println("EQUALS");
-                if((expr1.getType().equals("int") ||
-                expr1.getType().equals("double") || expr1.getType().equals("char")) && 
-                (expr2.getType().equals("int") || expr2.getType().equals("double") ||
-                expr2.getType().equals("char"))){
+                if(areNumbers){
                     result = Math.abs(value - anotherValue) < epsilon;
                     expression.setTrackedValue(result.toString());
                     expression.setType("boolean");
@@ -699,10 +766,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 return;
             case "!=":
                 System.out.println("NOTEQUALS");
-                if((expr1.getType().equals("int") ||
-                expr1.getType().equals("double") || expr1.getType().equals("char")) && 
-                (expr2.getType().equals("int") || expr2.getType().equals("double") ||
-                expr2.getType().equals("char"))){
+                if(areNumbers){
                     result = Math.abs(value - anotherValue) >= epsilon;
                     expression.setTrackedValue(result.toString());
                     expression.setType("boolean");

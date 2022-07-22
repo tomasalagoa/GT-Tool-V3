@@ -20,6 +20,10 @@ public class Class extends Element {
         this.name = name;
         this.superClass = superClass;
     }
+    //Value tracking constructor (no need for ctx)
+    public Class(String name) {
+        this.name = name;
+    }
 
     private String superClass;
 

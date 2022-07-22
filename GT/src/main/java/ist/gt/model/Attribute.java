@@ -16,6 +16,9 @@ public class Attribute extends Variable {
         super(ctx, name, type);
     }
 
+    public Attribute() {
+    }
+
     private Expression value;
 
     @Override

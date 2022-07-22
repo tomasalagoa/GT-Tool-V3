@@ -7,6 +7,9 @@ import lombok.Data;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Stack;
 
 @Data
@@ -290,6 +293,58 @@ public class GastBuilder {
     /*==================================================================* 
      *      New functions for value tracking (Java only for now)        *
      *==================================================================*/
+    /**
+     * @function trackClassReference
+     * 
+     * Updates the expression (which will be a variable) with a reference to the
+     * class it is being instantiated with (through @param className ), basically 
+     * doing value tracking for class instances. Right now, it is called 
+     * whenever a newExpression is used.
+     */
+     public void trackClassReference(String className){
+        NewExpression newExpression = null;
+        if(statements.peek() instanceof NewExpression){
+            newExpression = (NewExpression) statements.pop();
+        }
+
+        Expression expression = (Expression) statements.pop();
+        Class trackedClass = new Class(className);
+        Class originalClass = null;
+
+        for(Class c : this.classes){
+            if(c.getName().equals(className)){
+                originalClass = c;
+                break;
+            }
+        }
+
+        if(originalClass != null){
+            trackedClass.setSuperClass(originalClass.getSuperClass());
+            //Needed so that attributes do not share same reference between different instances
+            HashMap<String, Attribute> attributes = new HashMap<String, Attribute>();
+            for(Attribute attribute : originalClass.getAttributes().values()){
+                Attribute newAttribute = new Attribute();
+                newAttribute.setName(attribute.getName());
+                newAttribute.setType(attribute.getType());
+                newAttribute.setTainted(attribute.isTainted());
+                newAttribute.setLine(attribute.getLine());
+                newAttribute.setText(attribute.getText());
+                attributes.put(newAttribute.getName(), newAttribute);
+            }
+            trackedClass.setAttributes(attributes);
+            trackedClass.setMethods(new HashMap<String, Function>(originalClass.getMethods()));
+
+            expression.setClassReference(trackedClass);
+            expression.setType(trackedClass.getName());
+        }
+        
+        if(newExpression != null){
+            statements.push(newExpression);
+        }
+
+        statements.push(expression);
+
+     }
 
     /**
      * @function trackLeftVariableValue
@@ -297,22 +352,82 @@ public class GastBuilder {
      * Passes the value in the right side of an assignment to the left side,
      * if the right side exists (i.e could just be an empty variable declaration)
      * or if it has a type meaning its value could be tracked earlier (will be
-     * tracked later if not).
+     * tracked later if not). Also supports attribute accesses in either side of
+     * the assignment.
      */
     public void trackLeftVariableValue(){
-        //Updating left variable value in assignment and in current function
         Assignment assignment = (Assignment) statements.pop();
 
-        if(assignment.getRight() != null && assignment.getRight().getType() != null
-            && assignment.getRight().getTrackedValue() != null){
-            Variable tmpVar = (Variable) assignment.getLeft();
-            Variable var = currentFunction.getVariables().get(tmpVar.getName());
-            var.setTrackedValue(assignment.getRight().getTrackedValue());
-            var.setType(assignment.getRight().getType());
-            currentFunction.getVariables().replace(var.getName(), var);
-            assignment.setLeft(var);
-        }
+        if(assignment.getRight() != null && assignment.getRight().getType() != null){
+            Variable var = (Variable) assignment.getLeft();
+            //Variable var = currentFunction.getVariables().get(tmpVar.getName());
+            //Is the right-side a simple variable?
+            if(assignment.getRight().getTrackedValue() != null){
+                //Check if left has class reference or not. If it has, update is done at the attribute's value
+                if(assignment.getLeft().getClassReference() == null){
+                    var.setTrackedValue(assignment.getRight().getTrackedValue());
+                    var.setType(assignment.getRight().getType());
+                }
+                else{
+                    String leftAttribute = assignment.getLeft().getSelectedAttribute();
+                    var.getClassReference().getAttributes().get(leftAttribute)
+                    .setTrackedValue(assignment.getRight().getTrackedValue());
+                    
+                    var.getClassReference().getAttributes().get(leftAttribute)
+                    .setType(assignment.getRight().getType());
+                }
+            }
 
+            else if(assignment.getRight().getClassReference() != null){
+                /*Have to watch out for the following cases: left-side is a simple variable so it becomes 
+                 * a class instance if right-side does not access any attribute OR 
+                 * left-side still is a simple variable but right-side accesses an attribute OR 
+                 * left-side accesses an attribute but right-side doesnt so that attribute is a class instance OR 
+                 * left-side & right-side both access an attribute
+                 */
+                if(assignment.getRight().getSelectedAttribute() == null){
+                    if(assignment.getLeft().getClassReference() != null && 
+                    assignment.getLeft().getSelectedAttribute() != null){
+                        String leftAttribute = assignment.getLeft().getSelectedAttribute();
+                        var.getClassReference().getAttributes().get(leftAttribute)
+                        .setClassReference(assignment.getRight().getClassReference());
+                        
+                        var.getClassReference().getAttributes().get(leftAttribute)
+                        .setType(assignment.getRight().getType());
+                    }
+                    else{
+                        var.setClassReference(assignment.getRight().getClassReference());
+                        var.setType(assignment.getRight().getType());
+                    }
+                }
+                else{
+                    if(assignment.getLeft().getClassReference() != null && 
+                    assignment.getLeft().getSelectedAttribute() != null){
+                        String leftAttribute = assignment.getLeft().getSelectedAttribute();
+                        String rightAttribute = assignment.getRight().getSelectedAttribute();
+                        var.getClassReference().getAttributes().get(leftAttribute)
+                        .setTrackedValue(assignment.getRight().getClassReference()
+                        .getAttributes().get(rightAttribute).getTrackedValue());
+                        
+                        var.getClassReference().getAttributes().get(leftAttribute)
+                        .setType(assignment.getRight().getClassReference()
+                        .getAttributes().get(rightAttribute).getType());
+                    } 
+                    else{
+                        String rightAttribute = assignment.getRight().getSelectedAttribute();
+                        var.setTrackedValue(assignment.getRight().getClassReference()
+                        .getAttributes().get(rightAttribute).getTrackedValue());
+                        var.setType(assignment.getRight().getClassReference()
+                        .getAttributes().get(rightAttribute).getType());
+                    }
+                }
+            }
+
+            if(var.getTrackedValue() != null || var.getClassReference() != null){
+                currentFunction.getVariables().replace(var.getName(), var);
+                assignment.setLeft(var);
+            }
+        }
         statements.push(assignment);
     }
 
@@ -320,15 +435,22 @@ public class GastBuilder {
      * @function trackExpressionValue
      * 
      * Updates the value of current Expression. Can only be made if the current
-     * Expression does not possess a tracked value yet and if it only has one 
+     * Expression does not possess a tracked value (or class reference) yet and if it only has one 
      * element (Variable, Parameter, etc), making it able to immediately get its
      * value in this stage.
     */
     public void trackExpressionValue(){
         Expression expression = (Expression) statements.pop();
         //Most likely this expression only has one element
-        if(expression.getTrackedValue() == null && expression.getMembers().size() == 1){
-            expression.setTrackedValue(expression.getMembers().get(0).getTrackedValue());
+        if(expression.getMembers().size() == 1){
+            if(expression.getTrackedValue() == null && expression.getMembers()
+            .get(0).getClassReference() == null){
+                expression.setTrackedValue(expression.getMembers().get(0).getTrackedValue());
+            } 
+            else if(expression.getMembers().get(0).getClassReference() != null && 
+                        expression.getClassReference() == null){
+                expression.setClassReference(expression.getMembers().get(0).getClassReference());
+            }
             expression.setType(expression.getMembers().get(0).getType());
         }
 
@@ -497,7 +619,7 @@ public class GastBuilder {
                 //Should never enter here!
                 System.out.println("Invalid operator");
                 return;
-    }
+        }
         //x = ++id; -> id = id + 1; x = id;
         if(condType.equals("pre")){
             assignment.setLeft(variable);
@@ -517,5 +639,97 @@ public class GastBuilder {
         statements.push(genStmt);
         statements.push(assignmentStack);
         statements.push(assignExp);
+    }
+
+    public void accessedAttribute(){
+        //Attribute access is on the left side of assignment
+        if(statements.peek() instanceof Assignment){
+            Assignment assignment = (Assignment) statements.pop();
+            Variable left = (Variable) assignment.getLeft();
+            List<String> members = Arrays.asList(left.getName().split("\\."));
+
+            Variable var = createNewVariableForAttributes(currentFunction.getVariables().get(members.get(0)));
+            var.setSelectedAttribute(members.get(1));
+            assignment.setLeft(var);
+            statements.push(assignment);
+        //Attribute access is on the right side of expression
+        } else if(statements.peek() instanceof Expression){
+            Expression expression = (Expression) statements.pop();
+            Assignment assignment = (Assignment) statements.pop();
+            /* 3 here relates to the members that exist in an expression when we have an attribute access,
+             * e.g., for someClass.someAttribute it would have Variable (someClass), AttributeAccess, 
+             * Variable (someAttribute). So if we have a complex expression (someClass.someAttribute + 
+             * anotherClass.anotherAttribute), it would have 4 members (the already parsed someClass and the
+             * to-be-parsed anotherClass).
+            */
+            int newAttributeAddedIdx = expression.getMembers().size() - 3;
+            Variable attribute = (Variable) expression.getMembers().get(newAttributeAddedIdx + 2);
+            //No need for AttributeAccess & Variable for attribute anymore
+            expression.getMembers().remove(newAttributeAddedIdx + 2);
+            expression.getMembers().remove(newAttributeAddedIdx + 1);
+            
+            Variable var = createNewVariableForAttributes((Variable) expression.getMembers().get(newAttributeAddedIdx));
+            var.setSelectedAttribute(attribute.getName());
+            
+            if(newAttributeAddedIdx == 0){
+                expression.setSelectedAttribute(attribute.getName());
+                expression.getMembers().clear();
+                expression.getMembers().add(var);
+                expression.setClassReference(expression.getMembers().get(newAttributeAddedIdx).getClassReference());
+            } else{
+                expression.getMembers().remove(newAttributeAddedIdx);
+                expression.getMembers().add(newAttributeAddedIdx, var);
+            }
+            
+            assignment.setRight(expression);
+
+            statements.push(assignment);
+            statements.push(expression);
+        } else if(statements.peek() instanceof GenericStatement){
+            GenericStatement genStmt = (GenericStatement) statements.pop();
+            Expression expression = (Expression) genStmt.getStatement();
+            Variable attribute = (Variable) expression.getMembers().get(2);
+            Variable var = createNewVariableForAttributes((Variable) expression.getMembers().get(0));
+            var.setSelectedAttribute(attribute.getName());
+
+            genStmt.setStatement(var);
+            statements.push(genStmt);
+        }
+    }
+
+    public Variable createNewVariableForAttributes(Variable variable){
+        Variable var = new Variable(variable.getName());
+        var.setClassReference(variable.getClassReference());
+        var.setType(variable.getType());
+        var.setLine(variable.getLine());
+        var.setTainted(variable.isTainted());
+        var.setText(variable.getText());
+        return var;
+    }
+
+    /**
+     * @function isGenericStatement
+     * @return boolean
+     * 
+     * This function is used, primarily for now, for attribute accesses in Generic Statements.
+     * The issue being solved here was found regarding pre/post-increment/decrement expressions with
+     * attribute acesses. With a Generic Statement, the information regarding attribute accesses is lost
+     * and to be able to get that information, this function will instead insert an Expression in the Stack
+     * (and in the Generic Statement) to store that information so it can be processed in another function.
+     * 
+     * It returns true/false based on the fact if GT has a Generic Statement in the Stack or not.
+     */
+    public boolean isGenericStatement(){
+        if(statements.peek() instanceof GenericStatement){
+            GenericStatement genStmt = (GenericStatement) statements.pop();
+            Expression expression = new Expression();
+            genStmt.setStatement(expression);
+
+            statements.push(genStmt);
+            statements.push(expression);
+            return true;
+        } else{
+            return false;
+        }
     }
 }

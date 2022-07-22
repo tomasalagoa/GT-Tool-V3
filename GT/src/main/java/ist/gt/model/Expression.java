@@ -32,6 +32,9 @@ public class Expression extends Statement {
     private String operator;
     //Mostly used for Constants & Variables, helping in value tracking
     private String type;
+    //In case Variable will need to reference a class
+    private Class classReference;
+    private String selectedAttribute;
 
     public void setType(String type) {
         if (type != null)

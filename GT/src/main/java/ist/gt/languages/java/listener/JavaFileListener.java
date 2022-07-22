@@ -16,6 +16,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
     private final Stack<Boolean> primaries = new Stack<>();
     private boolean wasConditionalExpr;
     private boolean wasAssignmentNeeded;
+    private boolean negativeNumberFound = false;
     private final GastBuilder gastBuilder;
     private final Stack<FunctionCall> expressionAfterPrimaryEnd = new Stack<>();
 
@@ -53,9 +54,21 @@ public class JavaFileListener extends Java8ParserBaseListener {
         if(ctx.BooleanLiteral() != null){
             gastBuilder.addConstant(ctx, ctx.getText(), "boolean");
         } else if(ctx.IntegerLiteral() != null){
-            gastBuilder.addConstant(ctx, ctx.getText(), "int");
+            System.out.println(ctx.getText());
+            if(this.negativeNumberFound){
+                gastBuilder.addConstant(ctx, "-" + ctx.getText(), "int");
+                this.negativeNumberFound = false;
+            } else {
+                gastBuilder.addConstant(ctx, ctx.getText(), "int");
+            }
         } else if(ctx.FloatingPointLiteral() != null){
-            gastBuilder.addConstant(ctx, ctx.getText(), "double");
+            System.out.println(ctx.getText());
+            if(this.negativeNumberFound){
+                gastBuilder.addConstant(ctx, "-" + ctx.getText(), "double");
+                this.negativeNumberFound = false;
+            } else{
+                gastBuilder.addConstant(ctx, ctx.getText(), "double");
+            }
         } else if(ctx.CharacterLiteral() != null){
             gastBuilder.addConstant(ctx, ctx.getText(), "char");
         } else if(ctx.StringLiteral() != null){
@@ -66,6 +79,26 @@ public class JavaFileListener extends Java8ParserBaseListener {
             gastBuilder.addConstant(ctx, ctx.getText(), "null");
         }
         
+    }
+
+    /** 
+     * This rule is mainly used to catch negative numbers as literals. The reason for this is
+     * because if, e.g, we do int num = -1, what reaches the LiteralContext above is only 1, the
+     * - is used in this rule and -1 never reaches LiteralContext. So with this, we are advising
+     * a "counter" to know when the number should've been negative.
+     */
+    @Override
+    public void enterUnaryExpression(Java8Parser.UnaryExpressionContext ctx){
+        if(ctx.SUB() != null){
+            System.out.println(ctx.getText());
+            String str = ctx.getText();
+            
+            if(str.matches("\\-\\d+\\.?\\d*")){
+                negativeNumberFound = true;
+            } else{
+                negativeNumberFound = false;
+            }
+        }
     }
 
     @Override
@@ -124,13 +157,27 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterExpressionName(Java8Parser.ExpressionNameContext ctx) {
+        boolean accessedAttribute = false;
+        boolean isGenStmt = false;
         if (ctx.ambiguousName() != null) {
             //gastBuilder.addMethodCall(ctx); TODO Still havent realized what a method call is doing here
+            /* This function will be used, primarily, because with a Generic Statement GT will lose some
+             * information about an attribute access. */
+            isGenStmt = gastBuilder.isGenericStatement();
             gastBuilder.addVariable(ctx, ctx.ambiguousName().Identifier().getText());
             gastBuilder.addAttributeAccess(ctx, ctx.Identifier().getText());
             gastBuilder.exitStatementOrExpression();
+            accessedAttribute = true;
         }
         gastBuilder.addVariable(ctx, ctx.Identifier().getText());
+
+        if(isGenStmt){
+            gastBuilder.exitStatementOrExpression();
+        }
+        if(accessedAttribute){
+            //New function to help with attribute value tracking
+            gastBuilder.accessedAttribute();
+        }
     }
 
     @Override
@@ -192,7 +239,6 @@ public class JavaFileListener extends Java8ParserBaseListener {
         }
     }
 
-
     @Override
     public void enterPrimary(Java8Parser.PrimaryContext ctx) {
         primaries.push(false);
@@ -211,10 +257,10 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     }
 
-
     @Override
     public void enterClassInstanceCreationExpression(Java8Parser.ClassInstanceCreationExpressionContext ctx) {
         gastBuilder.addNewExpression(ctx, ctx.Identifier(0).getText());
+        gastBuilder.trackClassReference(ctx.Identifier(0).getText());
     }
 
     @Override
@@ -225,6 +271,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void enterClassInstanceCreationExpression_lf_primary(Java8Parser.ClassInstanceCreationExpression_lf_primaryContext ctx) {
         gastBuilder.addNewExpression(ctx, ctx.Identifier().getText());
+        gastBuilder.trackClassReference(ctx.Identifier().getText());
     }
 
     @Override
@@ -236,6 +283,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void enterClassInstanceCreationExpression_lfno_primary(Java8Parser.ClassInstanceCreationExpression_lfno_primaryContext ctx) {
         gastBuilder.addNewExpression(ctx, ctx.Identifier(0).getText());
+        gastBuilder.trackClassReference(ctx.Identifier(0).getText());
     }
 
     @Override
