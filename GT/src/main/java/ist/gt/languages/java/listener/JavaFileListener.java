@@ -26,7 +26,12 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterNormalClassDeclaration(Java8Parser.NormalClassDeclarationContext ctx) {
-        gastBuilder.addClass(ctx, ctx.Identifier().getText());
+        if(ctx.superclass() != null){
+            gastBuilder.addClass(ctx, ctx.Identifier().getText(), ctx.superclass().classType().getText());
+        } else{
+            gastBuilder.addClass(ctx, ctx.Identifier().getText());
+        }
+        
     }
 
     @Override
@@ -54,7 +59,6 @@ public class JavaFileListener extends Java8ParserBaseListener {
         if(ctx.BooleanLiteral() != null){
             gastBuilder.addConstant(ctx, ctx.getText(), "boolean");
         } else if(ctx.IntegerLiteral() != null){
-            System.out.println(ctx.getText());
             if(this.negativeNumberFound){
                 gastBuilder.addConstant(ctx, "-" + ctx.getText(), "int");
                 this.negativeNumberFound = false;
@@ -62,7 +66,6 @@ public class JavaFileListener extends Java8ParserBaseListener {
                 gastBuilder.addConstant(ctx, ctx.getText(), "int");
             }
         } else if(ctx.FloatingPointLiteral() != null){
-            System.out.println(ctx.getText());
             if(this.negativeNumberFound){
                 gastBuilder.addConstant(ctx, "-" + ctx.getText(), "double");
                 this.negativeNumberFound = false;
@@ -90,7 +93,6 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void enterUnaryExpression(Java8Parser.UnaryExpressionContext ctx){
         if(ctx.SUB() != null){
-            System.out.println(ctx.getText());
             String str = ctx.getText();
             
             if(str.matches("\\-\\d+\\.?\\d*")){

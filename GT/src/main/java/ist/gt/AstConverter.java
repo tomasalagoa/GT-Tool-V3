@@ -16,6 +16,7 @@ import ist.gt.languages.python.listener.PythonFileListener;
 import ist.gt.languages.python.parser.PythonLexer;
 import ist.gt.languages.python.parser.PythonParser;
 import ist.gt.model.File;
+import ist.gt.model.Class;
 import ist.gt.settings.Settings;
 import ist.gt.util.Report;
 import ist.gt.util.Vulnerability;
@@ -38,10 +39,12 @@ import java.util.stream.Stream;
 @Data
 public class AstConverter {
 
-    private static final String reportFilePath = "YASAT/src/main/resources/report.json";
+    private static final String reportFilePath = "C:\\Users\\diogo\\Desktop\\MEIC-T\\2Ano\\Tese\\MasterDissertation\\GT-Tool-V2\\GT\\src\\main\\resources\\report.json";
 
     private static final ObjectMapper jsonMapper = new ObjectMapper();
     public static Report report = new Report();
+    //Propagate analyzed classes between files, especially useful for Java
+    private static ArrayList<Class> analyzedClasses = new ArrayList<>();
 
 
     private static File convertFile(String filePath) throws Exception {
@@ -64,7 +67,11 @@ public class AstConverter {
                 CommonTokenStream tokens = new CommonTokenStream(new Java8Lexer(input));
                 var tree = new Java8Parser(tokens).compilationUnit();
                 var listener = new JavaFileListener(path.getFileName().toString());
+                if(analyzedClasses.size() != 0){
+                    listener.getGastBuilder().setAnalyzedClasses(analyzedClasses);
+                }
                 walker.walk(listener, tree);
+                analyzedClasses = listener.getGastBuilder().getAnalyzedClasses();
                 return listener.getGastBuilder().getFile();
             }
             case "js" -> {
@@ -125,6 +132,8 @@ public class AstConverter {
         taintVisitor.start();
         sw.stop();
         report.setTimeToProcessMilliseconds(sw.getTime(TimeUnit.MILLISECONDS));
+        //clearReport();
+        writeReport();
     }
 
     private static void addMessage(String message) {

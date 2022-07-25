@@ -7,6 +7,7 @@ import lombok.Data;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -21,6 +22,7 @@ public class GastBuilder {
     private Stack<IfStatement> ifStatements = new Stack<>();
     private final File file;
     private final Stack<Class> classes = new Stack<>();
+    private ArrayList<Class> analyzedClasses = new ArrayList<>();
     private final Stack<TryCatch> tryCatches = new Stack<>();
 
     private <E> void popIfNotEmpty(Stack<E> stack) {
@@ -192,6 +194,7 @@ public class GastBuilder {
         statements.clear();
         file.getClasses().put(aClass.getName(), aClass);
         classes.push(aClass);
+        analyzedClasses.add(aClass);
         return aClass;
     }
 
@@ -320,16 +323,19 @@ public class GastBuilder {
 
         if(originalClass != null){
             trackedClass.setSuperClass(originalClass.getSuperClass());
+            HashMap<String, Attribute> superclassAttributes = getAllSuperclassesAttributes(
+                originalClass.getSuperClass());
             //Needed so that attributes do not share same reference between different instances
             HashMap<String, Attribute> attributes = new HashMap<String, Attribute>();
             for(Attribute attribute : originalClass.getAttributes().values()){
-                Attribute newAttribute = new Attribute();
-                newAttribute.setName(attribute.getName());
-                newAttribute.setType(attribute.getType());
-                newAttribute.setTainted(attribute.isTainted());
-                newAttribute.setLine(attribute.getLine());
-                newAttribute.setText(attribute.getText());
+                Attribute newAttribute = createNewAttributeReference(attribute);
                 attributes.put(newAttribute.getName(), newAttribute);
+            }
+
+            if(superclassAttributes != null){
+                for(Attribute attribute : superclassAttributes.values()){
+                    attributes.put(attribute.getName(), attribute);
+                }
             }
             trackedClass.setAttributes(attributes);
             trackedClass.setMethods(new HashMap<String, Function>(originalClass.getMethods()));
@@ -343,7 +349,67 @@ public class GastBuilder {
         }
 
         statements.push(expression);
+     }
 
+     /**
+      * @function getAllSuperclassesAttributes
+      * @param superclassName
+      * @return HashMap<String, Attribute>
+      *
+      * Receives the name of a given superclass and returns its attributes + the ones of its
+      * superclass (and so on) if applicable.
+      */
+     public HashMap<String, Attribute> getAllSuperclassesAttributes(String superclassName){
+        if(superclassName == null){
+            return null;
+        } else{
+            HashMap<String, Attribute> attributes = new HashMap<String, Attribute>();
+            ArrayList<Class> superclasses = new ArrayList<Class>();
+            Boolean noMoreSupers = false;
+            
+            while(!noMoreSupers){
+                for(Class c : this.analyzedClasses){
+                    if(c.getName().matches(superclassName)){
+                        superclasses.add(c);
+                        if(c.getSuperClass() != null){
+                            superclassName = c.getSuperClass();
+                            break;
+                        } else{
+                            noMoreSupers = true;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            for(Class c : superclasses){
+                for(Attribute attribute : c.getAttributes().values()){
+                    Attribute newAttribute = createNewAttributeReference(attribute);
+                    attributes.put(newAttribute.getName(), newAttribute);
+                }
+            }
+            return attributes;
+        }
+     }
+
+     /**
+      * @function createNewAttributeReference
+      * @param attribute
+      * @return Attribute
+      *
+      * Represents the creation of a new reference for the @param attribute.
+      * The goal here is to create a new reference for a given attribute (whenever 
+      * a new class instance is created) so that it is not the same as the one stored 
+      * in the classes field of GastBuilder.
+      */
+     public Attribute createNewAttributeReference(Attribute attribute){
+        Attribute newAttribute = new Attribute();
+        newAttribute.setName(attribute.getName());
+        newAttribute.setType(attribute.getType());
+        newAttribute.setTainted(attribute.isTainted());
+        newAttribute.setLine(attribute.getLine());
+        newAttribute.setText(attribute.getText());
+        return newAttribute;
      }
 
     /**
@@ -641,6 +707,18 @@ public class GastBuilder {
         statements.push(assignExp);
     }
 
+    /**
+     * @function accessedAttribute
+     * 
+     * Represents the 3 cases where an attribute will be accessed here: 
+     * 1. In the left side of an assignment, and it can be known because the last
+     * statement in the statements Stack will be the Assignment object.
+     * 2. In the right side of an assignment, and it can be known because the right side
+     * is always represented with an Expression so it is enough to check if the statement before
+     * is an Assignment or not.
+     * 3. In a pre/post-increment/decrement expression, known by the use of GenericStatement in these
+     * types of statements.
+     */
     public void accessedAttribute(){
         //Attribute access is on the left side of assignment
         if(statements.peek() instanceof Assignment){
@@ -697,6 +775,15 @@ public class GastBuilder {
         }
     }
 
+    /**
+     * @function createNewVariableForAttributes
+     * @return Variable
+     * 
+     * Receives a variable and returns another reference to that variable with the same
+     * information regarding name, type, if it's tainted or not, etc. Used mainly because
+     * of class instances to know what attribute was used for that instance in a given statement,
+     * without having that information be oberwritte to all other references of that variable
+     */
     public Variable createNewVariableForAttributes(Variable variable){
         Variable var = new Variable(variable.getName());
         var.setClassReference(variable.getClassReference());

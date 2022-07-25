@@ -67,7 +67,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             return;
         }
 
-
         var function = specification.isMethod()
                 ? file.getClasses().get(specification.getFunction().getType()).getMethods().get(specification.getFunction().getName())
                 : file.getFunctions().get(specification.getFunction().getName());
@@ -527,7 +526,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
     }
 
-
     private boolean propagateTaintInExpressionList(List<Expression> expressions) {
         boolean taint = false;
         for (Expression expr : expressions) {
@@ -550,7 +548,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     }
 
     /*==================================================================* 
-     *      New functions for value tracking                            *
+     *              New functions for value tracking                    *
      *==================================================================*/
     @Override
     public void track(Assignment assignment){
@@ -642,8 +640,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             } 
         }
     }
+
     //This will only be invoked if an expression has an operator
-    //TODO Check if case code can be cleaner
     @Override
     public void track(Expression expression){
         Object result;
@@ -675,7 +673,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             expr2 = (Expression) expr2.getClassReference().getAttributes().get(expr2.getSelectedAttribute());
         }
 
-        //Clean code a bit or if statements get way too big
         boolean areNumbers = (expr1.getType().equals("int") ||
         expr1.getType().equals("double") || expr1.getType().equals("char")) && 
         (expr2.getType().equals("int") || expr2.getType().equals("double") ||
