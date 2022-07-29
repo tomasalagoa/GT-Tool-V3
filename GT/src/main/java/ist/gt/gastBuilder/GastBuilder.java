@@ -733,7 +733,7 @@ public class GastBuilder {
         //Attribute access is on the right side of expression
         } else if(statements.peek() instanceof Expression){
             Expression expression = (Expression) statements.pop();
-            Assignment assignment = (Assignment) statements.pop();
+            //Assignment assignment = (Assignment) statements.pop();
             /* 3 here relates to the members that exist in an expression when we have an attribute access,
              * e.g., for someClass.someAttribute it would have Variable (someClass), AttributeAccess, 
              * Variable (someAttribute). So if we have a complex expression (someClass.someAttribute + 
@@ -759,9 +759,9 @@ public class GastBuilder {
                 expression.getMembers().add(newAttributeAddedIdx, var);
             }
             
-            assignment.setRight(expression);
+            //assignment.setRight(expression);
 
-            statements.push(assignment);
+            //statements.push(assignment);
             statements.push(expression);
         } else if(statements.peek() instanceof GenericStatement){
             GenericStatement genStmt = (GenericStatement) statements.pop();
@@ -782,7 +782,7 @@ public class GastBuilder {
      * Receives a variable and returns another reference to that variable with the same
      * information regarding name, type, if it's tainted or not, etc. Used mainly because
      * of class instances to know what attribute was used for that instance in a given statement,
-     * without having that information be oberwritte to all other references of that variable
+     * without having that information be overwritten to all other references of that variable
      */
     public Variable createNewVariableForAttributes(Variable variable){
         Variable var = new Variable(variable.getName());

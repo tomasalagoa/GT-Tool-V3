@@ -132,8 +132,22 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             //Value tracking of parameters
             Expression parameter = functionCall.getMembers().get(i);
             if(parameter.getType() != null){
-                function.getParameters().getElement(i).setTrackedValue(parameter.getTrackedValue());
-                function.getParameters().getElement(i).setType(parameter.getType());
+                if(parameter.getClassReference() != null){
+                    if(parameter.getSelectedAttribute() != null){
+                        String attributeName = parameter.getSelectedAttribute();
+                        function.getParameters().getElement(i).setTrackedValue(
+                            parameter.getClassReference().getAttributes().get(attributeName).getTrackedValue());
+                        
+                        function.getParameters().getElement(i).setType(
+                            parameter.getClassReference().getAttributes().get(attributeName).getType());
+                    } else{
+                        function.getParameters().getElement(i).setClassReference(parameter.getClassReference());
+                        function.getParameters().getElement(i).setType(parameter.getType());
+                    }
+                } else{
+                    function.getParameters().getElement(i).setTrackedValue(parameter.getTrackedValue());
+                    function.getParameters().getElement(i).setType(parameter.getType());
+                }
             }
         }
         function.accept(new TaintVisitor(files, spec, functionNames, file, clazz));
@@ -190,7 +204,18 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
         propagateSetTainted(assignment.getLeft(), assignment.getRight().isTainted());
         assignment.setTainted(assignment.getRight().isTainted());
-        assignment.getLeft().setTainted(assignment.getRight().isTainted());
+        //Same logic as in @function visit(Variable)
+        if(assignment.getLeft().getClassReference() != null){
+            if(assignment.getLeft().getSelectedAttribute() != null){
+                String attribute = assignment.getLeft().getSelectedAttribute();
+                assignment.getLeft().setTainted(assignment.getLeft().getClassReference()
+                .getAttributes().get(attribute).isTainted());
+            } else{
+                assignment.getLeft().setTainted(assignment.getLeft().getClassReference().areAttributesTainted());
+            }
+        } else{
+            assignment.getLeft().setTainted(assignment.getRight().isTainted());
+        }
     }
 
     @Override
@@ -207,7 +232,18 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     @Override
     public void visit(Variable var) {
         if (currentPathVariables.containsKey(var.getName())) {
-            var.setTainted(currentPathVariables.get(var.getName()).isTainted());
+            if(currentPathVariables.get(var.getName()).getClassReference() != null){
+                /* var will almost always point to a different updated accessed attribute than the variable saved in
+                 * currentPathVariables. If it's not different, then they are pointing to the same one. */
+                currentPathVariables.get(var.getName()).setSelectedAttribute(var.getSelectedAttribute());
+                /* The class reference will always have the attributes' taintedness updated but if the object
+                 * (class instance) is being used then we have to update its own taintedness. */
+                if(currentPathVariables.get(var.getName()).getSelectedAttribute() == null){
+                    var.setTainted(currentPathVariables.get(var.getName()).getClassReference().areAttributesTainted());
+                }
+            } else{
+                var.setTainted(currentPathVariables.get(var.getName()).isTainted());
+            }
             currentPathVariables.get(var.getName()).setType(var.getType());
             var.setType(currentPathVariables.get(var.getName()).getType());
             return;
@@ -235,9 +271,25 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
         if (!functions.empty() && functions.peek().getVariables().containsKey(var.getName())) {
             Variable variable = functions.peek().getVariables().get(var.getName());
-            var.setTainted(variable.isTainted());
             var.setType(variable.getType());
-            currentPathVariables.put(var.getName(), variable);
+            if(variable.getClassReference() != null){
+                if(variable.getSelectedAttribute() != null){
+                    String attribute = variable.getSelectedAttribute();
+                    var.setTainted(variable.getClassReference().getAttributes().get(attribute).isTainted());
+                }else{
+                    var.setTainted(variable.getClassReference().areAttributesTainted());
+                }
+                /* As we are using class references and the attribute accessed can be different, 
+                 * this allows us to use a variable that can store that change in attributes without it
+                 * affecting the variables referenced in the statements (class reference is always the same)
+                 * which could introduce unwanted accesses
+                */
+                Variable newVarRef = createNewVariableForAttributes(variable);
+                currentPathVariables.put(var.getName(), newVarRef);
+            }else{
+                var.setTainted(variable.isTainted());
+                currentPathVariables.put(var.getName(), variable);
+            }
             return;
         }
         if (spec.isAllFiles() && !spec.getGlobalTaintVariableRegex().isEmpty()) {
@@ -363,8 +415,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
 
         //Check all else if statements until a condition is evaluated to true.
-        //Will still have some impossible paths in more complex and difficult to
-        //analyse conditions.
+        /* Will still have some impossible paths in more complex and difficult to
+         * analyse conditions. */
         if(ifStatement.getElseIfs() != null && ifStatement.getElseIfs().size() > 0){
             for(IfStatement elseIf : ifStatement.getElseIfs()){
                 if(!elseIf.isFullyExplored()){
@@ -530,7 +582,12 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         boolean taint = false;
         for (Expression expr : expressions) {
             expr.accept(this);
-            taint = taint || expr.isTainted();
+            if(expr.getClassReference() != null && expr.getSelectedAttribute() != null){
+                String attribute = expr.getSelectedAttribute();
+                taint = taint || expr.getClassReference().getAttributes().get(attribute).isTainted();
+            } else{
+                taint = taint || expr.isTainted();
+            }
         }
         return taint;
     }
@@ -540,7 +597,18 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         expression.setTainted(taint);
         if (expression instanceof Variable) {
             var variable = (Variable) expression;
-            currentPathVariables.get(variable.getName()).setTainted(variable.isTainted());
+            if(variable.getClassReference() != null){
+                if(variable.getSelectedAttribute() != null){
+                    String attributeName = variable.getSelectedAttribute();
+                    currentPathVariables.get(variable.getName()).getClassReference().getAttributes()
+                    .get(attributeName).setTainted(variable.isTainted());
+                } else{
+                    currentPathVariables.get(variable.getName()).setTainted(
+                        variable.getClassReference().areAttributesTainted());
+                }
+            } else{
+                currentPathVariables.get(variable.getName()).setTainted(variable.isTainted());
+            }
         }
         for (Expression expr : expression.getMembers()) {
             propagateSetTainted(expr, taint);
@@ -630,13 +698,17 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             assignment.setLeft(variable);
 
             if(currentPathVariables.containsKey(variable.getName())){
-                currentPathVariables.replace(variable.getName(), variable);
+                if(currentPathVariables.get(variable.getName()).getClassReference() == null){
+                    currentPathVariables.replace(variable.getName(), variable);
+                }
             } else {
                 currentPathVariables.put(variable.getName(), variable);
             }
 
             if(functions.peek().getVariables().containsKey(variable.getName())){
-                functions.peek().getVariables().replace(variable.getName(), variable);
+                if(functions.peek().getVariables().get(variable.getName()).getClassReference() == null){
+                    functions.peek().getVariables().replace(variable.getName(), variable);
+                }
             } 
         }
     }
@@ -783,9 +855,23 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
     }
 
-    @Override
-    public void track(Variable variable){
-        
+    /**
+     * @function createNewVariableForAttributes
+     * @return Variable
+     * 
+     * Receives a variable and returns another reference to that variable with the same
+     * information regarding name, type, if it's tainted or not, etc. Used mainly because
+     * of class instances to know what attribute was used for that instance in a given statement,
+     * without having that information be overwritten to all other references of that variable
+     */
+    public Variable createNewVariableForAttributes(Variable variable){
+        Variable var = new Variable(variable.getName());
+        var.setClassReference(variable.getClassReference());
+        var.setType(variable.getType());
+        var.setLine(variable.getLine());
+        var.setTainted(variable.isTainted());
+        var.setText(variable.getText());
+        return var;
     }
 
 }

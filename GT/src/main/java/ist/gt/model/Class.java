@@ -26,9 +26,22 @@ public class Class extends Element {
     }
 
     private String superClass;
-
     private HashMap<String, Function> methods = new HashMap<>();
     private HashMap<String, Attribute> attributes = new HashMap<>();
+
+    /**
+     * @function areAttributesTainted
+     * If at least one attribute is tainted, then class object is considered tainted
+     */
+    public boolean areAttributesTainted(){
+        boolean tainted = false;
+
+        for(Attribute attribute : attributes.values()){
+            tainted = tainted || attribute.isTainted();
+        }
+
+        return tainted;
+    }
 
     @Override
     public void accept(AstBuilderVisitorInterface visitor) {
