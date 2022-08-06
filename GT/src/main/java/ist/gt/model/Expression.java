@@ -35,6 +35,8 @@ public class Expression extends Statement {
     //In case Variable will need to reference a class
     private Class classReference;
     private String selectedAttribute;
+    //In case it will need to store a lambda function
+    private Function lambdaFunc;
 
     public void setType(String type) {
         if (type != null)

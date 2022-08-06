@@ -17,6 +17,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
     private boolean wasConditionalExpr;
     private boolean wasAssignmentNeeded;
     private boolean negativeNumberFound = false;
+    private boolean lambdaFunctionDetected = false;
     private final GastBuilder gastBuilder;
     private final Stack<FunctionCall> expressionAfterPrimaryEnd = new Stack<>();
 
@@ -673,4 +674,49 @@ public class JavaFileListener extends Java8ParserBaseListener {
             gastBuilder.addAssignmentOperator("%=");
         }
     }
+
+    /**
+     * @function enterLambdaExpression
+     * 
+     * Checks if we are dealing with a lambda function. The flag 
+     * lambdaFunctionDetected will be used @function enterInferredFormalParameterList.
+     */
+    @Override
+    public void enterLambdaExpression(Java8Parser.LambdaExpressionContext ctx){
+        //Call to function here
+        if(ctx.ARROW() != null){
+            System.out.println("Got a lambda function here");
+            gastBuilder.addLambdaFunction(ctx);
+            lambdaFunctionDetected = true;
+        }
+    }
+
+    /**
+     * @function exitLambdaExpression
+     * 
+     * After analyzing the lambda function, the system is returned to its normal
+     * state (all flags regarding lambda functions are turned to false).
+     */
+    @Override
+    public void exitLambdaExpression(Java8Parser.LambdaExpressionContext ctx){
+        lambdaFunctionDetected = false;
+        gastBuilder.exitLambdaFunction();
+    }
+
+    /**
+     * @function enterInferredFormalParameterList
+     * 
+     * Mainly used for lambda functions. Represents its parameters in a list, so
+     * to get them, an iteration through it is needed.
+     */
+    @Override
+    public void enterInferredFormalParameterList(Java8Parser.InferredFormalParameterListContext ctx){
+        if(lambdaFunctionDetected){
+            for(int i = 0; i < ctx.Identifier().size(); i++){
+                System.out.println("Parameter found: " + ctx.Identifier(i).getText());
+                gastBuilder.addParametersToLambdaFunction(ctx, ctx.Identifier(i).getText());
+            }
+        }
+    }
+
 }

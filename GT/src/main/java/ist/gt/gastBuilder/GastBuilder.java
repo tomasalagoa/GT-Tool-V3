@@ -24,6 +24,7 @@ public class GastBuilder {
     private final Stack<Class> classes = new Stack<>();
     private ArrayList<Class> analyzedClasses = new ArrayList<>();
     private final Stack<TryCatch> tryCatches = new Stack<>();
+    private boolean analyzingLambdaFunc = false;
 
     private <E> void popIfNotEmpty(Stack<E> stack) {
         if (!stack.empty())
@@ -103,14 +104,24 @@ public class GastBuilder {
 
     public void addExpression(ParserRuleContext ctx) {
         Expression expression = new Expression(ctx);
-        processExpression(expression);
+        if(!analyzingLambdaFunc){
+            processExpression(expression);
+        } else{
+            if(!addStatementsToLambdaFunc(expression)){
+                processExpression(expression);
+            }
+        }
         statements.push(expression);
     }
 
 
     public Assignment addAssignment(ParserRuleContext ctx) {
         Assignment assignment = new Assignment(ctx);
-        codeBlocks.peek().getStatements().add(assignment);
+        if(!analyzingLambdaFunc){
+            codeBlocks.peek().getStatements().add(assignment);
+        } else{
+            addStatementsToLambdaFunc(assignment);
+        }
         statements.push(assignment);
         return assignment;
     }
@@ -118,7 +129,11 @@ public class GastBuilder {
 
     public ReturnStatement addReturnStatement(ParserRuleContext ctx) {
         ReturnStatement stmt = new ReturnStatement(ctx);
-        codeBlocks.peek().getStatements().add(stmt);
+        if(!analyzingLambdaFunc){
+            codeBlocks.peek().getStatements().add(stmt);
+        } else{
+            addStatementsToLambdaFunc(stmt);
+        }
         statements.push(stmt);
         return stmt;
     }
@@ -227,7 +242,11 @@ public class GastBuilder {
 
     public GenericStatement addGenericStatement(ParserRuleContext ctx) {
         var statement = new GenericStatement(ctx);
-        codeBlocks.peek().getStatements().add(statement);
+        if(!analyzingLambdaFunc){
+            codeBlocks.peek().getStatements().add(statement);
+        } else{
+            addStatementsToLambdaFunc(statement);
+        }
         statements.push(statement);
         return statement;
     }
@@ -291,6 +310,53 @@ public class GastBuilder {
         var attribute = addAttribute(ctx, name);
         attribute.setType(type);
         return attribute;
+    }
+
+    /**
+     * @function addLambdaFunction
+     * @params ctx
+     * 
+     * Creates a new Function to represent a lambda function and gives it to the
+     * Expression that will store it.
+     */
+    public void addLambdaFunction(ParserRuleContext ctx){
+        if(statements.peek() instanceof Expression){
+            Expression expression = (Expression) statements.pop();
+            Function lambdaFunc = new Function();
+            expression.setLambdaFunc(lambdaFunc);
+            expression.setType("Lambda");
+            analyzingLambdaFunc = true;
+            statements.push(expression);
+        }
+    }
+
+    /**
+     * @function exitLambdaFunction
+     * 
+     * Sets the flag analyzingLambdaFunc to false as it is no longer analyzing
+     * a lambda function.
+     */
+    public void exitLambdaFunction(){
+        analyzingLambdaFunc = false;
+    }
+
+    /**
+     * @function addParametersToLambdaFunction
+     * @params ctx, paramName
+     * 
+     * Receives a parameter's name as well as its context in order to retrieve 
+     * it from the root function and give it to the associated lambda function.
+     */
+    public void addParametersToLambdaFunction(ParserRuleContext ctx, String paramName){
+        if(statements.peek() instanceof Expression){
+            Expression expression = (Expression) statements.pop();
+            if(expression.getLambdaFunc() != null){
+                String type = this.getFile().getRootFunc().getParameters().get(paramName).getType();
+                Parameter param = new Parameter(ctx, paramName, type);
+                expression.getLambdaFunc().getParameters().putIfAbsent(paramName, param);
+            }
+            statements.push(expression);
+        }
     }
 
     /*==================================================================* 
@@ -419,7 +485,7 @@ public class GastBuilder {
      * if the right side exists (i.e could just be an empty variable declaration)
      * or if it has a type meaning its value could be tracked earlier (will be
      * tracked later if not). Also supports attribute accesses in either side of
-     * the assignment.
+     * the assignment and lambda function tracking.
      */
     public void trackLeftVariableValue(){
         Assignment assignment = (Assignment) statements.pop();
@@ -487,9 +553,12 @@ public class GastBuilder {
                         .getAttributes().get(rightAttribute).getType());
                     }
                 }
+            } else if(assignment.getRight().getLambdaFunc() != null){
+                var.setLambdaFunc(assignment.getRight().getLambdaFunc());
             }
 
-            if(var.getTrackedValue() != null || var.getClassReference() != null){
+            if(var.getTrackedValue() != null || var.getClassReference() != null 
+                || var.getLambdaFunc() != null){
                 currentFunction.getVariables().replace(var.getName(), var);
                 assignment.setLeft(var);
             }
@@ -818,5 +887,27 @@ public class GastBuilder {
         } else{
             return false;
         }
+    }
+
+    /**
+     * @function addStatementsToLambdaFunc
+     * @param statement
+     * @return boolean
+     * Adds a given statement to the codeblock of the current lambda function.
+     * Returns true if it is dealing with a lambda function, and false otherwise.  
+     */
+    public boolean addStatementsToLambdaFunc(Statement statement){
+        boolean isLambdaFuncExpr = false;
+        if(statements.peek() instanceof Expression){
+            //This expression should contain the lambda function
+            Expression expression = (Expression) statements.pop();
+            if(expression.getLambdaFunc() != null){
+                expression.getLambdaFunc().getCodeBlock().getStatements().add(statement);
+                isLambdaFuncExpr = true;
+            }
+            statements.push(expression);
+        }
+
+        return isLambdaFuncExpr;
     }
 }

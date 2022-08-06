@@ -618,7 +618,16 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     /*==================================================================* 
      *              New functions for value tracking                    *
      *==================================================================*/
-    @Override
+    
+     /**
+      * @function track(Assignment)
+      * @param assignment
+      * This function is used for value tracking of the left side of the 
+      * assignment, be it a primitive type, a class reference (more complex) or 
+      * a lambda function reference. More comments along it that explain some of
+      * the logic.
+      */
+     @Override
     public void track(Assignment assignment){
         if(assignment.getRight() != null){
             Expression expression = assignment.getRight();
@@ -713,7 +722,15 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
     }
 
-    //This will only be invoked if an expression has an operator
+    /**
+     * @function track(Expression)
+     * @param expression
+     * 
+     * Represents the logic for complex expressions between numbers and strings, ie,
+     * additive, multiplicative, equality, relational expressions. Various distinctions
+     * had to be made to assure the values are correct and legal. This function is invoked
+     * if a given expression possesses an operator (+, -, *, /, %, ==, !=, <, <=, >, >=).
+     */
     @Override
     public void track(Expression expression){
         Object result;

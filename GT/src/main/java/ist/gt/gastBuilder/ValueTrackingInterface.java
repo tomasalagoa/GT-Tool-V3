@@ -9,6 +9,4 @@ public interface ValueTrackingInterface {
     void track(Assignment assignment);
 
     void track(Expression expression);
-    
-    void track(Variable variable);
 }
