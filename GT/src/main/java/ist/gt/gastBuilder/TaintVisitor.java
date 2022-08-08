@@ -488,6 +488,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     private boolean processMethodCall(MethodCallExpression methodCall, String type, boolean isTaintedSource) {
         methodCall.setCurrentType(type);
         var isTainted = false;
+        boolean gotLambdaFunc = false;
         for (Expression member : methodCall.getMembers()) {
             if (member instanceof FunctionCall) {
                 FunctionCall funcCall = (FunctionCall) member;
@@ -500,19 +501,30 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     if (isCallToSanitizationFunction(funcCall, isTaintedSource, methodCall.getCurrentType())) {
                         continue;
                     }
-
-                    List<FileAndFunction> functions = getFunctionsForType(methodCall.getCurrentType(), funcCall);
-                    if (functions.isEmpty()) {
-                        System.out.println("Could not find any function for type " + methodCall.getCurrentType() + " and function: " + funcCall.getFunctionName() + " file: " + file.getName());
-                        funcCall.accept(this);
-                        methodCall.setCurrentType(funcCall.getReturnType());
-                        isTainted = isTainted || funcCall.isTainted() || (isTaintedSource && spec.isReturnTaintedIfTaintedSource());
+                    
+                    if(methodCall.getSource() instanceof Variable){
+                        Variable variable = (Variable) methodCall.getSource();
+                        if(variable.getLambdaFunc() != null){
+                            processFunction(variable.getLambdaFunc(), funcCall, file, classes.peek());
+                            isTainted = isTainted || funcCall.isTainted() || (isTaintedSource && spec.isReturnTaintedIfTaintedSource());
+                            gotLambdaFunc = true;
+                        }
                     }
 
-                    for (FileAndFunction func : functions) {
-                        processFunction(func.getFunction(), funcCall, func.getFile(), func.getClazz());
-                        isTainted = isTainted || funcCall.isTainted() || (isTaintedSource && spec.isReturnTaintedIfTaintedSource());
-                        methodCall.setCurrentType(func.getFunction().getReturnType());
+                    if(!gotLambdaFunc){
+                        List<FileAndFunction> functions = getFunctionsForType(methodCall.getCurrentType(), funcCall);
+                        if (functions.isEmpty()) {
+                            System.out.println("Could not find any function for type " + methodCall.getCurrentType() + " and function: " + funcCall.getFunctionName() + " file: " + file.getName());
+                            funcCall.accept(this);
+                            methodCall.setCurrentType(funcCall.getReturnType());
+                            isTainted = isTainted || funcCall.isTainted() || (isTaintedSource && spec.isReturnTaintedIfTaintedSource());
+                        }
+
+                        for (FileAndFunction func : functions) {
+                            processFunction(func.getFunction(), funcCall, func.getFile(), func.getClazz());
+                            isTainted = isTainted || funcCall.isTainted() || (isTaintedSource && spec.isReturnTaintedIfTaintedSource());
+                            methodCall.setCurrentType(func.getFunction().getReturnType());
+                        }
                     }
                 }
 
@@ -640,7 +652,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             //Case where the expression has only 1 element (parameter) whose value 
             //isn't known until it arrives to this stage (TaintVisitor), e.g, var = param;
             if(expression.getTrackedValue() == null && expression.getMembers().size() == 1
-                && expression.getClassReference() == null){
+                && expression.getClassReference() == null && expression.getLambdaFunc() == null){
                 expression.setType(expression.getMembers().get(0).getType());
                 expression.setTrackedValue(expression.getMembers().get(0).getTrackedValue());
             }
@@ -702,6 +714,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                         .getAttributes().get(rightAttribute).getType());
                     }
                 }
+            } else if(expression.getLambdaFunc() != null){
+                variable.setLambdaFunc(expression.getLambdaFunc());
             }
 
             assignment.setLeft(variable);

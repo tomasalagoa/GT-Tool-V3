@@ -24,7 +24,7 @@ public class GastBuilder {
     private final Stack<Class> classes = new Stack<>();
     private ArrayList<Class> analyzedClasses = new ArrayList<>();
     private final Stack<TryCatch> tryCatches = new Stack<>();
-    private boolean analyzingLambdaFunc = false;
+    private Function currentLambdaFunction;
 
     private <E> void popIfNotEmpty(Stack<E> stack) {
         if (!stack.empty())
@@ -104,7 +104,7 @@ public class GastBuilder {
 
     public void addExpression(ParserRuleContext ctx) {
         Expression expression = new Expression(ctx);
-        if(!analyzingLambdaFunc){
+        if(currentLambdaFunction == null){
             processExpression(expression);
         } else{
             if(!addStatementsToLambdaFunc(expression)){
@@ -117,7 +117,7 @@ public class GastBuilder {
 
     public Assignment addAssignment(ParserRuleContext ctx) {
         Assignment assignment = new Assignment(ctx);
-        if(!analyzingLambdaFunc){
+        if(currentLambdaFunction == null){
             codeBlocks.peek().getStatements().add(assignment);
         } else{
             addStatementsToLambdaFunc(assignment);
@@ -129,7 +129,7 @@ public class GastBuilder {
 
     public ReturnStatement addReturnStatement(ParserRuleContext ctx) {
         ReturnStatement stmt = new ReturnStatement(ctx);
-        if(!analyzingLambdaFunc){
+        if(currentLambdaFunction == null){
             codeBlocks.peek().getStatements().add(stmt);
         } else{
             addStatementsToLambdaFunc(stmt);
@@ -141,17 +141,25 @@ public class GastBuilder {
 
     public Variable addVariable(ParserRuleContext ctx, String name) {
         Variable var = new Variable(ctx, name);
-        //Update var's tracked value info in case the variable was
-        //already analysed
+        /* Update var's tracked value info in case the variable was
+         * already analysed. */
         if(currentFunction.getVariables().containsKey(var.getName())){
             var = currentFunction.getVariables().get(var.getName());
         }
-        //In case a parameter's value is overwriten (with an assignment), we will
-        //not know its type unless we retrieve it 
+        /* In case a parameter's value is overwriten (with an assignment), we will
+         * not know its type unless we retrieve it. */ 
         else if(!currentFunction.getVariables().containsKey(var.getName()) &&
         currentFunction.getParameters().containsKey(var.getName())){
             var = currentFunction.getParameters().get(var.getName());
         }
+        /* If the variable is not in current function nor is it a parameter of it,
+         * then it could be a parameter of a lambda function (declared in a interface to run it). */
+        else if(currentLambdaFunction != null){
+            if(currentLambdaFunction.getParameters().containsKey(var.getName())){
+                var = currentLambdaFunction.getParameters().get(var.getName());
+            }
+        }
+
         currentFunction.getVariables().putIfAbsent(var.getName(), var);
         processExpression(var);
         return var;
@@ -242,7 +250,7 @@ public class GastBuilder {
 
     public GenericStatement addGenericStatement(ParserRuleContext ctx) {
         var statement = new GenericStatement(ctx);
-        if(!analyzingLambdaFunc){
+        if(currentLambdaFunction == null){
             codeBlocks.peek().getStatements().add(statement);
         } else{
             addStatementsToLambdaFunc(statement);
@@ -325,7 +333,7 @@ public class GastBuilder {
             Function lambdaFunc = new Function();
             expression.setLambdaFunc(lambdaFunc);
             expression.setType("Lambda");
-            analyzingLambdaFunc = true;
+            currentLambdaFunction = lambdaFunc;
             statements.push(expression);
         }
     }
@@ -337,7 +345,7 @@ public class GastBuilder {
      * a lambda function.
      */
     public void exitLambdaFunction(){
-        analyzingLambdaFunc = false;
+        currentLambdaFunction = null;
     }
 
     /**
@@ -348,14 +356,10 @@ public class GastBuilder {
      * it from the root function and give it to the associated lambda function.
      */
     public void addParametersToLambdaFunction(ParserRuleContext ctx, String paramName){
-        if(statements.peek() instanceof Expression){
-            Expression expression = (Expression) statements.pop();
-            if(expression.getLambdaFunc() != null){
-                String type = this.getFile().getRootFunc().getParameters().get(paramName).getType();
-                Parameter param = new Parameter(ctx, paramName, type);
-                expression.getLambdaFunc().getParameters().putIfAbsent(paramName, param);
-            }
-            statements.push(expression);
+        if(currentLambdaFunction != null){
+            String type = this.getFile().getRootFunc().getParameters().get(paramName).getType();
+            Parameter param = new Parameter(ctx, paramName, type);
+            currentLambdaFunction.getParameters().put(paramName, param);
         }
     }
 
@@ -898,6 +902,18 @@ public class GastBuilder {
      */
     public boolean addStatementsToLambdaFunc(Statement statement){
         boolean isLambdaFuncExpr = false;
+        GenericStatement genStmt = null;
+        /**
+         * Found this "bug" in lambda functions (works as intended in normal functions) 
+         * where if we have, e.g, str = functionCall(something), the Parser will generate 
+         * a GenericStatement and the Assignment object that follows will be lost. However,
+         * what we want to truly capture is the Assignment, so the GenericStatement is 
+         * redundant in this case.
+         */
+        if(statements.peek() instanceof GenericStatement){
+            genStmt = (GenericStatement) statements.pop();
+        }
+
         if(statements.peek() instanceof Expression){
             //This expression should contain the lambda function
             Expression expression = (Expression) statements.pop();
@@ -906,6 +922,10 @@ public class GastBuilder {
                 isLambdaFuncExpr = true;
             }
             statements.push(expression);
+        }
+
+        if(genStmt != null){
+            statements.push(genStmt);
         }
 
         return isLambdaFuncExpr;

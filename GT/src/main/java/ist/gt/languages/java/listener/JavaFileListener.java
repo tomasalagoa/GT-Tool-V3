@@ -683,9 +683,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
      */
     @Override
     public void enterLambdaExpression(Java8Parser.LambdaExpressionContext ctx){
-        //Call to function here
         if(ctx.ARROW() != null){
-            System.out.println("Got a lambda function here");
             gastBuilder.addLambdaFunction(ctx);
             lambdaFunctionDetected = true;
         }
@@ -713,7 +711,6 @@ public class JavaFileListener extends Java8ParserBaseListener {
     public void enterInferredFormalParameterList(Java8Parser.InferredFormalParameterListContext ctx){
         if(lambdaFunctionDetected){
             for(int i = 0; i < ctx.Identifier().size(); i++){
-                System.out.println("Parameter found: " + ctx.Identifier(i).getText());
                 gastBuilder.addParametersToLambdaFunction(ctx, ctx.Identifier(i).getText());
             }
         }
