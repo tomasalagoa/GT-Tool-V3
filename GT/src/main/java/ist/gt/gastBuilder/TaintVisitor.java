@@ -189,6 +189,9 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
     @Override
     public void visit(Expression expression) {
+        if(expression.getOperator() != null && expression.getTrackedValue() == null){
+            expression.addValue(this);
+        }
         expression.setTainted(propagateTaintInExpressionList(expression.getMembers()));
     }
 
@@ -505,7 +508,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     if(methodCall.getSource() instanceof Variable){
                         Variable variable = (Variable) methodCall.getSource();
                         if(variable.getLambdaFunc() != null){
-                            processFunction(variable.getLambdaFunc(), funcCall, file, classes.peek());
+                            processFunction(variable.getLambdaFunc(), funcCall, file, classes.isEmpty() ? null : classes.peek());
                             isTainted = isTainted || funcCall.isTainted() || (isTaintedSource && spec.isReturnTaintedIfTaintedSource());
                             gotLambdaFunc = true;
                         }

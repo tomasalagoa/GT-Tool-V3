@@ -8,7 +8,6 @@ import lombok.Data;
 
 import java.util.Stack;
 
-import org.antlr.v4.runtime.ParserRuleContext;
 
 @Data
 public class JavaFileListener extends Java8ParserBaseListener {

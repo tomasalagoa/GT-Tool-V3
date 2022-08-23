@@ -174,8 +174,10 @@ public class GastBuilder {
 
     public Parameter addParameter(ParserRuleContext ctx, String name) {
         Parameter param = new Parameter(ctx, name);
-        statements.clear();
-        currentFunction.getParameters().put(param.getName(), param);
+        if(currentLambdaFunction == null){
+            statements.clear();
+            currentFunction.getParameters().put(param.getName(), param);
+        }
         return param;
     }
 
@@ -357,7 +359,12 @@ public class GastBuilder {
      */
     public void addParametersToLambdaFunction(ParserRuleContext ctx, String paramName){
         if(currentLambdaFunction != null){
-            String type = this.getFile().getRootFunc().getParameters().get(paramName).getType();
+            String type;
+            if(this.getFile().getRootFunc().getParameters().containsKey(paramName)){
+                type = this.getFile().getRootFunc().getParameters().get(paramName).getType();
+            } else{
+                type = null;
+            }
             Parameter param = new Parameter(ctx, paramName, type);
             currentLambdaFunction.getParameters().put(paramName, param);
         }
@@ -890,6 +897,59 @@ public class GastBuilder {
             return true;
         } else{
             return false;
+        }
+    }
+
+    /**
+     * @function createGenStatementForIncDecExpression
+     * This function was created because, unlike Java8Parser, other Parsers do not know what a 
+     * GenericStatement is. To keep the logic made in @assignmentIncrementDecrementExpression intact 
+     * (and avoid more if cases), a GenericStatement is created here with the necessary 
+     * adjustments to make sure the code is reused.
+     */
+    public void createGenStatementForIncDecExpression(ParserRuleContext ctx){
+        GenericStatement genStmt;
+        Expression expression;
+        addGenericStatement(ctx);
+        genStmt = (GenericStatement) statements.pop();
+        expression = (Expression) statements.pop();
+        Assignment assignment = (Assignment) statements.pop();
+
+        statements.push(genStmt);
+        statements.push(assignment);
+        statements.push(expression);
+
+        int idx = this.getCodeBlocks().peek().getStatements().size();
+        genStmt = (GenericStatement) this.getCodeBlocks().peek().getStatements().remove(idx-1); 
+        assignment = (Assignment) this.getCodeBlocks().peek().getStatements().remove(idx-2);
+        this.getCodeBlocks().peek().getStatements().add(genStmt);
+        this.getCodeBlocks().peek().getStatements().add(assignment);
+    }
+
+    /**
+     * @function switchGenStatementForIncDecExpression
+     * This function is used to keep the logic made in @normalIncrementDecrementExpression intact 
+     * (and avoid more if cases), by switching the GenericStatement with the Expression 
+     * created before it.
+     */
+    public void switchGenStatementForIncDecExpression(boolean switchBack){
+        Expression expression;
+        GenericStatement genStmt;
+        if(switchBack){
+            genStmt = (GenericStatement) statements.pop();
+            expression = (Expression) statements.pop();
+
+            statements.push(genStmt);
+            statements.push(expression);
+
+        } else{
+            expression = (Expression) statements.pop();
+            genStmt = (GenericStatement) statements.pop();
+            Variable variable = (Variable) expression.getMembers().get(0);
+            genStmt.setStatement(variable);
+
+            statements.push(expression);
+            statements.push(genStmt);
         }
     }
 
