@@ -153,7 +153,7 @@ public class GastBuilder {
             var = currentFunction.getParameters().get(var.getName());
         }
         /* If the variable is not in current function nor is it a parameter of it,
-         * then it could be a parameter of a lambda function (declared in a interface to run it). */
+         * then it could be a parameter of a lambda function (declared in an interface to run it). */
         else if(currentLambdaFunction != null){
             if(currentLambdaFunction.getParameters().containsKey(var.getName())){
                 var = currentLambdaFunction.getParameters().get(var.getName());
@@ -312,7 +312,7 @@ public class GastBuilder {
         var attribute = new Attribute(ctx, name);
         classes.peek().getAttributes().put(attribute.getName(), attribute);
         processExpression(attribute);
-        statements.push(attribute);
+        //statements.push(attribute);
         return attribute;
     }
 
@@ -391,7 +391,7 @@ public class GastBuilder {
         Class trackedClass = new Class(className);
         Class originalClass = null;
 
-        for(Class c : this.classes){
+        for(Class c : this.analyzedClasses){
             if(c.getName().equals(className)){
                 originalClass = c;
                 break;
@@ -570,7 +570,9 @@ public class GastBuilder {
 
             if(var.getTrackedValue() != null || var.getClassReference() != null 
                 || var.getLambdaFunc() != null){
-                currentFunction.getVariables().replace(var.getName(), var);
+                if(var.getSelectedAttribute() == null){
+                    currentFunction.getVariables().replace(var.getName(), var);
+                }
                 assignment.setLeft(var);
             }
         }
@@ -592,12 +594,20 @@ public class GastBuilder {
             if(expression.getTrackedValue() == null && expression.getMembers()
             .get(0).getClassReference() == null){
                 expression.setTrackedValue(expression.getMembers().get(0).getTrackedValue());
+                expression.setType(expression.getMembers().get(0).getType());
             } 
             else if(expression.getMembers().get(0).getClassReference() != null && 
-                        expression.getClassReference() == null){
+                    expression.getClassReference() == null){
                 expression.setClassReference(expression.getMembers().get(0).getClassReference());
+                if(expression.getMembers().get(0).getSelectedAttribute() != null){
+                    String attribute = expression.getMembers().get(0).getSelectedAttribute();
+                    expression.setSelectedAttribute(attribute);
+                    expression.setType(expression.getMembers().get(0).getClassReference()
+                    .getAttributes().get(attribute).getType());
+                } else{
+                    expression.setType(expression.getMembers().get(0).getType());
+                }
             }
-            expression.setType(expression.getMembers().get(0).getType());
         }
 
         statements.push(expression);
@@ -649,7 +659,13 @@ public class GastBuilder {
                 return;
             } else{
                 Variable variable = (Variable) assignment.getLeft();
-                Expression expression = assignment.getRight();
+                Expression expression;
+                if(statements.peek() instanceof Expression){
+                    expression = assignment.getRight();
+                } else{
+                    expression = new Expression();
+                    expression.getMembers().add(assignment.getRight());
+                }
                 expression.getMembers().add(0, variable);
 
                 switch(assignment.getOperator()){
@@ -795,45 +811,83 @@ public class GastBuilder {
      * statement in the statements Stack will be the Assignment object.
      * 2. In the right side of an assignment, and it can be known because the right side
      * is always represented with an Expression so it is enough to check if the statement before
-     * is an Assignment or not.
+     * is an Assignment or not. May also be used when it is an argument in a function call.
      * 3. In a pre/post-increment/decrement expression, known by the use of GenericStatement in these
      * types of statements.
      */
     public void accessedAttribute(){
+        List<String> members = null;
         //Attribute access is on the left side of assignment
         if(statements.peek() instanceof Assignment){
             Assignment assignment = (Assignment) statements.pop();
             Variable left = (Variable) assignment.getLeft();
-            List<String> members = Arrays.asList(left.getName().split("\\."));
+            boolean isInLeft = true;
+            /**
+             * JavaScript treats attribute accesses (and other expressions) different than Java, not using
+             * Expression object in certain cases to contain other objects (variable, attribute access, etc).
+             * Because of this, eg, var str = x.y will go here as the right side wont have an Expression object but a
+             * Variable object instead...
+             */
+            if(left.getName().matches("[a-zA-Z0-9_]+\\.[a-zA-Z0-9_]+")){
+                members = Arrays.asList(left.getName().split("\\."));
+            } else if(assignment.getRight() instanceof Variable){
+                Variable right = (Variable) assignment.getRight();
+                members = Arrays.asList(right.getName().split("\\."));
+                isInLeft = false;
+            }
 
-            Variable var = createNewVariableForAttributes(currentFunction.getVariables().get(members.get(0)));
-            var.setSelectedAttribute(members.get(1));
-            assignment.setLeft(var);
+            if(members != null){
+                Variable var = createNewVariableForAttributes(currentFunction.getVariables().get(members.get(0)));
+                var.setSelectedAttribute(members.get(1));
+                if(isInLeft){
+                    assignment.setLeft(var);
+                } else{
+                    assignment.setRight(var);
+                }
+            }
             statements.push(assignment);
         //Attribute access is on the right side of expression
         } else if(statements.peek() instanceof Expression){
+            Variable var = null, attribute = null;
+            int newAttributeAddedIdx = -1;
+            String attributeName = "";
+            String fileNameExtension = Arrays.asList(this.file.getName().split("\\.")).get(1);
             Expression expression = (Expression) statements.pop();
-            //Assignment assignment = (Assignment) statements.pop();
-            /* 3 here relates to the members that exist in an expression when we have an attribute access,
-             * e.g., for someClass.someAttribute it would have Variable (someClass), AttributeAccess, 
-             * Variable (someAttribute). So if we have a complex expression (someClass.someAttribute + 
-             * anotherClass.anotherAttribute), it would have 4 members (the already parsed someClass and the
-             * to-be-parsed anotherClass).
-            */
-            int newAttributeAddedIdx = expression.getMembers().size() - 3;
-            Variable attribute = (Variable) expression.getMembers().get(newAttributeAddedIdx + 2);
-            //No need for AttributeAccess & Variable for attribute anymore
-            expression.getMembers().remove(newAttributeAddedIdx + 2);
-            expression.getMembers().remove(newAttributeAddedIdx + 1);
-            
-            Variable var = createNewVariableForAttributes((Variable) expression.getMembers().get(newAttributeAddedIdx));
-            var.setSelectedAttribute(attribute.getName());
+
+            if(fileNameExtension.equals("java")){
+                /* 3 here relates to the members that exist in an expression when we have an attribute access,
+                    * e.g., for someClass.someAttribute it would have Variable (someClass), AttributeAccess, 
+                    * Variable (someAttribute). So if we have a complex expression (someClass.someAttribute + 
+                    * anotherClass.anotherAttribute), it would have 4 members (the already parsed someClass and the
+                    * to-be-parsed anotherClass).
+                */
+                newAttributeAddedIdx = expression.getMembers().size() - 3;
+                attribute = (Variable) expression.getMembers().get(newAttributeAddedIdx + 2);
+                attributeName = attribute.getName();
+                //No need for AttributeAccess & Variable for attribute anymore
+                expression.getMembers().remove(newAttributeAddedIdx + 2);
+                expression.getMembers().remove(newAttributeAddedIdx + 1);
+                
+                var = createNewVariableForAttributes((Variable) expression.getMembers().get(newAttributeAddedIdx));
+                var.setSelectedAttribute(attributeName);
+            } else if(fileNameExtension.equals("js")){
+                /**
+                 * For more complex expressions (using +, -, +=, etc), JavaScript adds the Expression object
+                 * however, the accessed attribute is done with one object only: a Variable with source.attribute name.
+                 */
+                newAttributeAddedIdx = expression.getMembers().size() - 1;
+                Variable tempVar = (Variable) expression.getMembers().get(newAttributeAddedIdx);
+                members = Arrays.asList(tempVar.getName().split("\\."));
+                attributeName = members.get(1);
+                var = createNewVariableForAttributes(currentFunction.getVariables().get(members.get(0)));
+                var.setSelectedAttribute(attributeName);
+            }
             
             if(newAttributeAddedIdx == 0){
-                expression.setSelectedAttribute(attribute.getName());
+                //expression.setSelectedAttribute(attributeName);
                 expression.getMembers().clear();
                 expression.getMembers().add(var);
-                expression.setClassReference(expression.getMembers().get(newAttributeAddedIdx).getClassReference());
+                //expression.setClassReference(expression.getMembers().get(newAttributeAddedIdx).getClassReference());
             } else{
                 expression.getMembers().remove(newAttributeAddedIdx);
                 expression.getMembers().add(newAttributeAddedIdx, var);
@@ -989,5 +1043,19 @@ public class GastBuilder {
         }
 
         return isLambdaFuncExpr;
+    }
+
+    public void addAttributeToClass(ParserRuleContext ctx, String attributeName){
+        if(!this.classes.isEmpty() && !this.classes.peek().getAttributes().containsKey(attributeName)){
+            addAttribute(ctx, attributeName);
+        }
+    }
+    //Will be used only when in constructor 
+    public void addClassAttributeToAssignment(String attributeName){
+        if(statements.peek() instanceof Assignment){
+            Assignment assignment = (Assignment) statements.pop();
+            assignment.setLeft(this.classes.peek().getAttributes().get(attributeName));
+            statements.push(assignment);
+        }
     }
 }

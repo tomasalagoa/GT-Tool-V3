@@ -511,6 +511,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                             processFunction(variable.getLambdaFunc(), funcCall, file, classes.isEmpty() ? null : classes.peek());
                             isTainted = isTainted || funcCall.isTainted() || (isTaintedSource && spec.isReturnTaintedIfTaintedSource());
                             gotLambdaFunc = true;
+                            variable.getLambdaFunc().getCodeBlock().setFullyExplored(false);
                         }
                     }
 
@@ -711,14 +712,33 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     } 
                     else{
                         String rightAttribute = expression.getSelectedAttribute();
+
                         variable.setTrackedValue(expression.getClassReference()
                         .getAttributes().get(rightAttribute).getTrackedValue());
+
                         variable.setType(expression.getClassReference()
                         .getAttributes().get(rightAttribute).getType());
                     }
                 }
             } else if(expression.getLambdaFunc() != null){
                 variable.setLambdaFunc(expression.getLambdaFunc());
+            } else{
+                if(variable.getClassReference() != null){
+                    if(variable.getSelectedAttribute() != null){
+                        String attribute = variable.getSelectedAttribute();
+                        variable.getClassReference().getAttributes().get(attribute).setTrackedValue(null);
+                        variable.getClassReference().getAttributes().get(attribute).setClassReference(null);
+                        variable.getClassReference().getAttributes().get(attribute).setLambdaFunc(null);
+                        variable.getClassReference().getAttributes().get(attribute).setType(null);
+                    } else{
+                        variable.setClassReference(null);
+                        variable.setType(null);
+                    }
+
+                } else{
+                    variable.setTrackedValue(null);
+                    variable.setType(null);
+                }
             }
 
             assignment.setLeft(variable);

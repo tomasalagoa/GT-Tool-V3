@@ -298,10 +298,10 @@ public class JavaFileListener extends Java8ParserBaseListener {
         gastBuilder.addAttribute(ctx, ctx.variableDeclaratorList().variableDeclarator(0).variableDeclaratorId().getText(), ctx.unannType().getText());
     }
 
-    @Override
+    /*@Override
     public void exitFieldDeclaration(Java8Parser.FieldDeclarationContext ctx) {
         gastBuilder.exitStatementOrExpression();
-    }
+    }*/
 
     @Override
     public void enterAssignment(Java8Parser.AssignmentContext ctx) {

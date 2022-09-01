@@ -5,6 +5,8 @@ import ist.gt.languages.js.parser.JavaScriptParser;
 import ist.gt.languages.js.parser.JavaScriptParserBaseListener;
 import ist.gt.model.Expression;
 import ist.gt.util.Util;
+
+import java.util.Arrays;
 import lombok.Data;
 
 @Data
@@ -20,6 +22,10 @@ public class JsFileListener extends JavaScriptParserBaseListener {
     /* This is used for normal pre/post increment-decrement expressions where 
      * GenericStatement is parsed by the Parser (and not inserted by the tool) */
     private boolean genericStatementParsed = false;
+    private boolean constructorFound = false;
+    //When accessing a variable, the Parser will send the same variable twice which can cause unwanted behavior
+    private boolean variableAttributeAccess = false;
+    private String variableAccessName = "";
 
     public JsFileListener(String filename) {
         gastBuilder = new GastBuilder(filename);
@@ -37,19 +43,15 @@ public class JsFileListener extends JavaScriptParserBaseListener {
             gastBuilder.addConstant(ctx, ctx.getText(), "null");
         } else if (ctx.numericLiteral() != null){
             if(negativeNumberFound){
-                System.out.println("-" + ctx.getText());
                 gastBuilder.addConstant(ctx, "-" + ctx.getText(), "double");
                 negativeNumberFound = false;
-            }
-            else{
-                System.out.println(ctx.getText());
+            } else{
                 gastBuilder.addConstant(ctx, ctx.getText(), "double");
             }
-        } else if(ctx.TemplateStringLiteral() != null){
-            System.out.println(ctx.getText() + " Template String");
-        } else if(ctx.RegularExpressionLiteral() != null){
-            System.out.println(ctx.getText() + " Regular Expression");
-        }
+        } else if(ctx.TemplateStringLiteral() != null || ctx.RegularExpressionLiteral() != null){
+            String rmvQuotes = ctx.getText().substring(1, ctx.getText().length()-1).replace("\"\"", "\"");
+            gastBuilder.addConstant(ctx, rmvQuotes, "String");
+        } 
     }
 
     @Override
@@ -65,11 +67,17 @@ public class JsFileListener extends JavaScriptParserBaseListener {
     @Override
     public void enterMethodDefinition(JavaScriptParser.MethodDefinitionContext ctx) {
         gastBuilder.addFunction(ctx, ctx.propertyName().getText());
+        if(ctx.propertyName().getText().equals("constructor")){
+            constructorFound = true;
+        }
     }
 
     @Override
     public void exitMethodDefinition(JavaScriptParser.MethodDefinitionContext ctx) {
         gastBuilder.exitFunctionOrMethodDeclaration();
+        if(constructorFound){
+            constructorFound = false;
+        }
     }
     
     @Override
@@ -119,7 +127,7 @@ public class JsFileListener extends JavaScriptParserBaseListener {
                 genericStatementInserted = true;
             }
 
-            if(ctx.getText().matches("\\+\\+[a-zA-Z0-9_]+")){
+            if(ctx.getText().matches("\\+\\+[a-zA-Z0-9_]+?\\.?[a-zA-Z0-9_]+")){
                 if(wasAssignmentFound){
                     gastBuilder.assignmentIncrementDecrementExpression(ctx, "+", "pre");
                 } else {
@@ -127,7 +135,7 @@ public class JsFileListener extends JavaScriptParserBaseListener {
                     gastBuilder.normalIncrementDecrementExpression(ctx, "+", "pre");
                     gastBuilder.switchGenStatementForIncDecExpression(true);
                 }
-            } else if(ctx.getText().matches("[a-zA-Z0-9_]+\\+\\+")){
+            } else if(ctx.getText().matches("[a-zA-Z0-9_]+?\\.?[a-zA-Z0-9_]+\\+\\+")){
                 if(wasAssignmentFound){
                     gastBuilder.assignmentIncrementDecrementExpression(ctx, "+", "post");
                 } else{
@@ -145,7 +153,7 @@ public class JsFileListener extends JavaScriptParserBaseListener {
                 genericStatementInserted = true;
             }
 
-            if(ctx.getText().matches("--[a-zA-Z0-9_]+")){
+            if(ctx.getText().matches("--[a-zA-Z0-9_]+?\\.?[a-zA-Z0-9_]+")){
                 if(wasAssignmentFound){
                     gastBuilder.assignmentIncrementDecrementExpression(ctx, "-", "pre");
                 } else{
@@ -153,7 +161,7 @@ public class JsFileListener extends JavaScriptParserBaseListener {
                     gastBuilder.normalIncrementDecrementExpression(ctx, "-", "pre");
                     gastBuilder.switchGenStatementForIncDecExpression(true);
                 }
-            } else if(ctx.getText().matches("[a-zA-Z0-9_]+--")){
+            } else if(ctx.getText().matches("[a-zA-Z0-9_]+?\\.?[a-zA-Z0-9_]+--")){
                 if(wasAssignmentFound){
                     gastBuilder.assignmentIncrementDecrementExpression(ctx, "-", "post");
                 }  else{
@@ -170,7 +178,7 @@ public class JsFileListener extends JavaScriptParserBaseListener {
             insertedExpression = false;
         }
     }
-
+ 
     @Override
     public void enterClassDeclaration(JavaScriptParser.ClassDeclarationContext ctx) {
         gastBuilder.addClass(ctx, Util.getPropSafe(() -> ctx.identifier().getText()), Util.getPropSafe(() -> ctx.classTail().singleExpression().getText()));
@@ -184,7 +192,12 @@ public class JsFileListener extends JavaScriptParserBaseListener {
 
     @Override
     public void enterIdentifierExpression(JavaScriptParser.IdentifierExpressionContext ctx) {
-        gastBuilder.addVariable(ctx, ctx.identifier().getText());
+        if(!variableAttributeAccess){
+            gastBuilder.addVariable(ctx, ctx.identifier().getText());
+        } else if(variableAttributeAccess && ctx.identifier().getText().equals(variableAccessName)){
+            variableAccessName = "";
+            variableAttributeAccess = false;
+        }
     }
 
     @Override
@@ -209,7 +222,12 @@ public class JsFileListener extends JavaScriptParserBaseListener {
 
     @Override
     public void enterAssignable(JavaScriptParser.AssignableContext ctx) {
-        gastBuilder.addVariable(ctx, ctx.getText());
+        if(!variableAttributeAccess){
+            gastBuilder.addVariable(ctx, ctx.getText());
+        } else if(variableAttributeAccess && ctx.identifier().getText().equals(variableAccessName)){
+            variableAccessName = "";
+            variableAttributeAccess = false;
+        }
     }
 
     @Override
@@ -290,12 +308,10 @@ public class JsFileListener extends JavaScriptParserBaseListener {
 
     @Override
     public void enterAttributeAccess(JavaScriptParser.AttributeAccessContext ctx) {
-        gastBuilder.addAttributeAccess(ctx, ctx.identifierName().getText());
-    }
-
-    @Override
-    public void exitAttributeAccess(JavaScriptParser.AttributeAccessContext ctx) {
-        gastBuilder.exitStatementOrExpression();
+        if(constructorFound){
+            gastBuilder.addAttributeToClass(ctx, ctx.identifierName().getText());
+            gastBuilder.addClassAttributeToAssignment(ctx.identifierName().getText());
+        }
     }
 
     @Override
@@ -314,26 +330,9 @@ public class JsFileListener extends JavaScriptParserBaseListener {
         gastBuilder.exitConditionalStatement();
     }
 
-    /*@Override
-    public void enterExpressionSequence(JavaScriptParser.ExpressionSequenceContext ctx) {
-        gastBuilder.addExpression(ctx);
-    }
-
-    @Override
-    public void exitExpressionSequence(JavaScriptParser.ExpressionSequenceContext ctx) {
-        gastBuilder.trackExpressionValue();
-        gastBuilder.exitStatementOrExpression();
-    }*/
-
-
     @Override
     public void enterAttribute(JavaScriptParser.AttributeContext ctx) {
         gastBuilder.addAttribute(ctx, ctx.propertyName().getText());
-    }
-
-    @Override
-    public void exitAttribute(JavaScriptParser.AttributeContext ctx) {
-        gastBuilder.exitStatementOrExpression();
     }
 
     @Override
@@ -348,13 +347,38 @@ public class JsFileListener extends JavaScriptParserBaseListener {
 
     @Override
     public void enterArgumentsExpression(JavaScriptParser.ArgumentsExpressionContext ctx) {
-        gastBuilder.addMethodCall(ctx);
-        gastBuilder.addVariable(ctx,  ctx.singleExpression().getText());
+        if(ctx.Dot() != null){
+            if(ctx.functionCall().size() > 0){
+                gastBuilder.addMethodCall(ctx);
+                gastBuilder.addVariable(ctx,  ctx.singleExpression().getText());
+            } else if(ctx.attributeAccess().size() > 0){
+                if(!ctx.singleExpression().getText().equals("this")){
+                    gastBuilder.addVariable(ctx, ctx.singleExpression().getText() + "." + ctx.attributeAccess(0).identifierName().getText());
+                    variableAttributeAccess = true;
+                    variableAccessName = ctx.singleExpression().getText();
+                }
+                
+                if(constructorFound){
+                    gastBuilder.addAttributeToClass(ctx, ctx.attributeAccess(0).identifierName().getText());
+                    gastBuilder.addClassAttributeToAssignment(ctx.attributeAccess(0).identifierName().getText());
+                } else{
+                    gastBuilder.accessedAttribute();
+                }
+            }
+        } else{
+            gastBuilder.addExpression(ctx);
+        }
     }
 
     @Override
     public void exitArgumentsExpression(JavaScriptParser.ArgumentsExpressionContext ctx) {
-        gastBuilder.exitStatementOrExpression();
+        if(ctx.Dot() != null){
+            if(ctx.functionCall().size() > 0){
+                gastBuilder.exitStatementOrExpression();
+            }
+        } else{
+            gastBuilder.exitStatementOrExpression();
+        }
     }
 
     /**
@@ -431,5 +455,17 @@ public class JsFileListener extends JavaScriptParserBaseListener {
     public void exitExpressionStatement(JavaScriptParser.ExpressionStatementContext ctx){
         gastBuilder.exitStatementOrExpression();
         genericStatementParsed = false;
+    }
+
+    @Override
+    public void enterNewExpression(JavaScriptParser.NewExpressionContext ctx){
+        String className = Arrays.asList(ctx.singleExpression().getText().split("\\(")).get(0);
+        gastBuilder.addExpression(ctx);
+        gastBuilder.trackClassReference(className);
+    }
+
+    @Override
+    public void exitNewExpression(JavaScriptParser.NewExpressionContext ctx){
+        gastBuilder.exitStatementOrExpression();
     }
 }
