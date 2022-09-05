@@ -17,6 +17,8 @@ public class JavaFileListener extends Java8ParserBaseListener {
     private boolean wasAssignmentNeeded;
     private boolean negativeNumberFound = false;
     private boolean lambdaFunctionDetected = false;
+    private boolean wasVarDecl = false;
+    private boolean genStmtInserted = false;
     private final GastBuilder gastBuilder;
     private final Stack<FunctionCall> expressionAfterPrimaryEnd = new Stack<>();
 
@@ -147,6 +149,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void enterLocalVariableDeclarationStatement(Java8Parser.LocalVariableDeclarationStatementContext ctx) {
         gastBuilder.addAssignment(ctx);
+        wasVarDecl = true;
     }
 
     @Override
@@ -155,6 +158,12 @@ public class JavaFileListener extends Java8ParserBaseListener {
         //Used in situations where assignment has +=, -=, *=, /=, %=
         gastBuilder.modifyAssignmentWithOperator();
         gastBuilder.exitStatementOrExpression();
+        wasVarDecl = false;
+        if(genStmtInserted){
+            genStmtInserted = false;
+            gastBuilder.exitStatementOrExpression();
+        }
+        
     }
 
     @Override
@@ -583,6 +592,10 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void exitPreIncrementExpression(Java8Parser.PreIncrementExpressionContext ctx){
         if(ctx.INC() != null){
+            if(wasVarDecl){
+                gastBuilder.createGenStatementForIncDecExpression(ctx);
+                genStmtInserted = true;
+            }
             gastBuilder.normalIncrementDecrementExpression(ctx, "+", "pre");
         }
     }
@@ -595,6 +608,10 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void exitPreDecrementExpression(Java8Parser.PreDecrementExpressionContext ctx){
         if(ctx.DEC() != null){
+            if(wasVarDecl){
+                gastBuilder.createGenStatementForIncDecExpression(ctx);
+                genStmtInserted = true;
+            }
             gastBuilder.normalIncrementDecrementExpression(ctx, "-", "pre");
         }
     }
@@ -633,6 +650,10 @@ public class JavaFileListener extends Java8ParserBaseListener {
     public void exitPostIncrementExpression_lf_postfixExpression(Java8Parser.
     PostIncrementExpression_lf_postfixExpressionContext ctx){
         if(ctx.INC() != null){
+            if(wasVarDecl){
+                gastBuilder.createGenStatementForIncDecExpression(ctx);
+                genStmtInserted = true;
+            }
             gastBuilder.assignmentIncrementDecrementExpression(ctx, "+", "post");
         }
     }
@@ -647,6 +668,10 @@ public class JavaFileListener extends Java8ParserBaseListener {
     public void exitPostDecrementExpression_lf_postfixExpression(Java8Parser.
     PostDecrementExpression_lf_postfixExpressionContext ctx){
         if(ctx.DEC() != null){
+            if(wasVarDecl){
+                gastBuilder.createGenStatementForIncDecExpression(ctx);
+                genStmtInserted = true;
+            }
             gastBuilder.assignmentIncrementDecrementExpression(ctx, "-", "post");
         }
     }

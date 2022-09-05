@@ -184,6 +184,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             vulnerability.setFunctionCallStack(new ArrayList<>(functionNames));
             AstConverter.addVulnerability(vulnerability);
 //            CommonTools.throwAny(new Exception("Found vulnerability " + functionCall.getLine()));
+            System.out.println("Found vulnerability " + functionCall.getLine() + " " + functionCall.getText());
         }
     }
 

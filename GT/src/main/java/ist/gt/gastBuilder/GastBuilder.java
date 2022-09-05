@@ -501,7 +501,8 @@ public class GastBuilder {
     public void trackLeftVariableValue(){
         Assignment assignment = (Assignment) statements.pop();
 
-        if(assignment.getRight() != null && assignment.getRight().getType() != null){
+        if(assignment.getRight() != null && assignment.getRight().getType() != null && 
+        (assignment.getOperator() == null || (assignment.getOperator() != null && assignment.getOperator().equals("=")))){
             Variable var = (Variable) assignment.getLeft();
             //Variable var = currentFunction.getVariables().get(tmpVar.getName());
             //Is the right-side a simple variable?
@@ -1044,7 +1045,12 @@ public class GastBuilder {
 
         return isLambdaFuncExpr;
     }
-
+    /**
+     * @function addAttributeToClass
+     * In JavaScripParser's case, an Attribute is not immediately recognized as it is only analyzed when
+     * in the constructor. So, for that, once we verify that we are indeed in the constructor we create
+     * the attribute so that it can be added to its class.
+     */
     public void addAttributeToClass(ParserRuleContext ctx, String attributeName){
         if(!this.classes.isEmpty() && !this.classes.peek().getAttributes().containsKey(attributeName)){
             addAttribute(ctx, attributeName);

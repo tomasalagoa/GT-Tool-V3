@@ -67,7 +67,7 @@ public class AstConverter {
                 CommonTokenStream tokens = new CommonTokenStream(new Java8Lexer(input));
                 var tree = new Java8Parser(tokens).compilationUnit();
                 var listener = new JavaFileListener(path.getFileName().toString());
-                if(analyzedClasses.size() != 0){
+                if(!analyzedClasses.isEmpty()){
                     listener.getGastBuilder().setAnalyzedClasses(analyzedClasses);
                 }
                 walker.walk(listener, tree);
@@ -78,7 +78,11 @@ public class AstConverter {
                 CommonTokenStream tokens = new CommonTokenStream(new JavaScriptLexer(input));
                 var tree = new JavaScriptParser(tokens).program();
                 var listener = new JsFileListener(path.getFileName().toString());
+                if(!analyzedClasses.isEmpty()){
+                    listener.getGastBuilder().setAnalyzedClasses(analyzedClasses);
+                }
                 walker.walk(listener, tree);
+                analyzedClasses = listener.getGastBuilder().getAnalyzedClasses();
                 return listener.getGastBuilder().getFile();
             }
             case "py" -> {
