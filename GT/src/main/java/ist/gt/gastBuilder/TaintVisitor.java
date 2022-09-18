@@ -121,7 +121,15 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 functionCall.setReturnType(fileAndFunction.getFunction().getReturnType());
             }
         } else {
-            functionCall.setTainted(propagateTaintInExpressionList(functionCall.getMembers()));
+            //In Python, a lambda function is called by making the variable that contains it a function call
+            if(currentPathVariables.containsKey(functionCall.getFunctionName())){
+                Variable variable = currentPathVariables.get(functionCall.getFunctionName());
+                processFunction(variable.getLambdaFunc(), functionCall, file, classes.isEmpty() ? null : classes.peek());
+                variable.getLambdaFunc().getCodeBlock().setFullyExplored(false);
+                
+            } else{
+                functionCall.setTainted(propagateTaintInExpressionList(functionCall.getMembers()));
+            }
         }
     }
 
@@ -663,8 +671,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             }
 
             if(expression.getTrackedValue() != null){
-                if(variable.getClassReference() == null){
+                if(variable.getClassReference() == null || 
+                (variable.getClassReference() != null && variable.getSelectedAttribute() == null)){
                     variable.setTrackedValue(expression.getTrackedValue());
+                    variable.setClassReference(null);
+                    variable.setLambdaFunc(null);
                     variable.setType(expression.getType());
                 } else{
                     String leftAttribute = assignment.getLeft().getSelectedAttribute();
@@ -696,6 +707,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     else{
                         variable.setClassReference(expression.getClassReference());
                         variable.setType(expression.getType());
+                        variable.setTrackedValue(null);
+                        variable.setLambdaFunc(null);
                     }
                 }
                 else{
@@ -719,10 +732,14 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
                         variable.setType(expression.getClassReference()
                         .getAttributes().get(rightAttribute).getType());
+                        variable.setClassReference(null);
+                        variable.setLambdaFunc(null);
                     }
                 }
             } else if(expression.getLambdaFunc() != null){
                 variable.setLambdaFunc(expression.getLambdaFunc());
+                variable.setClassReference(null);
+                variable.setTrackedValue(null);
             } else{
                 if(variable.getClassReference() != null){
                     if(variable.getSelectedAttribute() != null){
@@ -738,6 +755,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
                 } else{
                     variable.setTrackedValue(null);
+                    variable.setLambdaFunc(null);
                     variable.setType(null);
                 }
             }

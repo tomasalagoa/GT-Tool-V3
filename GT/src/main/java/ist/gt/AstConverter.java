@@ -89,7 +89,11 @@ public class AstConverter {
                 CommonTokenStream tokens = new CommonTokenStream(new PythonLexer(input));
                 var tree = new PythonParser(tokens).root();
                 var listener = new PythonFileListener(path.getFileName().toString());
+                if(!analyzedClasses.isEmpty()){
+                    listener.getGastBuilder().setAnalyzedClasses(analyzedClasses);
+                }
                 walker.walk(listener, tree);
+                analyzedClasses = listener.getGastBuilder().getAnalyzedClasses();
                 return listener.getGastBuilder().getFile();
             }
             default -> throw new Exception("File extension not supported");

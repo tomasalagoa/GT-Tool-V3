@@ -82,7 +82,7 @@ public class JsFileListener extends JavaScriptParserBaseListener {
     
     @Override
     public void enterGenericExpression(JavaScriptParser.GenericExpressionContext ctx) {
-        /* To avoid adding an Expression to another existing Expression*/
+        /* To avoid adding an Expression to another existing Expression (has unnecessary cases)*/
         if(!(gastBuilder.getStatements().peek() instanceof Expression)){
             gastBuilder.addExpression(ctx);
             insertedExpression = true;
