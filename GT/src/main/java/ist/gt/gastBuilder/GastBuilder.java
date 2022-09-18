@@ -96,7 +96,13 @@ public class GastBuilder {
 
     public FunctionCall addFunctionCall(ParserRuleContext ctx, String name) {
         var functionCall = new FunctionCall(ctx, name);
-        processExpression(functionCall);
+        if(currentLambdaFunction == null){
+            processExpression(functionCall);
+        } else{
+            if(!addStatementsToLambdaFunc(functionCall)){
+                processExpression(functionCall);
+            }
+        }
         statements.push(functionCall);
         return functionCall;
     }
@@ -486,6 +492,9 @@ public class GastBuilder {
         newAttribute.setTainted(attribute.isTainted());
         newAttribute.setLine(attribute.getLine());
         newAttribute.setText(attribute.getText());
+        newAttribute.setTrackedValue(attribute.getTrackedValue());
+        newAttribute.setClassReference(attribute.getClassReference());
+        newAttribute.setLambdaFunc(attribute.getLambdaFunc());
         return newAttribute;
      }
 
@@ -495,8 +504,7 @@ public class GastBuilder {
      * Passes the value in the right side of an assignment to the left side,
      * if the right side exists (i.e could just be an empty variable declaration)
      * or if it has a type meaning its value could be tracked earlier (will be
-     * tracked later if not). Also supports attribute accesses in either side of
-     * the assignment and lambda function tracking.
+     * tracked later if not). Also supports class reference and lambda function tracking.
      */
     public void trackLeftVariableValue(){
         Assignment assignment = (Assignment) statements.pop();
@@ -504,69 +512,31 @@ public class GastBuilder {
         if(assignment.getRight() != null && assignment.getRight().getType() != null && 
         (assignment.getOperator() == null || (assignment.getOperator() != null && assignment.getOperator().equals("=")))){
             Variable var = (Variable) assignment.getLeft();
-            //Variable var = currentFunction.getVariables().get(tmpVar.getName());
             //Is the right-side a simple variable?
             if(assignment.getRight().getTrackedValue() != null){
-                //Check if left has class reference or not. If it has, update is done at the attribute's value
-                if(assignment.getLeft().getClassReference() == null){
+                //Check if left has class reference or not
+                if(var.getClassReference() == null || 
+                    (var.getClassReference() != null && var.getSelectedAttribute() == null)){
                     var.setTrackedValue(assignment.getRight().getTrackedValue());
+                    var.setClassReference(null);
+                    var.setLambdaFunc(null);
                     var.setType(assignment.getRight().getType());
-                }
-                else{
-                    String leftAttribute = assignment.getLeft().getSelectedAttribute();
-                    var.getClassReference().getAttributes().get(leftAttribute)
-                    .setTrackedValue(assignment.getRight().getTrackedValue());
-                    
-                    var.getClassReference().getAttributes().get(leftAttribute)
-                    .setType(assignment.getRight().getType());
                 }
             }
 
             else if(assignment.getRight().getClassReference() != null){
-                /*Have to watch out for the following cases: left-side is a simple variable so it becomes 
-                 * a class instance if right-side does not access any attribute OR 
-                 * left-side still is a simple variable but right-side accesses an attribute OR 
-                 * left-side accesses an attribute but right-side doesnt so that attribute is a class instance OR 
-                 * left-side & right-side both access an attribute
-                 */
-                if(assignment.getRight().getSelectedAttribute() == null){
-                    if(assignment.getLeft().getClassReference() != null && 
-                    assignment.getLeft().getSelectedAttribute() != null){
-                        String leftAttribute = assignment.getLeft().getSelectedAttribute();
-                        var.getClassReference().getAttributes().get(leftAttribute)
-                        .setClassReference(assignment.getRight().getClassReference());
-                        
-                        var.getClassReference().getAttributes().get(leftAttribute)
-                        .setType(assignment.getRight().getType());
-                    }
-                    else{
-                        var.setClassReference(assignment.getRight().getClassReference());
-                        var.setType(assignment.getRight().getType());
-                    }
-                }
-                else{
-                    if(assignment.getLeft().getClassReference() != null && 
-                    assignment.getLeft().getSelectedAttribute() != null){
-                        String leftAttribute = assignment.getLeft().getSelectedAttribute();
-                        String rightAttribute = assignment.getRight().getSelectedAttribute();
-                        var.getClassReference().getAttributes().get(leftAttribute)
-                        .setTrackedValue(assignment.getRight().getClassReference()
-                        .getAttributes().get(rightAttribute).getTrackedValue());
-                        
-                        var.getClassReference().getAttributes().get(leftAttribute)
-                        .setType(assignment.getRight().getClassReference()
-                        .getAttributes().get(rightAttribute).getType());
-                    } 
-                    else{
-                        String rightAttribute = assignment.getRight().getSelectedAttribute();
-                        var.setTrackedValue(assignment.getRight().getClassReference()
-                        .getAttributes().get(rightAttribute).getTrackedValue());
-                        var.setType(assignment.getRight().getClassReference()
-                        .getAttributes().get(rightAttribute).getType());
-                    }
+                /* A new class reference is assigned to the variable on the left side of the assignment. */
+                if(assignment.getRight().getSelectedAttribute() == null && var.getSelectedAttribute() == null){
+                    var.setClassReference(assignment.getRight().getClassReference());
+                    var.setType(assignment.getRight().getType());
+                    var.setTrackedValue(null);
+                    var.setLambdaFunc(null);
+                
                 }
             } else if(assignment.getRight().getLambdaFunc() != null){
                 var.setLambdaFunc(assignment.getRight().getLambdaFunc());
+                var.setClassReference(null);
+                var.setTrackedValue(null);
             }
 
             if(var.getTrackedValue() != null || var.getClassReference() != null 
@@ -871,7 +841,7 @@ public class GastBuilder {
                 
                 var = createNewVariableForAttributes((Variable) expression.getMembers().get(newAttributeAddedIdx));
                 var.setSelectedAttribute(attributeName);
-            } else if(fileNameExtension.equals("js")){
+            } else if(fileNameExtension.equals("js") || fileNameExtension.equals("py")){
                 /**
                  * For more complex expressions (using +, -, +=, etc), JavaScript adds the Expression object
                  * however, the accessed attribute is done with one object only: a Variable with source.attribute name.
@@ -1056,12 +1026,42 @@ public class GastBuilder {
             addAttribute(ctx, attributeName);
         }
     }
-    //Will be used only when in constructor 
+    //Will be used only when in constructor (JavaScript, Python)
     public void addClassAttributeToAssignment(String attributeName){
         if(statements.peek() instanceof Assignment){
             Assignment assignment = (Assignment) statements.pop();
             assignment.setLeft(this.classes.peek().getAttributes().get(attributeName));
             statements.push(assignment);
+        } else if(statements.peek() instanceof Expression){
+            Expression expression = (Expression) statements.pop();
+            addClassAttributeToAssignment(attributeName);
+            statements.push(expression);
         }
+    }
+
+    //Used in Assignments from PythonParser
+    public void checkIfLeftSideIsExpr(){
+        if(statements.peek() instanceof Assignment){
+            Assignment assignment = (Assignment) statements.pop();
+            if(assignment.getLeft() instanceof Expression && assignment.getLeft().getMembers().size() == 1){
+                Variable leftVar = (Variable) assignment.getLeft().getMembers().get(0);
+                assignment.setLeft(leftVar);
+            }
+            statements.push(assignment);
+        }
+    }
+
+    /* PythonParser does not have a rule for class instance creation (no "new" expression) 
+     * so that type of expression will lead to a function call rule. In order to know if a class
+     * instance is being created, the name of the "function" is compared with the name of classes seen
+     * so far to see if it is a function or a class instance.
+    */
+    public boolean nameBelongsToClass(String name){
+        for(Class c : analyzedClasses){
+            if(c.getName().equals(name)){
+                return true;
+            }
+        }
+        return false;
     }
 }
