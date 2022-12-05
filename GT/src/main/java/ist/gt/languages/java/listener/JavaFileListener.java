@@ -6,6 +6,8 @@ import ist.gt.languages.java.parser.Java8ParserBaseListener;
 import ist.gt.model.FunctionCall;
 import lombok.Data;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Stack;
 
 
@@ -19,6 +21,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
     private boolean lambdaFunctionDetected = false;
     private boolean wasVarDecl = false;
     private boolean genStmtInserted = false;
+    private boolean collectionFound = false;
     private final GastBuilder gastBuilder;
     private final Stack<FunctionCall> expressionAfterPrimaryEnd = new Stack<>();
 
@@ -176,11 +179,12 @@ public class JavaFileListener extends Java8ParserBaseListener {
              * information about an attribute access. */
             isGenStmt = gastBuilder.isGenericStatement();
             gastBuilder.addVariable(ctx, ctx.ambiguousName().Identifier().getText());
-            gastBuilder.addAttributeAccess(ctx, ctx.Identifier().getText());
-            gastBuilder.exitStatementOrExpression();
+            /*gastBuilder.addAttributeAccess(ctx, ctx.Identifier().getText());
+            gastBuilder.exitStatementOrExpression();*/
             accessedAttribute = true;
         }
-        gastBuilder.addVariable(ctx, ctx.Identifier().getText());
+
+            gastBuilder.addVariable(ctx, ctx.Identifier().getText());
 
         if(isGenStmt){
             gastBuilder.exitStatementOrExpression();
@@ -205,7 +209,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void enterMethodInvocation_lfno_primary(Java8Parser.MethodInvocation_lfno_primaryContext ctx) {
         if (ctx.typeName() != null) {
-            primaries.push(true);
+            //primaries.push(true);
             gastBuilder.addMethodCall(ctx);
             if (ctx.typeName() != null)
                 gastBuilder.addVariable(ctx, ctx.typeName().getText());
@@ -218,7 +222,12 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void exitMethodInvocation_lfno_primary(Java8Parser.MethodInvocation_lfno_primaryContext ctx) {
-        gastBuilder.exitStatementOrExpression();
+        if(ctx.typeName() != null){
+            gastBuilder.exitStatementOrExpression();
+            gastBuilder.exitStatementOrExpression();
+        } else{
+            gastBuilder.exitStatementOrExpression();
+        }
     }
 
     @Override
@@ -234,7 +243,16 @@ public class JavaFileListener extends Java8ParserBaseListener {
             gastBuilder.addFunctionCall(ctx, ctx.Identifier().getText());
         } else {
             gastBuilder.addMethodCall(ctx);
-            expressionAfterPrimaryEnd.push(new FunctionCall(ctx, ctx.Identifier().getText()));
+            System.out.println("Method Call Identifier: " + ctx.Identifier().getText());
+            System.out.println(ctx.getText());
+            System.out.println(ctx.primary().getText());
+            // "this" is stored in primary
+            if(ctx.primary() != null && ctx.primary().getText().equals("this")){
+                gastBuilder.addVariable(ctx, ctx.primary().getText());
+            }
+            gastBuilder.addFunctionCall(ctx, ctx.Identifier().getText());
+            //This probably won't be needed anymore
+            //expressionAfterPrimaryEnd.push(new FunctionCall(ctx, ctx.Identifier().getText()));
         }
     }
 
@@ -245,14 +263,24 @@ public class JavaFileListener extends Java8ParserBaseListener {
         } else if (ctx.typeName() != null) {
             gastBuilder.exitStatementOrExpression();
             gastBuilder.exitStatementOrExpression();
-        } else if (!expressionAfterPrimaryEnd.empty()) {
+        } /*else if (!expressionAfterPrimaryEnd.empty()) {
             expressionAfterPrimaryEnd.pop();
+        }*/
+        else{
+            gastBuilder.exitStatementOrExpression();
+            gastBuilder.exitStatementOrExpression();
         }
     }
 
     @Override
     public void enterPrimary(Java8Parser.PrimaryContext ctx) {
         primaries.push(false);
+        System.out.println("Primary: " + ctx.getText());
+        if(ctx.getText().matches("this\\.[a-zA-Z0-9_]+")){
+            List<String> members = Arrays.asList(ctx.getText().split("\\."));
+            gastBuilder.addVariable(ctx, members.get(0));
+            gastBuilder.addSelectedAttributeToThis(members.get(1));
+        }
     }
 
     @Override
@@ -270,36 +298,75 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterClassInstanceCreationExpression(Java8Parser.ClassInstanceCreationExpressionContext ctx) {
-        gastBuilder.addNewExpression(ctx, ctx.Identifier(0).getText());
-        gastBuilder.trackClassReference(ctx.Identifier(0).getText());
+        if(ctx.Identifier(0).getText().equals("ArrayList") || 
+            ctx.Identifier(0).getText().equals("LinkedList") ||
+            ctx.Identifier(0).getText().equals("HashMap") ||
+            ctx.Identifier(0).getText().equals("Stack") ||
+            ctx.Identifier(0).getText().equals("HashSet")){
+            collectionFound = true;
+        } else{
+            gastBuilder.addNewExpression(ctx, ctx.Identifier(0).getText());
+            gastBuilder.trackClassReference(ctx.Identifier(0).getText());
+        }
     }
 
     @Override
     public void exitClassInstanceCreationExpression(Java8Parser.ClassInstanceCreationExpressionContext ctx) {
-        gastBuilder.exitStatementOrExpression();
+        if(collectionFound){
+            gastBuilder.collectionInitFound();
+            collectionFound = false;
+        } else{
+            gastBuilder.exitStatementOrExpression();
+        }
     }
 
     @Override
     public void enterClassInstanceCreationExpression_lf_primary(Java8Parser.ClassInstanceCreationExpression_lf_primaryContext ctx) {
-        gastBuilder.addNewExpression(ctx, ctx.Identifier().getText());
-        gastBuilder.trackClassReference(ctx.Identifier().getText());
+        if(ctx.Identifier().getText().equals("ArrayList") || 
+            ctx.Identifier().getText().equals("LinkedList") ||
+            ctx.Identifier().getText().equals("HashMap") ||
+            ctx.Identifier().getText().equals("Stack") ||
+            ctx.Identifier().getText().equals("HashSet")){
+            collectionFound = true;
+        } else{
+            gastBuilder.addNewExpression(ctx, ctx.Identifier().getText());
+            gastBuilder.trackClassReference(ctx.Identifier().getText());
+        }
     }
 
     @Override
     public void exitClassInstanceCreationExpression_lf_primary(Java8Parser.ClassInstanceCreationExpression_lf_primaryContext ctx) {
-        gastBuilder.exitStatementOrExpression();
+        if(collectionFound){
+            gastBuilder.collectionInitFound();
+            collectionFound = false;
+        } else{
+            gastBuilder.exitStatementOrExpression();
+        }
 
     }
 
     @Override
     public void enterClassInstanceCreationExpression_lfno_primary(Java8Parser.ClassInstanceCreationExpression_lfno_primaryContext ctx) {
-        gastBuilder.addNewExpression(ctx, ctx.Identifier(0).getText());
-        gastBuilder.trackClassReference(ctx.Identifier(0).getText());
+        if(ctx.Identifier(0).getText().equals("ArrayList") || 
+            ctx.Identifier(0).getText().equals("LinkedList") ||
+            ctx.Identifier(0).getText().equals("HashMap") ||
+            ctx.Identifier(0).getText().equals("Stack") ||
+            ctx.Identifier(0).getText().equals("HashSet")){
+            collectionFound = true;
+        } else{
+            gastBuilder.addNewExpression(ctx, ctx.Identifier(0).getText());
+            gastBuilder.trackClassReference(ctx.Identifier(0).getText());
+        }
     }
 
     @Override
     public void exitClassInstanceCreationExpression_lfno_primary(Java8Parser.ClassInstanceCreationExpression_lfno_primaryContext ctx) {
-        gastBuilder.exitStatementOrExpression();
+        if(collectionFound){
+            gastBuilder.collectionInitFound();
+            collectionFound = false;
+        } else{
+            gastBuilder.exitStatementOrExpression();
+        }
     }
 
     @Override
@@ -315,7 +382,15 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void enterAssignment(Java8Parser.AssignmentContext ctx) {
         gastBuilder.addAssignment(ctx);
-        gastBuilder.addVariable(ctx.leftHandSide(), ctx.leftHandSide().getText());
+        if(ctx.leftHandSide().getText().matches("this\\.[a-zA-Z0-9_]+")){
+            List<String> members = Arrays.asList(ctx.leftHandSide().getText().split("\\."));
+            gastBuilder.addVariable(ctx, members.get(0));
+            gastBuilder.addSelectedAttributeToThis(members.get(1));
+            /*gastBuilder.addVariable(ctx, members.get(1));
+            gastBuilder.accessedAttribute();*/
+        } else{
+            gastBuilder.addVariable(ctx.leftHandSide(), ctx.leftHandSide().getText());
+        }
     }
 
     @Override
@@ -469,6 +544,9 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterConstructorDeclaration(Java8Parser.ConstructorDeclarationContext ctx) {
+        System.out.println("enterConstructorDeclaration");
+        System.out.println(ctx.getText());
+        System.out.println("ConstructorModifier " + ctx.constructorModifier().toString());
         gastBuilder.addFunction(ctx, ctx.constructorDeclarator().simpleTypeName().Identifier().getText(), ctx.constructorDeclarator().simpleTypeName().Identifier().getText());
     }
 
@@ -738,6 +816,91 @@ public class JavaFileListener extends Java8ParserBaseListener {
                 gastBuilder.addParametersToLambdaFunction(ctx, ctx.Identifier(i).getText());
             }
         }
+    }
+
+    // TESTING FOR ARRAYS/COLLECTIONS
+    @Override
+    public void enterUnannArrayType(Java8Parser.UnannArrayTypeContext ctx){
+        System.out.println("UnannArrayType");
+        System.out.println(ctx.getText());
+    }
+
+    @Override
+    public void enterElementValueArrayInitializer(Java8Parser.ElementValueArrayInitializerContext ctx){
+        System.out.println("ElementValueArrayInitializer");
+        System.out.println(ctx.getText());
+    }
+
+    @Override
+    public void enterArrayInitializer(Java8Parser.ArrayInitializerContext ctx){
+        System.out.println("ArrayInitializer");
+        System.out.println(ctx.getText());
+    }
+
+    @Override
+    public void enterArrayAccess(Java8Parser.ArrayAccessContext ctx){
+        System.out.println("ArrayAccess");
+        System.out.println(ctx.getText());
+    }
+
+    @Override
+    public void enterArrayCreationExpression(Java8Parser.ArrayCreationExpressionContext ctx){
+        System.out.println("ArrayCreationExpression");
+        System.out.println(ctx.getText());
+    }
+
+    @Override
+    public void enterElementValuePairList(Java8Parser.ElementValuePairListContext ctx){
+        System.out.println("ElementValuePairList");
+        System.out.println(ctx.getText());
+    }
+
+    @Override
+    public void enterElementValuePair(Java8Parser.ElementValuePairContext ctx){
+        System.out.println("ElementValuePair");
+        System.out.println(ctx.getText());
+    }
+
+    @Override
+    public void enterElementValueList(Java8Parser.ElementValueListContext ctx){
+        System.out.println("ElementValueList");
+        System.out.println(ctx.getText());
+    }
+
+    @Override
+    public void enterPrimaryNoNewArray(Java8Parser.PrimaryNoNewArrayContext ctx){
+        System.out.println("PrimaryNoNewArray");
+        System.out.println(ctx.getText());
+    }
+
+    @Override
+    public void enterPrimaryNoNewArray_lf_primary(Java8Parser.PrimaryNoNewArray_lf_primaryContext ctx){
+        System.out.println("enterPrimaryNoNewArray_lf_primary");
+        System.out.println(ctx.getText());
+    }
+
+    @Override
+    public void enterPrimaryNoNewArray_lfno_primary(Java8Parser.PrimaryNoNewArray_lfno_primaryContext ctx){
+        System.out.println("enterPrimaryNoNewArray_lfno_primary");
+        System.out.println(ctx.getText());
+        System.out.println(ctx.CLASS() != null);
+        System.out.println(ctx.arrayAccess_lfno_primary() + " " + (ctx.arrayAccess_lfno_primary() != null ? ctx.arrayAccess_lfno_primary().getText() : "null"));
+        System.out.println(ctx.classInstanceCreationExpression_lfno_primary() + " " + (ctx.classInstanceCreationExpression_lfno_primary() != null ? ctx.classInstanceCreationExpression_lfno_primary().getText() : "null"));
+    }
+
+    @Override
+    public void enterConstructorDeclarator(Java8Parser.ConstructorDeclaratorContext ctx){
+        System.out.println("enterConstructorDeclarator");
+        System.out.println(ctx.getText());
+        System.out.println("simpleTypeName " + ctx.simpleTypeName().getText());
+        System.out.println("TypeParameters " + ctx.typeParameters().getText());
+        System.out.println("formalParameterList " + ctx.formalParameterList().getText());
+    }
+
+    @Override
+    public void enterExplicitConstructorInvocation(Java8Parser.ExplicitConstructorInvocationContext ctx){
+        System.out.println("enterExplicitConstructorInvocation");
+        System.out.println(ctx.getText());
     }
 
 }

@@ -11,7 +11,6 @@ import org.antlr.v4.runtime.ParserRuleContext;
 public class Variable extends Expression {
     @NonNull
     private String name;
-    //private String type;
 
     public Variable(@NonNull String name) {
         this.name = name;

@@ -27,6 +27,10 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     private TaintSpecification spec;
     private static Settings settings;
 
+    private Variable currentThis;
+    private Variable tempThis;
+    private List<Variable> thisReplacements = new ArrayList<>();
+
 
     public TaintVisitor(List<File> files, Settings setting) {
         settings = setting;
@@ -152,14 +156,34 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                         function.getParameters().getElement(i).setClassReference(parameter.getClassReference());
                         function.getParameters().getElement(i).setType(parameter.getType());
                     }
-                } else{
+                } else if(parameter.getTrackedValue() != null){
                     function.getParameters().getElement(i).setTrackedValue(parameter.getTrackedValue());
                     function.getParameters().getElement(i).setType(parameter.getType());
+                } else if(parameter.isCollection()){
+                    function.getParameters().getElement(i).setCollection(true);
                 }
             }
         }
-        function.accept(new TaintVisitor(files, spec, functionNames, file, clazz));
+        if(this.tempThis != null){
+            this.currentThis = this.tempThis;
+            this.thisReplacements.add(this.tempThis);
+            this.tempThis = null;
+        }
+        //In order to propagate the currentThis (and replacements), need to set it on new TaintVisitor
+        TaintVisitor taintVisitor = new TaintVisitor(files, spec, functionNames, file, clazz);
+        taintVisitor.setCurrentThis(this.currentThis);
+        taintVisitor.setThisReplacements(new ArrayList<>(this.thisReplacements));
+
+        function.accept(taintVisitor);
         functionCall.setTainted(function.getCodeBlock().isReturnTainted());
+        //Latest variable replacement for "this" already used
+        if(this.currentThis != null && this.thisReplacements.size() > 1){
+            this.currentThis = null;
+            this.thisReplacements.remove(this.thisReplacements.size() - 1);
+            if(!this.thisReplacements.isEmpty()){
+                this.currentThis = this.thisReplacements.get(this.thisReplacements.size() - 1);
+            }
+        }
     }
 
 
@@ -198,10 +222,23 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
     @Override
     public void visit(Expression expression) {
-        if(expression.getOperator() != null && expression.getTrackedValue() == null){
+        if(expression.getOperator() != null){
             expression.addValue(this);
         }
+
         expression.setTainted(propagateTaintInExpressionList(expression.getMembers()));
+
+        if(expression.getMembers().size() == 1 && expression.getMembers().get(0).getTrackedValue() != null){
+            expression.setType(expression.getMembers().get(0).getType());
+            expression.setTrackedValue(expression.getMembers().get(0).getTrackedValue());
+        } else if(expression.getMembers().size() == 1){
+            //"this" variable has a few problems regarding value tracking propagation
+            expression.setType(expression.getMembers().get(0).getType());
+            if(expression.getMembers().get(0).getClassReference() != null){
+                expression.setClassReference(expression.getMembers().get(0).getClassReference());
+                expression.setSelectedAttribute(expression.getMembers().get(0).getSelectedAttribute());
+            }
+        }
     }
 
     @Override
@@ -245,6 +282,10 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     public void visit(Variable var) {
         if (currentPathVariables.containsKey(var.getName())) {
             if(currentPathVariables.get(var.getName()).getClassReference() != null){
+                // "this" variable has no class reference, as opposed to class instances
+                if(var.getName().equals("this")){
+                    var.setClassReference(currentPathVariables.get(var.getName()).getClassReference());
+                }
                 /* var will almost always point to a different updated accessed attribute than the variable saved in
                  * currentPathVariables. If it's not different, then they are pointing to the same one. */
                 currentPathVariables.get(var.getName()).setSelectedAttribute(var.getSelectedAttribute());
@@ -283,20 +324,36 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
         if (!functions.empty() && functions.peek().getVariables().containsKey(var.getName())) {
             Variable variable = functions.peek().getVariables().get(var.getName());
+            Variable newVarRef = null;
+            // Replacing the "this" variable with information previously gathered
+            if(variable.getName().equals("this") && currentThis != null){
+                // "this" variable has no class reference, as opposed to class instances
+                var.setClassReference(this.currentThis.getClassReference());
+                variable.setClassReference(this.currentThis.getClassReference());
+                variable.setType(this.currentThis.getType());
+                newVarRef = createNewVariableForAttributes(variable);
+                newVarRef.setSelectedAttribute(var.getSelectedAttribute());            
+            }
             var.setType(variable.getType());
             if(variable.getClassReference() != null){
                 if(variable.getSelectedAttribute() != null){
                     String attribute = variable.getSelectedAttribute();
                     var.setTainted(variable.getClassReference().getAttributes().get(attribute).isTainted());
-                }else{
+                } else if(newVarRef != null && newVarRef.getSelectedAttribute() != null){
+                    // For the "this" variable
+                    String attribute = newVarRef.getSelectedAttribute();
+                    var.setTainted(newVarRef.getClassReference().getAttributes().get(attribute).isTainted());
+                } else{
                     var.setTainted(variable.getClassReference().areAttributesTainted());
                 }
                 /* As we are using class references and the attribute accessed can be different, 
                  * this allows us to use a variable that can store that change in attributes without it
                  * affecting the variables referenced in the statements (class reference is always the same)
-                 * which could introduce unwanted accesses
+                 * which could introduce unwanted accesses. (Used for any other variable except "this")
                 */
-                Variable newVarRef = createNewVariableForAttributes(variable);
+                if(newVarRef == null){
+                    newVarRef = createNewVariableForAttributes(variable);
+                }
                 currentPathVariables.put(var.getName(), newVarRef);
             }else{
                 var.setTainted(variable.isTainted());
@@ -339,6 +396,12 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     e.printStackTrace();
                 }
             }
+        }
+        //EXPERIMENTAL LINE
+        function.getCodeBlock().setFullyExplored(false);
+        if(this.thisReplacements.size() == 1){
+            this.currentThis = null;
+            this.thisReplacements.clear();
         }
         functions.pop();
     }
@@ -501,11 +564,13 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         methodCall.setCurrentType(type);
         var isTainted = false;
         boolean gotLambdaFunc = false;
+        boolean gotCollection = false;
         for (Expression member : methodCall.getMembers()) {
             if (member instanceof FunctionCall) {
                 FunctionCall funcCall = (FunctionCall) member;
                 if (methodCall.getCurrentType() == null) {
-                    System.out.println("Source type is unknown so function call " + funcCall.getFunctionName() + " will be treated as a simple function " + " file: " + file.getName());
+                    System.out.println("Source type is unknown so function call " + funcCall.getFunctionName() + 
+                    " will be treated as a simple function " + " file: " + file.getName());
                     methodCall.setCurrentType(funcCall.getReturnType());
                     funcCall.accept(this);
                     isTainted = isTainted || funcCall.isTainted() || (isTaintedSource && spec.isReturnTaintedIfTaintedSource());
@@ -521,10 +586,25 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                             isTainted = isTainted || funcCall.isTainted() || (isTaintedSource && spec.isReturnTaintedIfTaintedSource());
                             gotLambdaFunc = true;
                             variable.getLambdaFunc().getCodeBlock().setFullyExplored(false);
+                        } else if(variable.isCollection()){
+                            gotCollection = true;
+                            System.out.println(methodCall.getText());
+                            System.out.println(funcCall.getFunctionName());
+                            if(!isTaintedSource && (funcCall.getFunctionName().equals("add") || 
+                            funcCall.getFunctionName().equals("put") || 
+                            funcCall.getFunctionName().equals("push"))){
+                                isTainted = propagateTaintInExpressionList(methodCall.getMembers());
+                                variable.setTainted(isTainted);
+                            } else{
+                                //Independently of the method invoked, if collection is tainted, it will return tainted
+                                isTainted = isTaintedSource ? true : false; 
+                            }
+                        } else if(variable.getClassReference() != null && !variable.getName().equals("this")){
+                            this.tempThis = variable;
                         }
                     }
 
-                    if(!gotLambdaFunc){
+                    if(!gotLambdaFunc && !gotCollection){
                         List<FileAndFunction> functions = getFunctionsForType(methodCall.getCurrentType(), funcCall);
                         if (functions.isEmpty()) {
                             System.out.println("Could not find any function for type " + methodCall.getCurrentType() + " and function: " + funcCall.getFunctionName() + " file: " + file.getName());
@@ -659,16 +739,16 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             Variable variable = (Variable) assignment.getLeft();
             
             //Get expression's value
-            if(expression.getOperator() != null){
+            /*if(expression.getOperator() != null){
                 expression.addValue(this);
-            }
+            }*/
             //Case where the expression has only 1 element (parameter) whose value 
             //isn't known until it arrives to this stage (TaintVisitor), e.g, var = param;
-            if(expression.getTrackedValue() == null && expression.getMembers().size() == 1
+            /*if(expression.getTrackedValue() == null && expression.getMembers().size() == 1
                 && expression.getClassReference() == null && expression.getLambdaFunc() == null){
                 expression.setType(expression.getMembers().get(0).getType());
                 expression.setTrackedValue(expression.getMembers().get(0).getTrackedValue());
-            }
+            }*/
 
             if(expression.getTrackedValue() != null){
                 if(variable.getClassReference() == null || 
@@ -793,10 +873,14 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         double value = 0.0, anotherValue = 0.0;
         double epsilon = 0.000001d;
         
-        //Check if its members also possess operators
+        //Check if its members also possess operators (should probably do an accept as well to update?)
         for(Expression expr : expression.getMembers()){
             if(expr.getOperator() != null){
                 expr.addValue(this);
+            } else if(expr.getTrackedValue() == null && expr.getClassReference() == null){
+                /* Mostly to give "this" (could happen to other variables) its info back because, 
+                 * when used in an Expression (for example, right-side of Assignment) it doesn't retrieve its values */
+                expr.accept(this);
             }
         }
 

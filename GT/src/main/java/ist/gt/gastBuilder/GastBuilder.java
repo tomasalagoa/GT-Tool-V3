@@ -826,18 +826,18 @@ public class GastBuilder {
             Expression expression = (Expression) statements.pop();
 
             if(fileNameExtension.equals("java")){
-                /* 3 here relates to the members that exist in an expression when we have an attribute access,
-                    * e.g., for someClass.someAttribute it would have Variable (someClass), AttributeAccess, 
+                /* 2 here relates to the members that exist in an expression when we have an attribute access,
+                    * e.g., for someClass.someAttribute it would have Variable (someClass) and 
                     * Variable (someAttribute). So if we have a complex expression (someClass.someAttribute + 
-                    * anotherClass.anotherAttribute), it would have 4 members (the already parsed someClass and the
+                    * anotherClass.anotherAttribute), it would have 3 members (the already parsed someClass and the
                     * to-be-parsed anotherClass).
                 */
-                newAttributeAddedIdx = expression.getMembers().size() - 3;
-                attribute = (Variable) expression.getMembers().get(newAttributeAddedIdx + 2);
+                newAttributeAddedIdx = expression.getMembers().size() - 2;
+                attribute = (Variable) expression.getMembers().get(newAttributeAddedIdx + 1/*2*/);
                 attributeName = attribute.getName();
-                //No need for AttributeAccess & Variable for attribute anymore
-                expression.getMembers().remove(newAttributeAddedIdx + 2);
-                expression.getMembers().remove(newAttributeAddedIdx + 1);
+                //No need for Variable for attribute anymore
+                expression.getMembers().remove(newAttributeAddedIdx + 1/*2*/);
+                //expression.getMembers().remove(newAttributeAddedIdx + 1);
                 
                 var = createNewVariableForAttributes((Variable) expression.getMembers().get(newAttributeAddedIdx));
                 var.setSelectedAttribute(attributeName);
@@ -1015,6 +1015,7 @@ public class GastBuilder {
 
         return isLambdaFuncExpr;
     }
+
     /**
      * @function addAttributeToClass
      * In JavaScripParser's case, an Attribute is not immediately recognized as it is only analyzed when
@@ -1026,6 +1027,7 @@ public class GastBuilder {
             addAttribute(ctx, attributeName);
         }
     }
+
     //Will be used only when in constructor (JavaScript, Python)
     public void addClassAttributeToAssignment(String attributeName){
         if(statements.peek() instanceof Assignment){
@@ -1063,5 +1065,43 @@ public class GastBuilder {
             }
         }
         return false;
+    }
+
+    public void collectionInitFound(){
+        //Curently in assignment context
+        Expression expression = (Expression) statements.pop();
+        Assignment assignment = (Assignment) statements.pop();
+        assignment.getLeft().setCollection(true);
+        statements.push(assignment);
+        statements.push(expression);
+    }
+
+
+    public void addSelectedAttributeToThis(String name){
+        if(statements.peek() instanceof Assignment){
+            Assignment assignment = (Assignment) statements.pop();
+            Variable var = createNewVariableForAttributes((Variable) assignment.getLeft());
+            var.setSelectedAttribute(name);
+            assignment.setLeft(var);
+            statements.push(assignment);
+        } else if(statements.peek() instanceof Expression){
+            /* For now, this function will be called when JavaFileListener is in enterPrimary due to "this" 
+             * variable and its attribute access. */
+            Expression expression = (Expression) statements.pop();
+            Variable tempVar = (Variable) expression.getMembers().get(expression.getMembers().size() - 1);
+            Variable var = createNewVariableForAttributes(tempVar);
+            var.setSelectedAttribute(name);
+            expression.getMembers().remove(expression.getMembers().size() - 1);
+            expression.getMembers().add(var);
+            statements.push(expression);
+        } else if(statements.peek() instanceof GenericStatement){
+            /* When there is a statement: (++/-)this.someAttribute(++/--), the GenericStatement
+             * wil go straight to the variable "this.someAttribute" found in enterPrimary */
+            GenericStatement genericStatement = (GenericStatement) statements.pop();
+            Variable var = createNewVariableForAttributes((Variable) genericStatement.getStatement());
+            var.setSelectedAttribute(name);
+            genericStatement.setStatement(var);
+            statements.push(genericStatement);
+        }
     }
 }
