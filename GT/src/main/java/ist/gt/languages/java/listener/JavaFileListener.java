@@ -14,7 +14,6 @@ import java.util.Stack;
 @Data
 public class JavaFileListener extends Java8ParserBaseListener {
 
-    private final Stack<Boolean> primaries = new Stack<>();
     private boolean wasConditionalExpr;
     private boolean wasAssignmentNeeded;
     private boolean negativeNumberFound = false;
@@ -23,7 +22,6 @@ public class JavaFileListener extends Java8ParserBaseListener {
     private boolean genStmtInserted = false;
     private boolean collectionFound = false;
     private final GastBuilder gastBuilder;
-    private final Stack<FunctionCall> expressionAfterPrimaryEnd = new Stack<>();
 
     public JavaFileListener(String filename) {
         gastBuilder = new GastBuilder(filename);
@@ -122,8 +120,8 @@ public class JavaFileListener extends Java8ParserBaseListener {
         }
     }
 
-    /*  Experimental function: ConditionalExpression is of the form: expression ? expression : expression;
-    */
+    /*  Auxiliary function: 
+     * ConditionalExpression is of the form: expression ? expression : expression; */
     public boolean isConditionalExpression(Java8Parser.ConditionalExpressionContext ctx){
         if(ctx.getToken(Java8Parser.QUESTION, 0) != null && ctx.getToken(Java8Parser.COLON, 0) != null){
             return true;
@@ -174,13 +172,10 @@ public class JavaFileListener extends Java8ParserBaseListener {
         boolean accessedAttribute = false;
         boolean isGenStmt = false;
         if (ctx.ambiguousName() != null) {
-            //gastBuilder.addMethodCall(ctx); TODO Still havent realized what a method call is doing here
             /* This function will be used, primarily, because with a Generic Statement GT will lose some
              * information about an attribute access. */
             isGenStmt = gastBuilder.isGenericStatement();
             gastBuilder.addVariable(ctx, ctx.ambiguousName().Identifier().getText());
-            /*gastBuilder.addAttributeAccess(ctx, ctx.Identifier().getText());
-            gastBuilder.exitStatementOrExpression();*/
             accessedAttribute = true;
         }
 
@@ -209,7 +204,6 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void enterMethodInvocation_lfno_primary(Java8Parser.MethodInvocation_lfno_primaryContext ctx) {
         if (ctx.typeName() != null) {
-            //primaries.push(true);
             gastBuilder.addMethodCall(ctx);
             if (ctx.typeName() != null)
                 gastBuilder.addVariable(ctx, ctx.typeName().getText());
@@ -243,16 +237,11 @@ public class JavaFileListener extends Java8ParserBaseListener {
             gastBuilder.addFunctionCall(ctx, ctx.Identifier().getText());
         } else {
             gastBuilder.addMethodCall(ctx);
-            System.out.println("Method Call Identifier: " + ctx.Identifier().getText());
-            System.out.println(ctx.getText());
-            System.out.println(ctx.primary().getText());
             // "this" is stored in primary
             if(ctx.primary() != null && ctx.primary().getText().equals("this")){
                 gastBuilder.addVariable(ctx, ctx.primary().getText());
             }
             gastBuilder.addFunctionCall(ctx, ctx.Identifier().getText());
-            //This probably won't be needed anymore
-            //expressionAfterPrimaryEnd.push(new FunctionCall(ctx, ctx.Identifier().getText()));
         }
     }
 
@@ -263,10 +252,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
         } else if (ctx.typeName() != null) {
             gastBuilder.exitStatementOrExpression();
             gastBuilder.exitStatementOrExpression();
-        } /*else if (!expressionAfterPrimaryEnd.empty()) {
-            expressionAfterPrimaryEnd.pop();
-        }*/
-        else{
+        } else{
             gastBuilder.exitStatementOrExpression();
             gastBuilder.exitStatementOrExpression();
         }
@@ -274,26 +260,11 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterPrimary(Java8Parser.PrimaryContext ctx) {
-        primaries.push(false);
-        System.out.println("Primary: " + ctx.getText());
         if(ctx.getText().matches("this\\.[a-zA-Z0-9_]+")){
             List<String> members = Arrays.asList(ctx.getText().split("\\."));
             gastBuilder.addVariable(ctx, members.get(0));
             gastBuilder.addSelectedAttributeToThis(members.get(1));
         }
-    }
-
-    @Override
-    public void exitPrimary(Java8Parser.PrimaryContext ctx) {
-        if (primaries.peek()) {
-            primaries.pop();
-            gastBuilder.exitStatementOrExpression();
-        }
-        if (!expressionAfterPrimaryEnd.empty()) {
-            var funcCall = expressionAfterPrimaryEnd.peek();
-            gastBuilder.addFunctionCall(ctx, funcCall.getFunctionName());
-        }
-
     }
 
     @Override
@@ -374,11 +345,6 @@ public class JavaFileListener extends Java8ParserBaseListener {
         gastBuilder.addAttribute(ctx, ctx.variableDeclaratorList().variableDeclarator(0).variableDeclaratorId().getText(), ctx.unannType().getText());
     }
 
-    /*@Override
-    public void exitFieldDeclaration(Java8Parser.FieldDeclarationContext ctx) {
-        gastBuilder.exitStatementOrExpression();
-    }*/
-
     @Override
     public void enterAssignment(Java8Parser.AssignmentContext ctx) {
         gastBuilder.addAssignment(ctx);
@@ -386,8 +352,6 @@ public class JavaFileListener extends Java8ParserBaseListener {
             List<String> members = Arrays.asList(ctx.leftHandSide().getText().split("\\."));
             gastBuilder.addVariable(ctx, members.get(0));
             gastBuilder.addSelectedAttributeToThis(members.get(1));
-            /*gastBuilder.addVariable(ctx, members.get(1));
-            gastBuilder.accessedAttribute();*/
         } else{
             gastBuilder.addVariable(ctx.leftHandSide(), ctx.leftHandSide().getText());
         }
