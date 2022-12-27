@@ -388,9 +388,16 @@ public class GastBuilder {
      * whenever a newExpression is used.
      */
      public void trackClassReference(String className){
+        /* NewExpression version stays because of Python, JS value tracking
+         * versions being behind Java's. */
         NewExpression newExpression = null;
+        /* FunctionCall represents a constructor's invocation (for class instances' creation)*/
+        FunctionCall functionCall = null;
         if(statements.peek() instanceof NewExpression){
             newExpression = (NewExpression) statements.pop();
+        } else if(statements.peek() instanceof FunctionCall){
+            functionCall = (FunctionCall) statements.pop();
+            functionCall.setConstructor(true);
         }
 
         Expression expression = (Expression) statements.pop();
@@ -424,6 +431,9 @@ public class GastBuilder {
             trackedClass.setMethods(new HashMap<String, Function>(originalClass.getMethods()));
 
             expression.setClassReference(trackedClass);
+            if(functionCall != null){
+                functionCall.getHiddenThis().setClassReference(trackedClass);
+            }
             expression.setType(trackedClass.getName());
         }
         
@@ -432,6 +442,10 @@ public class GastBuilder {
         }
 
         statements.push(expression);
+
+        if(functionCall != null){
+            statements.push(functionCall);
+        }
      }
 
      /**
@@ -833,12 +847,10 @@ public class GastBuilder {
                     * to-be-parsed anotherClass).
                 */
                 newAttributeAddedIdx = expression.getMembers().size() - 2;
-                attribute = (Variable) expression.getMembers().get(newAttributeAddedIdx + 1/*2*/);
+                attribute = (Variable) expression.getMembers().get(newAttributeAddedIdx + 1);
                 attributeName = attribute.getName();
                 //No need for Variable for attribute anymore
-                expression.getMembers().remove(newAttributeAddedIdx + 1/*2*/);
-                //expression.getMembers().remove(newAttributeAddedIdx + 1);
-                
+                expression.getMembers().remove(newAttributeAddedIdx + 1);
                 var = createNewVariableForAttributes((Variable) expression.getMembers().get(newAttributeAddedIdx));
                 var.setSelectedAttribute(attributeName);
             } else if(fileNameExtension.equals("js") || fileNameExtension.equals("py")){
@@ -855,18 +867,13 @@ public class GastBuilder {
             }
             
             if(newAttributeAddedIdx == 0){
-                //expression.setSelectedAttribute(attributeName);
                 expression.getMembers().clear();
                 expression.getMembers().add(var);
-                //expression.setClassReference(expression.getMembers().get(newAttributeAddedIdx).getClassReference());
             } else{
                 expression.getMembers().remove(newAttributeAddedIdx);
                 expression.getMembers().add(newAttributeAddedIdx, var);
             }
-            
-            //assignment.setRight(expression);
 
-            //statements.push(assignment);
             statements.push(expression);
         } else if(statements.peek() instanceof GenericStatement){
             GenericStatement genStmt = (GenericStatement) statements.pop();
@@ -927,6 +934,7 @@ public class GastBuilder {
 
     /**
      * @function createGenStatementForIncDecExpression
+     * @param ctx
      * This function was created because, unlike Java8Parser, other Parsers do not know what a 
      * GenericStatement is. To keep the logic made in @assignmentIncrementDecrementExpression intact 
      * (and avoid more if cases), a GenericStatement is created here with the necessary 
@@ -953,6 +961,7 @@ public class GastBuilder {
 
     /**
      * @function switchGenStatementForIncDecExpression
+     * @param switchBack
      * This function is used to keep the logic made in @normalIncrementDecrementExpression intact 
      * (and avoid more if cases), by switching the GenericStatement with the Expression 
      * created before it.
@@ -1018,6 +1027,8 @@ public class GastBuilder {
 
     /**
      * @function addAttributeToClass
+     * @param ctx
+     * @param attributeName
      * In JavaScripParser's case, an Attribute is not immediately recognized as it is only analyzed when
      * in the constructor. So, for that, once we verify that we are indeed in the constructor we create
      * the attribute so that it can be added to its class.
@@ -1028,7 +1039,7 @@ public class GastBuilder {
         }
     }
 
-    //Will be used only when in constructor (JavaScript, Python)
+    //Will only be used when in a constructor (JavaScript, Python)
     public void addClassAttributeToAssignment(String attributeName){
         if(statements.peek() instanceof Assignment){
             Assignment assignment = (Assignment) statements.pop();
@@ -1076,7 +1087,13 @@ public class GastBuilder {
         statements.push(expression);
     }
 
-
+    /**
+     * @function addSelectedAttributeToThis
+     * @param name
+     * Receives the name of the attribute accessed by the "this" object and, depending on the scenario where
+     * it occurred (Assignment, Expression, GenericStatement), will locate the "this" object and provide it
+     * with the accessed attribute (to be used later in TaintVisitor).
+      */
     public void addSelectedAttributeToThis(String name){
         if(statements.peek() instanceof Assignment){
             Assignment assignment = (Assignment) statements.pop();
@@ -1096,12 +1113,63 @@ public class GastBuilder {
             statements.push(expression);
         } else if(statements.peek() instanceof GenericStatement){
             /* When there is a statement: (++/-)this.someAttribute(++/--), the GenericStatement
-             * wil go straight to the variable "this.someAttribute" found in enterPrimary */
+             * will go straight to the variable "this.someAttribute" found in enterPrimary */
             GenericStatement genericStatement = (GenericStatement) statements.pop();
             Variable var = createNewVariableForAttributes((Variable) genericStatement.getStatement());
             var.setSelectedAttribute(name);
             genericStatement.setStatement(var);
             statements.push(genericStatement);
         }
+    }
+
+    /**
+     * @function addSuperMethodCall
+     * @param ctx
+     * @param functionName
+     * @param isConstructorSuper
+     * Receives the context (so that, for example, line number is known), name of the funtion
+     * and if it is a super() or a "super.". The objective of this function is to transform super calls
+     * into their respective function calls for analysis, distinguishing from super() (used in constructors)
+     * and "super." (used to call super of a given method).
+     */
+    public void addSuperMethodCall(ParserRuleContext ctx, String functionName, boolean isConstructorSuper){
+        FunctionCall superFunction;
+        addFunctionCall(ctx, functionName);
+        superFunction = (FunctionCall) statements.pop();
+        if(isConstructorSuper){
+            superFunction.setConstructor(true);
+        } else{
+            superFunction.setSuper(true);
+        }
+        statements.push(superFunction);
+    }
+
+    /**
+     * @function addConstructorToClass
+     * @param constructorName
+     * Auxiliary function. Receives the name of a given constructor so that its function is moved
+     * from the analysed class's method list into its constructors list.     
+     */
+    public void addConstructorToClass(String constructorName){
+        Function constructorFunc = classes.peek().getMethods().remove(constructorName);
+        classes.peek().getConstructors().add(constructorFunc);
+    }
+
+    /**
+     * @function addSuperOrThisInConstructor
+     * @param ctx
+     * @param isSuperStatement
+     * Auxiliary function. Receives the context and a boolean to determine if it is analysing a
+     * super() or this() (used in constructors), so that the appropriate name is provided to the
+     * addSuperMethodCall function.
+     */
+    public void addSuperOrThisInConstructor(ParserRuleContext ctx, boolean isSuperStatement){
+        String functionName;
+        if(isSuperStatement){
+            functionName = classes.peek().getSuperClass();
+        } else{
+            functionName = classes.peek().getName();
+        }
+        addSuperMethodCall(ctx, functionName, true);
     }
 }

@@ -3,12 +3,10 @@ package ist.gt.languages.java.listener;
 import ist.gt.gastBuilder.GastBuilder;
 import ist.gt.languages.java.parser.Java8Parser;
 import ist.gt.languages.java.parser.Java8ParserBaseListener;
-import ist.gt.model.FunctionCall;
 import lombok.Data;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Stack;
 
 
 @Data
@@ -226,6 +224,11 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterMethodInvocation(Java8Parser.MethodInvocationContext ctx) {
+        if(ctx.SUPER() != null){
+            gastBuilder.addSuperMethodCall(ctx, ctx.Identifier().getText(), false);
+            return;
+        }
+
         if (ctx.methodName() != null) {
             gastBuilder.addFunctionCall(ctx, ctx.methodName().getText());
             return;
@@ -247,6 +250,10 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void exitMethodInvocation(Java8Parser.MethodInvocationContext ctx) {
+        if(ctx.SUPER() != null){
+            gastBuilder.exitStatementOrExpression();
+        }
+        
         if (ctx.methodName() != null) {
             gastBuilder.exitStatementOrExpression();
         } else if (ctx.typeName() != null) {
@@ -276,7 +283,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
             ctx.Identifier(0).getText().equals("HashSet")){
             collectionFound = true;
         } else{
-            gastBuilder.addNewExpression(ctx, ctx.Identifier(0).getText());
+            gastBuilder.addFunctionCall(ctx, ctx.Identifier(0).getText());
             gastBuilder.trackClassReference(ctx.Identifier(0).getText());
         }
     }
@@ -300,7 +307,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
             ctx.Identifier().getText().equals("HashSet")){
             collectionFound = true;
         } else{
-            gastBuilder.addNewExpression(ctx, ctx.Identifier().getText());
+            gastBuilder.addFunctionCall(ctx, ctx.Identifier().getText());
             gastBuilder.trackClassReference(ctx.Identifier().getText());
         }
     }
@@ -325,7 +332,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
             ctx.Identifier(0).getText().equals("HashSet")){
             collectionFound = true;
         } else{
-            gastBuilder.addNewExpression(ctx, ctx.Identifier(0).getText());
+            gastBuilder.addFunctionCall(ctx, ctx.Identifier(0).getText());
             gastBuilder.trackClassReference(ctx.Identifier(0).getText());
         }
     }
@@ -508,10 +515,8 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterConstructorDeclaration(Java8Parser.ConstructorDeclarationContext ctx) {
-        System.out.println("enterConstructorDeclaration");
-        System.out.println(ctx.getText());
-        System.out.println("ConstructorModifier " + ctx.constructorModifier().toString());
         gastBuilder.addFunction(ctx, ctx.constructorDeclarator().simpleTypeName().Identifier().getText(), ctx.constructorDeclarator().simpleTypeName().Identifier().getText());
+        gastBuilder.addConstructorToClass(ctx.constructorDeclarator().simpleTypeName().Identifier().getText());
     }
 
     @Override
@@ -856,15 +861,34 @@ public class JavaFileListener extends Java8ParserBaseListener {
     public void enterConstructorDeclarator(Java8Parser.ConstructorDeclaratorContext ctx){
         System.out.println("enterConstructorDeclarator");
         System.out.println(ctx.getText());
-        System.out.println("simpleTypeName " + ctx.simpleTypeName().getText());
-        System.out.println("TypeParameters " + ctx.typeParameters().getText());
-        System.out.println("formalParameterList " + ctx.formalParameterList().getText());
+        if(ctx.simpleTypeName() != null)
+            System.out.println("simpleTypeName " + ctx.simpleTypeName().getText());
+        if(ctx.typeParameters() != null)    
+            System.out.println("TypeParameters " + ctx.typeParameters().getText());
+        if(ctx.formalParameterList() != null)
+            System.out.println("formalParameterList " + ctx.formalParameterList().getText());
     }
 
     @Override
     public void enterExplicitConstructorInvocation(Java8Parser.ExplicitConstructorInvocationContext ctx){
-        System.out.println("enterExplicitConstructorInvocation");
-        System.out.println(ctx.getText());
+        if(ctx.SUPER() != null){
+            gastBuilder.addGenericStatement(ctx);
+            gastBuilder.addSuperOrThisInConstructor(ctx, true);
+        } else if(ctx.THIS() != null){
+            gastBuilder.addGenericStatement(ctx);
+            gastBuilder.addSuperOrThisInConstructor(ctx, false);
+        }
+    }
+
+    @Override
+    public void exitExplicitConstructorInvocation(Java8Parser.ExplicitConstructorInvocationContext ctx){
+        if(ctx.SUPER() != null){
+            gastBuilder.exitStatementOrExpression();
+            gastBuilder.exitStatementOrExpression();
+        } else if(ctx.THIS() != null){
+            gastBuilder.exitStatementOrExpression();
+            gastBuilder.exitStatementOrExpression();
+        }
     }
 
 }

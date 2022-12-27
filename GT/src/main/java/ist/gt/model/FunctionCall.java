@@ -15,10 +15,16 @@ public class FunctionCall extends Expression {
     @NonNull
     private String functionName;
     private String returnType;
+    private boolean isSuper;
+    private boolean isConstructor;
+    //Used mainly for constructor's value tracking
+    private Variable hiddenThis = new Variable("this");
 
     public FunctionCall(ParserRuleContext ctx, String functionName) {
         super(ctx);
-        this.functionName = Objects.requireNonNullElse(functionName, "lambda");    }
+        this.functionName = Objects.requireNonNullElse(functionName, "lambda");
+        this.isSuper = false;
+    }
 
     @Override
     public void accept(AstBuilderVisitorInterface visitor) {

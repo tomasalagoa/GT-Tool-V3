@@ -5,10 +5,15 @@ import lombok.Data;
 import org.antlr.v4.runtime.ParserRuleContext;
 
 import java.util.HashMap;
+import java.util.ArrayList;
 
 @Data
 public class Class extends Element {
     private String name;
+    private String superClass;
+    private HashMap<String, Function> methods = new HashMap<>();
+    private HashMap<String, Attribute> attributes = new HashMap<>();
+    private ArrayList<Function> constructors = new ArrayList<>();
 
     public Class(ParserRuleContext ctx, String name) {
         super(ctx);
@@ -20,14 +25,11 @@ public class Class extends Element {
         this.name = name;
         this.superClass = superClass;
     }
+    
     //Value tracking constructor (no need for ctx)
     public Class(String name) {
         this.name = name;
     }
-
-    private String superClass;
-    private HashMap<String, Function> methods = new HashMap<>();
-    private HashMap<String, Attribute> attributes = new HashMap<>();
 
     /**
      * @function areAttributesTainted
