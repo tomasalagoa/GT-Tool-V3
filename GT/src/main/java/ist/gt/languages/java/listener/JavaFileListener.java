@@ -8,7 +8,6 @@ import lombok.Data;
 import java.util.Arrays;
 import java.util.List;
 
-
 @Data
 public class JavaFileListener extends Java8ParserBaseListener {
 
@@ -349,7 +348,9 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterFieldDeclaration(Java8Parser.FieldDeclarationContext ctx) {
-        gastBuilder.addAttribute(ctx, ctx.variableDeclaratorList().variableDeclarator(0).variableDeclaratorId().getText(), ctx.unannType().getText());
+        for(int i = 0; i < ctx.variableDeclaratorList().variableDeclarator().size(); i++){
+            gastBuilder.addAttribute(ctx, ctx.variableDeclaratorList().variableDeclarator(i).variableDeclaratorId().getText(), ctx.unannType().getText());
+        }
     }
 
     @Override
@@ -785,88 +786,6 @@ public class JavaFileListener extends Java8ParserBaseListener {
                 gastBuilder.addParametersToLambdaFunction(ctx, ctx.Identifier(i).getText());
             }
         }
-    }
-
-    // TESTING FOR ARRAYS/COLLECTIONS
-    @Override
-    public void enterUnannArrayType(Java8Parser.UnannArrayTypeContext ctx){
-        System.out.println("UnannArrayType");
-        System.out.println(ctx.getText());
-    }
-
-    @Override
-    public void enterElementValueArrayInitializer(Java8Parser.ElementValueArrayInitializerContext ctx){
-        System.out.println("ElementValueArrayInitializer");
-        System.out.println(ctx.getText());
-    }
-
-    @Override
-    public void enterArrayInitializer(Java8Parser.ArrayInitializerContext ctx){
-        System.out.println("ArrayInitializer");
-        System.out.println(ctx.getText());
-    }
-
-    @Override
-    public void enterArrayAccess(Java8Parser.ArrayAccessContext ctx){
-        System.out.println("ArrayAccess");
-        System.out.println(ctx.getText());
-    }
-
-    @Override
-    public void enterArrayCreationExpression(Java8Parser.ArrayCreationExpressionContext ctx){
-        System.out.println("ArrayCreationExpression");
-        System.out.println(ctx.getText());
-    }
-
-    @Override
-    public void enterElementValuePairList(Java8Parser.ElementValuePairListContext ctx){
-        System.out.println("ElementValuePairList");
-        System.out.println(ctx.getText());
-    }
-
-    @Override
-    public void enterElementValuePair(Java8Parser.ElementValuePairContext ctx){
-        System.out.println("ElementValuePair");
-        System.out.println(ctx.getText());
-    }
-
-    @Override
-    public void enterElementValueList(Java8Parser.ElementValueListContext ctx){
-        System.out.println("ElementValueList");
-        System.out.println(ctx.getText());
-    }
-
-    @Override
-    public void enterPrimaryNoNewArray(Java8Parser.PrimaryNoNewArrayContext ctx){
-        System.out.println("PrimaryNoNewArray");
-        System.out.println(ctx.getText());
-    }
-
-    @Override
-    public void enterPrimaryNoNewArray_lf_primary(Java8Parser.PrimaryNoNewArray_lf_primaryContext ctx){
-        System.out.println("enterPrimaryNoNewArray_lf_primary");
-        System.out.println(ctx.getText());
-    }
-
-    @Override
-    public void enterPrimaryNoNewArray_lfno_primary(Java8Parser.PrimaryNoNewArray_lfno_primaryContext ctx){
-        System.out.println("enterPrimaryNoNewArray_lfno_primary");
-        System.out.println(ctx.getText());
-        System.out.println(ctx.CLASS() != null);
-        System.out.println(ctx.arrayAccess_lfno_primary() + " " + (ctx.arrayAccess_lfno_primary() != null ? ctx.arrayAccess_lfno_primary().getText() : "null"));
-        System.out.println(ctx.classInstanceCreationExpression_lfno_primary() + " " + (ctx.classInstanceCreationExpression_lfno_primary() != null ? ctx.classInstanceCreationExpression_lfno_primary().getText() : "null"));
-    }
-
-    @Override
-    public void enterConstructorDeclarator(Java8Parser.ConstructorDeclaratorContext ctx){
-        System.out.println("enterConstructorDeclarator");
-        System.out.println(ctx.getText());
-        if(ctx.simpleTypeName() != null)
-            System.out.println("simpleTypeName " + ctx.simpleTypeName().getText());
-        if(ctx.typeParameters() != null)    
-            System.out.println("TypeParameters " + ctx.typeParameters().getText());
-        if(ctx.formalParameterList() != null)
-            System.out.println("formalParameterList " + ctx.formalParameterList().getText());
     }
 
     @Override

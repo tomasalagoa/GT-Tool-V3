@@ -11,6 +11,7 @@ import java.util.ArrayList;
 public class Class extends Element {
     private String name;
     private String superClass;
+    private boolean needSuperclassUpdate = false;
     private HashMap<String, Function> methods = new HashMap<>();
     private HashMap<String, Attribute> attributes = new HashMap<>();
     private ArrayList<Function> constructors = new ArrayList<>();

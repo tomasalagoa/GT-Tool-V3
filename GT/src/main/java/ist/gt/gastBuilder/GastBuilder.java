@@ -22,9 +22,10 @@ public class GastBuilder {
     private Stack<IfStatement> ifStatements = new Stack<>();
     private final File file;
     private final Stack<Class> classes = new Stack<>();
-    private ArrayList<Class> analyzedClasses = new ArrayList<>();
+    private HashMap<String, Class> analyzedClasses = new HashMap<>();
     private final Stack<TryCatch> tryCatches = new Stack<>();
     private Function currentLambdaFunction;
+    private boolean needsFurtherSuperclassUpdate = false;
 
     private <E> void popIfNotEmpty(Stack<E> stack) {
         if (!stack.empty())
@@ -225,7 +226,7 @@ public class GastBuilder {
         statements.clear();
         file.getClasses().put(aClass.getName(), aClass);
         classes.push(aClass);
-        analyzedClasses.add(aClass);
+        analyzedClasses.put(aClass.getName(), aClass);
         return aClass;
     }
 
@@ -318,7 +319,6 @@ public class GastBuilder {
         var attribute = new Attribute(ctx, name);
         classes.peek().getAttributes().put(attribute.getName(), attribute);
         processExpression(attribute);
-        //statements.push(attribute);
         return attribute;
     }
 
@@ -402,19 +402,13 @@ public class GastBuilder {
 
         Expression expression = (Expression) statements.pop();
         Class trackedClass = new Class(className);
-        Class originalClass = null;
 
-        for(Class c : this.analyzedClasses){
-            if(c.getName().equals(className)){
-                originalClass = c;
-                break;
-            }
-        }
-
-        if(originalClass != null){
+        if(this.analyzedClasses.containsKey(className)){
+            Class originalClass = this.analyzedClasses.get(className);
             trackedClass.setSuperClass(originalClass.getSuperClass());
             HashMap<String, Attribute> superclassAttributes = getAllSuperclassesAttributes(
                 originalClass.getSuperClass());
+            
             //Needed so that attributes do not share same reference between different instances
             HashMap<String, Attribute> attributes = new HashMap<String, Attribute>();
             for(Attribute attribute : originalClass.getAttributes().values()){
@@ -423,9 +417,16 @@ public class GastBuilder {
             }
 
             if(superclassAttributes != null){
+                if(this.needsFurtherSuperclassUpdate){
+                    trackedClass.setNeedSuperclassUpdate(true);
+                    this.needsFurtherSuperclassUpdate = false;
+                }
+
                 for(Attribute attribute : superclassAttributes.values()){
                     attributes.put(attribute.getName(), attribute);
                 }
+            } else if(superclassAttributes == null && trackedClass.getSuperClass() != null){
+                trackedClass.setNeedSuperclassUpdate(true);
             }
             trackedClass.setAttributes(attributes);
             trackedClass.setMethods(new HashMap<String, Function>(originalClass.getMethods()));
@@ -434,6 +435,13 @@ public class GastBuilder {
             if(functionCall != null){
                 functionCall.getHiddenThis().setClassReference(trackedClass);
             }
+            expression.setType(trackedClass.getName());
+        } else{
+            trackedClass.setNeedSuperclassUpdate(true);
+            if(functionCall != null){
+                functionCall.getHiddenThis().setClassReference(trackedClass);
+            }
+            expression.setClassReference(trackedClass);
             expression.setType(trackedClass.getName());
         }
         
@@ -457,7 +465,7 @@ public class GastBuilder {
       * superclass (and so on) if applicable.
       */
      public HashMap<String, Attribute> getAllSuperclassesAttributes(String superclassName){
-        if(superclassName == null){
+        if(superclassName == null || !this.analyzedClasses.containsKey(superclassName)){
             return null;
         } else{
             HashMap<String, Attribute> attributes = new HashMap<String, Attribute>();
@@ -465,17 +473,17 @@ public class GastBuilder {
             Boolean noMoreSupers = false;
             
             while(!noMoreSupers){
-                for(Class c : this.analyzedClasses){
-                    if(c.getName().matches(superclassName)){
-                        superclasses.add(c);
-                        if(c.getSuperClass() != null){
-                            superclassName = c.getSuperClass();
-                            break;
-                        } else{
-                            noMoreSupers = true;
-                            break;
-                        }
+                if(this.analyzedClasses.containsKey(superclassName)){
+                    Class superclass = this.analyzedClasses.get(superclassName);
+                    superclasses.add(superclass);
+                    if(superclass.getSuperClass() != null){
+                        superclassName = superclass.getSuperClass();
+                    } else{
+                        noMoreSupers = true;
                     }
+                } else{
+                    this.needsFurtherSuperclassUpdate = true;
+                    break;
                 }
             }
 
@@ -587,8 +595,12 @@ public class GastBuilder {
                 if(expression.getMembers().get(0).getSelectedAttribute() != null){
                     String attribute = expression.getMembers().get(0).getSelectedAttribute();
                     expression.setSelectedAttribute(attribute);
-                    expression.setType(expression.getMembers().get(0).getClassReference()
+                    //Avoid exception in case subclass appears before superclass
+                    if(expression.getMembers().get(0).getClassReference()
+                    .getAttributes().containsKey(attribute)){
+                        expression.setType(expression.getMembers().get(0).getClassReference()
                     .getAttributes().get(attribute).getType());
+                    }
                 } else{
                     expression.setType(expression.getMembers().get(0).getType());
                 }
@@ -701,34 +713,35 @@ public class GastBuilder {
         if(statements.peek() instanceof Expression){
             assignmentIncrementDecrementExpression(ctx, operator, condType);
             return;
+        } else if(statements.peek() instanceof GenericStatement){
+            Expression expression = new Expression(ctx);
+            Assignment assignment = new Assignment(ctx);
+            Constant constant = new Constant(ctx, "1", "int");
+            GenericStatement genStmt = (GenericStatement) statements.pop();
+            Variable variable = (Variable) genStmt.getStatement();
+
+            expression.getMembers().add(variable);
+            expression.getMembers().add(constant);
+            assignment.setLeft(variable);
+            expression.setType("int");
+
+            assignment.setRight(expression);
+            genStmt.setStatement(assignment);
+
+            switch(operator){
+                case "+":
+                    expression.setOperator("+");
+                    break;
+                case "-":
+                    expression.setOperator("-");
+                    break;
+                default:
+                    System.out.println("Invalid operator");
+                    return;
+            }
+
+            statements.push(genStmt);
         }
-        Expression expression = new Expression(ctx);
-        Assignment assignment = new Assignment(ctx);
-        Constant constant = new Constant(ctx, "1", "int");
-        GenericStatement genStmt = (GenericStatement) statements.pop();
-        Variable variable = (Variable) genStmt.getStatement();
-
-        expression.getMembers().add(variable);
-        expression.getMembers().add(constant);
-        assignment.setLeft(variable);
-        expression.setType("int");
-
-        assignment.setRight(expression);
-        genStmt.setStatement(assignment);
-
-        switch(operator){
-            case "+":
-                expression.setOperator("+");
-                break;
-            case "-":
-                expression.setOperator("-");
-                break;
-            default:
-                System.out.println("Invalid operator");
-                return;
-        }
-
-        statements.push(genStmt);
     }
 
     /**
@@ -802,6 +815,9 @@ public class GastBuilder {
      */
     public void accessedAttribute(){
         List<String> members = null;
+        if(statements.isEmpty()){
+            return;
+        }
         //Attribute access is on the left side of assignment
         if(statements.peek() instanceof Assignment){
             Assignment assignment = (Assignment) statements.pop();
@@ -899,6 +915,7 @@ public class GastBuilder {
     public Variable createNewVariableForAttributes(Variable variable){
         Variable var = new Variable(variable.getName());
         var.setClassReference(variable.getClassReference());
+        var.setTrackedValue(variable.getTrackedValue());
         var.setType(variable.getType());
         var.setLine(variable.getLine());
         var.setTainted(variable.isTainted());
@@ -919,7 +936,7 @@ public class GastBuilder {
      * It returns true/false based on the fact if GT has a Generic Statement in the Stack or not.
      */
     public boolean isGenericStatement(){
-        if(statements.peek() instanceof GenericStatement){
+        if(!statements.isEmpty() && statements.peek() instanceof GenericStatement){
             GenericStatement genStmt = (GenericStatement) statements.pop();
             Expression expression = new Expression();
             genStmt.setStatement(expression);
@@ -1070,11 +1087,10 @@ public class GastBuilder {
      * so far to see if it is a function or a class instance.
     */
     public boolean nameBelongsToClass(String name){
-        for(Class c : analyzedClasses){
-            if(c.getName().equals(name)){
-                return true;
-            }
+        if(this.analyzedClasses.containsKey(name)){
+            return true;
         }
+
         return false;
     }
 

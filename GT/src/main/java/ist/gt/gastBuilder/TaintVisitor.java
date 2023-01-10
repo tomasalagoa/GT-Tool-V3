@@ -30,6 +30,9 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     private Variable currentThis;
     private Variable tempThis;
     private List<Variable> thisReplacements = new ArrayList<>();
+    private boolean unknownMethodFound = false;
+    private ArrayList<Integer> unknownMethodsLines = new ArrayList<>();
+    private HashMap<String, Class> analyzedClasses = new HashMap<>();
 
 
     public TaintVisitor(List<File> files, Settings setting) {
@@ -126,8 +129,10 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             }
         } else if(functionCall.isConstructor() && !classes.empty()){
             FileAndFunction constructorDetails = tryToGetConstructor(functionCall);
-            processFunction(constructorDetails.getFunction(), functionCall, 
-            constructorDetails.getFile(), constructorDetails.getClazz());
+            if(constructorDetails != null){
+                processFunction(constructorDetails.getFunction(), functionCall, 
+                constructorDetails.getFile(), constructorDetails.getClazz());
+            }
             return;
         } else if (!classes.empty() && classes.peek().getMethods().containsKey(functionCall.getFunctionName())) {
             processFunction(classes.peek().getMethods().get(functionCall.getFunctionName()), functionCall, file, classes.peek());
@@ -144,13 +149,17 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             }
         } else {
             //In Python, a lambda function is called by making the variable that contains it a function call
-            if(currentPathVariables.containsKey(functionCall.getFunctionName())){
+            if(currentPathVariables.containsKey(functionCall.getFunctionName()) && 
+            currentPathVariables.get(functionCall.getFunctionName()).getLambdaFunc() != null){
                 Variable variable = currentPathVariables.get(functionCall.getFunctionName());
                 processFunction(variable.getLambdaFunc(), functionCall, file, classes.isEmpty() ? null : classes.peek());
                 variable.getLambdaFunc().getCodeBlock().setFullyExplored(false);
                 
             } else{
                 functionCall.setTainted(propagateTaintInExpressionList(functionCall.getMembers()));
+                if(functionCall.isTainted()){
+                    AstConverter.addUnknownMethodsLines(functionCall.getLine());
+                }
             }
         }
     }
@@ -194,6 +203,9 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         //In order to propagate the currentThis (and replacements), need to set it on new TaintVisitor
         TaintVisitor taintVisitor = new TaintVisitor(files, spec, functionNames, file, clazz);
         if(functionCall.isConstructor() && functionCall.getHiddenThis().getClassReference() != null){
+            if(functionCall.getHiddenThis().getClassReference().isNeedSuperclassUpdate()){
+                updateClassReferenceAttributes(functionCall.getHiddenThis());
+            }
             taintVisitor.setCurrentThis(functionCall.getHiddenThis());
             taintVisitor.setThisReplacements(new ArrayList<>(List.of(functionCall.getHiddenThis())));
         } else{
@@ -642,8 +654,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                             variable.getLambdaFunc().getCodeBlock().setFullyExplored(false);
                         } else if(variable.isCollection()){
                             gotCollection = true;
-                            System.out.println(methodCall.getText());
-                            System.out.println(funcCall.getFunctionName());
                             if(!isTaintedSource && (funcCall.getFunctionName().equals("add") || 
                             funcCall.getFunctionName().equals("put") || 
                             funcCall.getFunctionName().equals("push"))){
@@ -961,49 +971,41 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
         switch(expression.getOperator()){
             case ">":
-                System.out.println("GT Expression");
                 result = value > anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("boolean");
                 return;
             case ">=":
-                System.out.println("GE Expression");
                 result = value >= anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("boolean");
                 return;
             case "<":
-                System.out.println("LT Expression");
                 result = value < anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("boolean");
                 return;
             case "<=":
-                System.out.println("LE Expression");
                 result = value <= anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("boolean");
                 return;
             case "*":
-                System.out.println("MUL Expression");
                 result = value * anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("double");
                 return;
             case "/":
-                System.out.println("DIV Expression");
                 result = value / anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("double");
                 return;
             case "%":
-                System.out.println("MOD Expression");
                 result = value % anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("double");
                 return;
             case "+":
-                System.out.println("ADD Expression");
                 if(areNumbers){
                     result = value + anotherValue;
                     expression.setTrackedValue(result.toString());
@@ -1015,13 +1017,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 }
                 return;
             case "-":
-                System.out.println("SUB Expression");
                 result = value - anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("double");
                 return;
             case "==":
-                System.out.println("EQUALS");
                 if(areNumbers){
                     result = Math.abs(value - anotherValue) < epsilon;
                     expression.setTrackedValue(result.toString());
@@ -1037,7 +1037,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 }
                 return;
             case "!=":
-                System.out.println("NOTEQUALS");
                 if(areNumbers){
                     result = Math.abs(value - anotherValue) >= epsilon;
                     expression.setTrackedValue(result.toString());
@@ -1070,6 +1069,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     public Variable createNewVariableForAttributes(Variable variable){
         Variable var = new Variable(variable.getName());
         var.setClassReference(variable.getClassReference());
+        var.setTrackedValue(variable.getTrackedValue());
         var.setType(variable.getType());
         var.setLine(variable.getLine());
         var.setTainted(variable.isTainted());
@@ -1078,14 +1078,36 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     }
 
     /**
+      * @function createNewAttributeReference
+      * @param attribute
+      * @return Attribute
+      *
+      * Represents the creation of a new reference for the @param attribute.
+      * The goal here is to create a new reference for a given attribute (whenever 
+      * a new class instance is created) so that it is not the same as the one stored 
+      * in the classes field of GastBuilder.
+      */
+      public Attribute createNewAttributeReference(Attribute attribute){
+        Attribute newAttribute = new Attribute();
+        newAttribute.setName(attribute.getName());
+        newAttribute.setType(attribute.getType());
+        newAttribute.setTainted(attribute.isTainted());
+        newAttribute.setLine(attribute.getLine());
+        newAttribute.setText(attribute.getText());
+        newAttribute.setTrackedValue(attribute.getTrackedValue());
+        newAttribute.setClassReference(attribute.getClassReference());
+        newAttribute.setLambdaFunc(attribute.getLambdaFunc());
+        return newAttribute;
+     }
+
+    /**
      * @function tryToGetConstructor
      * @param constructorCall
      * @return FileAndFunction
      * 
      * Receives a constructor call and analyses all the constructors its class might have.
      * It is done by analysing the parameters' type between the constructor and the invocation,
-     * which might be a simplified way of achieving this. Will certainly not return null, but it's
-     * there to avoid warnings.
+     * which might be a simplified way of achieving this. Will return null if using an "empty" constructor.
      * */
     public FileAndFunction tryToGetConstructor(FunctionCall constructorCall){
         int equalParameters;
@@ -1150,5 +1172,71 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         variable.setTrackedValue(null);
         variable.setLambdaFunc(null);
         variable.setCollection(false);
+    }
+
+
+    public void updateClassReferenceAttributes(Variable variable){
+        ArrayList<Attribute> attributes = new ArrayList<>();
+        if(!variable.getClassReference().getAttributes().isEmpty()){
+            attributes = getAllSuperAttributes(variable.getClassReference().getSuperClass());
+        } else{
+            attributes = getAllSuperAttributes(variable.getClassReference().getName());
+        }
+
+        if(attributes != null && !attributes.isEmpty()){
+            for(Attribute attribute : attributes){
+                if(!variable.getClassReference().getAttributes().containsKey(attribute.getName())){
+                    variable.getClassReference().getAttributes().put(attribute.getName(), attribute);
+                }
+            }
+
+            variable.getClassReference().setNeedSuperclassUpdate(false);
+        }
+    }
+
+
+    public ArrayList<Attribute> getAllSuperAttributes(String superclassName){
+        ArrayList<Attribute> attributes = new ArrayList<>();
+        
+        while(true){
+            if(this.analyzedClasses.containsKey(superclassName)){
+                for(Attribute attribute : this.analyzedClasses.get(superclassName).getAttributes().values()){
+                    Attribute newAttribute = createNewAttributeReference(attribute);
+                    attributes.add(newAttribute);
+                }
+
+                if(this.analyzedClasses.get(superclassName).getSuperClass() != null){
+                    superclassName = this.analyzedClasses.get(superclassName).getSuperClass();
+                } else{
+                    return attributes;
+                }
+            } else{
+                return attributes;
+            }
+        }
+    }
+
+    
+    public boolean getSuperclassTypeHierarchy(String classType, String matchingType){
+        if(classType.matches(matchingType)){
+            return true;
+        } else{
+            while(true){
+                for(File file : files){
+                    if(file.getClasses().containsKey(classType)){
+                        if(file.getClasses().get(classType).getSuperClass() != null){
+                            classType = file.getClasses().get(classType).getSuperClass();
+                            if(classType.matches(matchingType)){
+                                return true;
+                            }
+                        } else{
+                            return false;
+                        }
+                    }
+                }
+
+                return false;
+            }
+        }
     }
 }
