@@ -3,9 +3,11 @@ package ist.gt;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ist.gt.gastBuilder.TaintVisitor;
+import ist.gt.gastBuilder.FrameworkEntrypointFinder;
 import ist.gt.languages.java.listener.JavaFileListener;
 import ist.gt.languages.java.parser.Java8Lexer;
 import ist.gt.languages.java.parser.Java8Parser;
+import ist.gt.languages.java.parser.Java8Parser.CompilationUnitContext;
 import ist.gt.languages.js.listener.JsFileListener;
 import ist.gt.languages.js.parser.JavaScriptLexer;
 import ist.gt.languages.js.parser.JavaScriptParser;
@@ -17,6 +19,7 @@ import ist.gt.languages.python.parser.PythonLexer;
 import ist.gt.languages.python.parser.PythonParser;
 import ist.gt.model.File;
 import ist.gt.model.Class;
+import ist.gt.settings.FuncDefinition;
 import ist.gt.settings.Settings;
 import ist.gt.util.Report;
 import ist.gt.util.Vulnerability;
@@ -44,8 +47,12 @@ public class AstConverter {
     private static final ObjectMapper jsonMapper = new ObjectMapper();
     public static Report report = new Report();
     //Propagate analyzed classes between files, especially useful for Java
-    private static ArrayList<Class> analyzedClasses = new ArrayList<>();
-
+    private static HashMap<String, Class> analyzedClasses = new HashMap<>();
+    private static ArrayList<Integer> unknownMethodsLines = new ArrayList<>();
+    private static boolean isUsingFramework;
+    private static String frameworkName;
+    private static String fileName;
+    private static HashMap<String, HashMap<String, ArrayList<String>>> filesEntrypoints = new HashMap<>();
 
     private static File convertFile(String filePath) throws Exception {
         Path path = Path.of(filePath);
@@ -66,6 +73,11 @@ public class AstConverter {
             case "java" -> {
                 CommonTokenStream tokens = new CommonTokenStream(new Java8Lexer(input));
                 var tree = new Java8Parser(tokens).compilationUnit();
+                if(isUsingFramework){
+                    System.out.println(path.getFileName().toString());
+                    getFrameworkStrategy(path.getFileName().toString(), walker, tree);
+                    System.out.println("frameListener has ended!");
+                }
                 var listener = new JavaFileListener(path.getFileName().toString());
                 if(!analyzedClasses.isEmpty()){
                     listener.getGastBuilder().setAnalyzedClasses(analyzedClasses);
@@ -134,13 +146,35 @@ public class AstConverter {
     public static void analyse(String directoryPath, Settings settings) throws IOException {
         report = new Report();
         StopWatch sw = new StopWatch();
+        if(settings.getFramework() != null){
+            isUsingFramework = true;
+            frameworkName = settings.getFramework();
+            //Add the option of searching for entrypoint in a single file
+            if(settings.getSpecification().getFileName() != null){
+                fileName = settings.getSpecification().getFileName();
+            }
+        } else{
+            isUsingFramework = false;
+        }
         sw.start();
         List<File> files = getFilesFromDirectory(directoryPath, settings.getFileExtension());
-        TaintVisitor taintVisitor = new TaintVisitor(files, settings);
-        taintVisitor.start();
+
+        if(isUsingFramework){
+            frameworkEntrypointsAnalysis(settings, files);
+        } else{
+            TaintVisitor taintVisitor = new TaintVisitor(files, settings);
+            taintVisitor.setAnalyzedClasses(analyzedClasses);
+            taintVisitor.start();
+            report.setFileName(settings.getSpecification().getFileName());
+            report.setAnalyzedFunctionName(settings.getSpecification().getFunction().getName());
+            //clearReport();
+            if(!unknownMethodsLines.isEmpty() && !report.getVulnerabilities().isEmpty()){
+                createUnknownMethodWarningMessage();
+            }
+        }
+
         sw.stop();
         report.setTimeToProcessMilliseconds(sw.getTime(TimeUnit.MILLISECONDS));
-        //clearReport();
         writeReport();
     }
 
@@ -176,5 +210,94 @@ public class AstConverter {
                 e.printStackTrace();
             }
         }
+    }
+
+    public static void addUnknownMethodsLines(int lineNum){
+        if(!unknownMethodsLines.contains(lineNum)){
+            unknownMethodsLines.add(lineNum);
+        }
+    }
+
+    public static void getFrameworkStrategy(String file, ParseTreeWalker walker, CompilationUnitContext tree){
+        FrameworkEntrypointFinder frameListener = new FrameworkEntrypointFinder();
+        switch(frameworkName){
+            case "Spring":
+            if(fileName != null){
+                if(fileName.equals(file)){
+                    System.out.println("Checking entrypoints of file: " + fileName);
+                    walker.walk(frameListener, tree);
+                    saveEntrypoints(file, frameListener);
+                    return;
+                } else{
+                    return;
+                }
+            } else {
+                System.out.println("Checking entrypoints of all directory files");
+                walker.walk(frameListener, tree);
+                saveEntrypoints(file, frameListener);
+                return;
+            }
+
+            default:
+                System.out.println("Framework " + frameworkName + " is not supported. Current supported frameworks: Spring");
+                return;
+        }
+    }
+
+    public static void saveEntrypoints(String file, FrameworkEntrypointFinder frameListener){
+        if(!frameListener.getEntrypoints().isEmpty()){
+            filesEntrypoints.put(file, frameListener.getEntrypoints());
+        }
+    }
+
+    public static void frameworkEntrypointsAnalysis(Settings settings, List<File> files){
+        TaintVisitor taintVisitor;
+        for(String file : filesEntrypoints.keySet()){
+            HashMap<String, ArrayList<String>> entrypoints = filesEntrypoints.get(file);
+            for(String functionName : entrypoints.keySet()){
+                settings.getSpecification().setFunction(new FuncDefinition(functionName));
+                settings.getSpecification().setTaintedVarsOrArgs(entrypoints.get(functionName));
+                settings.getSpecification().setFileName(file);
+                settings.getSpecification().getFunction().setType(file.replace(".java", ""));
+                taintVisitor = new TaintVisitor(files, settings);
+                taintVisitor.setAnalyzedClasses(analyzedClasses);
+                taintVisitor.start();
+                addReportEntry(file, functionName);
+            }
+        }
+    }
+
+    public static void addReportEntry(String file, String functionName){
+        //clearReport();
+        report.setFrameworkMessage("This is a report on " + frameworkName + " framework analysis. Please note the processed time is on the last entry");
+        report.setAnalyzedFunctionName(functionName);
+        report.setFileName(file);
+        if(!unknownMethodsLines.isEmpty() && !report.getVulnerabilities().isEmpty()){
+            createUnknownMethodWarningMessage();
+        }
+        writeReport();
+        report = new Report();
+    }
+
+    private static void createUnknownMethodWarningMessage(){
+        String warning = "";
+        if(unknownMethodsLines.size() == 1){
+            warning += "An unknown method/function (i.e method/function with an unreachable code block) with tainted argument(s) has been found in line " + unknownMethodsLines.get(0) + ".";
+        } else {
+            Collections.sort(unknownMethodsLines);
+            warning += "Unknown methods/functions (i.e method/function with an unreachable code block) with tainted argument(s) have been found in lines ";
+            for(int i = 0; i < unknownMethodsLines.size(); i++){
+                if(i == unknownMethodsLines.size() - 1){
+                    warning += unknownMethodsLines.get(i) + ".";
+                } else{
+                    warning += unknownMethodsLines.get(i) + " - ";
+                }
+            }
+        }
+
+        warning += " As the tool's current unknown method detection is a bit simplified, please check if";
+        warning += " the vulnerabilities that arised from that detection are true vulnerabilities.";
+
+        report.setUnknownMethodWarning(warning);
     }
 }

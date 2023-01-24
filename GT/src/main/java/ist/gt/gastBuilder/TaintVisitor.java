@@ -833,7 +833,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 if(expression.getSelectedAttribute() == null){
                     if(variable.getClassReference() != null && 
                     variable.getSelectedAttribute() != null){
-                        String leftAttribute = expression.getSelectedAttribute();
+                        String leftAttribute = variable.getSelectedAttribute();
                         variable.getClassReference().getAttributes().get(leftAttribute)
                         .setClassReference(expression.getClassReference());
                         
