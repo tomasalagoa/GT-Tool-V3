@@ -3,6 +3,7 @@ package ist.gt.languages.js.listener;
 import ist.gt.gastBuilder.GastBuilder;
 import ist.gt.languages.js.parser.JavaScriptParser;
 import ist.gt.languages.js.parser.JavaScriptParserBaseListener;
+import ist.gt.model.Assignment;
 import ist.gt.model.Expression;
 import ist.gt.util.Util;
 
@@ -16,6 +17,8 @@ public class JsFileListener extends JavaScriptParserBaseListener {
     private boolean lambdaFunctionDetected = false;
     private boolean negativeNumberFound = false;
     private boolean insertedExpression = false;
+    private boolean assignmentExpression = false;
+    private boolean attributeAccessExpression = false;
     //These 2 are mainly used for pre/post increment-decrement assignment expressions
     private boolean wasAssignmentFound = false;
     private boolean genericStatementInserted = false;
@@ -193,7 +196,27 @@ public class JsFileListener extends JavaScriptParserBaseListener {
     @Override
     public void enterIdentifierExpression(JavaScriptParser.IdentifierExpressionContext ctx) {
         if(!variableAttributeAccess){
-            gastBuilder.addVariable(ctx, ctx.identifier().getText());
+            if(!gastBuilder.getStatements().isEmpty() && gastBuilder.getStatements().peek() instanceof Assignment){
+                Assignment assignment = (Assignment) gastBuilder.getStatements().pop();
+                if(assignment.getLeft() == null){
+                    gastBuilder.getStatements().push(assignment);
+                    gastBuilder.addVariable(ctx, ctx.identifier().getText());
+                    //Add Expression on right side
+                    gastBuilder.addExpression(ctx);
+                    this.assignmentExpression = true;
+                }
+                else if(assignment.getRight() != null){
+                    gastBuilder.getStatements().push(assignment);
+                    gastBuilder.addVariable(ctx, ctx.identifier().getText());
+                } else{
+                    gastBuilder.getStatements().push(assignment);
+                    gastBuilder.addExpression(ctx);
+                    this.assignmentExpression = true;
+                    gastBuilder.addVariable(ctx, ctx.identifier().getText());
+                }
+            } else{
+                gastBuilder.addVariable(ctx, ctx.identifier().getText());
+            }
         } else if(variableAttributeAccess && ctx.identifier().getText().equals(variableAccessName)){
             variableAccessName = "";
             variableAttributeAccess = false;
@@ -208,6 +231,12 @@ public class JsFileListener extends JavaScriptParserBaseListener {
 
     @Override
     public void exitAssignmentExpression(JavaScriptParser.AssignmentExpressionContext ctx) {
+        if(this.assignmentExpression){
+            gastBuilder.trackExpressionValue();
+            gastBuilder.exitStatementOrExpression();
+            this.assignmentExpression = false;
+        }
+        gastBuilder.checkIfLeftSideIsExpr();
         gastBuilder.trackLeftVariableValue();
         //Used in situations where assignment has +=, -=, *=, /=, %=
         gastBuilder.modifyAssignmentWithOperator();
@@ -223,7 +252,27 @@ public class JsFileListener extends JavaScriptParserBaseListener {
     @Override
     public void enterAssignable(JavaScriptParser.AssignableContext ctx) {
         if(!variableAttributeAccess){
-            gastBuilder.addVariable(ctx, ctx.getText());
+            if(!gastBuilder.getStatements().isEmpty() && gastBuilder.getStatements().peek() instanceof Assignment){
+                Assignment assignment = (Assignment) gastBuilder.getStatements().pop();
+                if(assignment.getLeft() == null){
+                    gastBuilder.getStatements().push(assignment);
+                    gastBuilder.addVariable(ctx, ctx.identifier().getText());
+                    //Add Expression on right side
+                    gastBuilder.addExpression(ctx);
+                    this.assignmentExpression = true;
+                }
+                else if(assignment.getRight() != null){
+                    gastBuilder.getStatements().push(assignment);
+                    gastBuilder.addVariable(ctx, ctx.identifier().getText());
+                } else{
+                    gastBuilder.getStatements().push(assignment);
+                    gastBuilder.addExpression(ctx);
+                    this.assignmentExpression = true;
+                    gastBuilder.addVariable(ctx, ctx.identifier().getText());
+                }
+            } else{
+                gastBuilder.addVariable(ctx, ctx.identifier().getText());
+            }
         } else if(variableAttributeAccess && ctx.identifier().getText().equals(variableAccessName)){
             variableAccessName = "";
             variableAttributeAccess = false;
@@ -238,6 +287,12 @@ public class JsFileListener extends JavaScriptParserBaseListener {
 
     @Override
     public void exitVariableDeclaration(JavaScriptParser.VariableDeclarationContext ctx) {
+        if(this.assignmentExpression){
+            gastBuilder.trackExpressionValue();
+            gastBuilder.exitStatementOrExpression();
+            this.assignmentExpression = false;
+        }
+        gastBuilder.checkIfLeftSideIsExpr();
         gastBuilder.trackLeftVariableValue();
         //Used in situations where assignment has +=, -=, *=, /=, %=
         gastBuilder.modifyAssignmentWithOperator();
@@ -252,7 +307,9 @@ public class JsFileListener extends JavaScriptParserBaseListener {
 
     @Override
     public void enterFormalParameterArg(JavaScriptParser.FormalParameterArgContext ctx) {
-        gastBuilder.addParameter(ctx, ctx.assignable().getText());
+        if(!lambdaFunctionDetected){
+            gastBuilder.addParameter(ctx, ctx.assignable().getText());
+        }
     }
 
     @Override
@@ -353,7 +410,12 @@ public class JsFileListener extends JavaScriptParserBaseListener {
                 gastBuilder.addVariable(ctx,  ctx.singleExpression().getText());
             } else if(ctx.attributeAccess().size() > 0){
                 if(!ctx.singleExpression().getText().equals("this")){
-                    gastBuilder.addVariable(ctx, ctx.singleExpression().getText() + "." + ctx.attributeAccess(0).identifierName().getText());
+                    if(!(gastBuilder.getStatements().peek() instanceof Expression)){
+                        gastBuilder.addExpression(ctx);
+                        this.attributeAccessExpression = true;
+                    }
+                    gastBuilder.addVariable(ctx, ctx.singleExpression().getText());
+                    gastBuilder.addVariable(ctx, ctx.attributeAccess(0).identifierName().getText());
                     variableAttributeAccess = true;
                     variableAccessName = ctx.singleExpression().getText();
                 }
@@ -375,6 +437,13 @@ public class JsFileListener extends JavaScriptParserBaseListener {
         if(ctx.Dot() != null){
             if(ctx.functionCall().size() > 0){
                 gastBuilder.exitStatementOrExpression();
+            } else if(ctx.attributeAccess().size() > 0){
+                if(!ctx.singleExpression().getText().equals("this")){
+                    if(this.attributeAccessExpression){
+                        gastBuilder.exitStatementOrExpression();
+                        this.attributeAccessExpression = false;
+                    }
+                }
             }
         } else{
             gastBuilder.exitStatementOrExpression();
@@ -411,7 +480,9 @@ public class JsFileListener extends JavaScriptParserBaseListener {
     @Override
     public void enterArrowFunction(JavaScriptParser.ArrowFunctionContext ctx){
         if(ctx.ARROW() != null){
-            gastBuilder.addExpression(ctx);
+            if(!(gastBuilder.getStatements().peek() instanceof Expression)){
+                gastBuilder.addExpression(ctx);
+            }
             gastBuilder.addLambdaFunction(ctx);
             lambdaFunctionDetected = true;
         }
@@ -427,7 +498,9 @@ public class JsFileListener extends JavaScriptParserBaseListener {
     public void exitArrowFunction(JavaScriptParser.ArrowFunctionContext ctx){
         lambdaFunctionDetected = false;
         gastBuilder.exitLambdaFunction();
-        gastBuilder.exitStatementOrExpression();
+        if(gastBuilder.getStatements().peek() instanceof Expression && !this.assignmentExpression){
+            gastBuilder.exitStatementOrExpression();
+        }
     }
 
     /**

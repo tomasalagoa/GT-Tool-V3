@@ -64,9 +64,9 @@ public class PythonFileListener extends PythonParserBaseListener {
              * extends Expression, so instanceof returns true in 1st expression, but 
              * it is not an Expression.
              */
-            if(!(gastBuilder.getStatements().peek() instanceof Expression) 
+            if(!gastBuilder.getStatements().isEmpty() && (!(gastBuilder.getStatements().peek() instanceof Expression) 
             || (gastBuilder.getStatements().peek() instanceof Expression 
-                && gastBuilder.getStatements().peek().getClass() != Expression.class)){
+                && gastBuilder.getStatements().peek().getClass() != Expression.class))){
                 insertedExpression++;
                 gastBuilder.addExpression(ctx);
             }
@@ -207,7 +207,7 @@ public class PythonFileListener extends PythonParserBaseListener {
             attributeAccessFound = false;
         } 
         else{
-            if(!classInstanceCreation && !functionName.equals(ctx.getText()) && !attributeAccessFound){
+            if(!classInstanceCreation && (functionName == null || !functionName.equals(ctx.getText())) && !attributeAccessFound){
                 gastBuilder.addVariable(ctx, ctx.getText());
             }
         }

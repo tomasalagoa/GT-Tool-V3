@@ -855,7 +855,7 @@ public class GastBuilder {
             String fileNameExtension = Arrays.asList(this.file.getName().split("\\.")).get(1);
             Expression expression = (Expression) statements.pop();
 
-            if(fileNameExtension.equals("java")){
+            if(fileNameExtension.equals("java") || fileNameExtension.equals("js")){
                 /* 2 here relates to the members that exist in an expression when we have an attribute access,
                     * e.g., for someClass.someAttribute it would have Variable (someClass) and 
                     * Variable (someAttribute). So if we have a complex expression (someClass.someAttribute + 
@@ -869,9 +869,9 @@ public class GastBuilder {
                 expression.getMembers().remove(newAttributeAddedIdx + 1);
                 var = createNewVariableForAttributes((Variable) expression.getMembers().get(newAttributeAddedIdx));
                 var.setSelectedAttribute(attributeName);
-            } else if(fileNameExtension.equals("js") || fileNameExtension.equals("py")){
+            } else if(fileNameExtension.equals("py")){
                 /**
-                 * For more complex expressions (using +, -, +=, etc), JavaScript adds the Expression object
+                 * For more complex expressions (using +, -, +=, etc), Python adds the Expression object
                  * however, the accessed attribute is done with one object only: a Variable with source.attribute name.
                  */
                 newAttributeAddedIdx = expression.getMembers().size() - 1;
@@ -1058,11 +1058,11 @@ public class GastBuilder {
 
     //Will only be used when in a constructor (JavaScript, Python)
     public void addClassAttributeToAssignment(String attributeName){
-        if(statements.peek() instanceof Assignment){
+        if(!statements.isEmpty() && statements.peek() instanceof Assignment){
             Assignment assignment = (Assignment) statements.pop();
             assignment.setLeft(this.classes.peek().getAttributes().get(attributeName));
             statements.push(assignment);
-        } else if(statements.peek() instanceof Expression){
+        } else if(!statements.isEmpty() && statements.peek() instanceof Expression){
             Expression expression = (Expression) statements.pop();
             addClassAttributeToAssignment(attributeName);
             statements.push(expression);

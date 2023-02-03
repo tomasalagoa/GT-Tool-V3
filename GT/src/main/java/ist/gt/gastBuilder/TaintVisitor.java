@@ -33,6 +33,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     private boolean unknownMethodFound = false;
     private ArrayList<Integer> unknownMethodsLines = new ArrayList<>();
     private HashMap<String, Class> analyzedClasses = new HashMap<>();
+    private boolean returnStatementFound = false;
 
 
     public TaintVisitor(List<File> files, Settings setting) {
@@ -132,6 +133,14 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             if(constructorDetails != null){
                 processFunction(constructorDetails.getFunction(), functionCall, 
                 constructorDetails.getFile(), constructorDetails.getClazz());
+            } else{
+                /*Can happen with library/framework functions that use the "new" expression,
+                 * so if the tool can't find it, this counts as unknown method/function.
+                */
+                functionCall.setTainted(propagateTaintInExpressionList(functionCall.getMembers()));
+                if(functionCall.isTainted()){
+                    AstConverter.addUnknownMethodsLines(functionCall.getLine());
+                }
             }
             return;
         } else if (!classes.empty() && classes.peek().getMethods().containsKey(functionCall.getFunctionName())) {
@@ -269,6 +278,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
         expression.setTainted(propagateTaintInExpressionList(expression.getMembers()));
 
+        if(expression.getLambdaFunc() != null && this.returnStatementFound){
+            expression.getLambdaFunc().getCodeBlock().accept(this);
+            expression.getLambdaFunc().getCodeBlock().setFullyExplored(false);
+        }
+
         if(expression.getMembers().size() == 1 && expression.getMembers().get(0).getTrackedValue() != null){
             expression.setType(expression.getMembers().get(0).getType());
             expression.setTrackedValue(expression.getMembers().get(0).getTrackedValue());
@@ -319,9 +333,10 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     public void visit(ReturnStatement stmt) {
         if (stmt.getExpression() == null)
             return;
+        this.returnStatementFound = true; 
         stmt.getExpression().accept(this);
-        functions.peek().getCodeBlock().setHasReturn(true);
-        functions.peek().getCodeBlock().setReturnTainted(functions.peek().getCodeBlock().isReturnTainted() || stmt.getExpression().isTainted());
+        codeBlocks.peek().setHasReturn(true);
+        codeBlocks.peek().setReturnTainted(codeBlocks.peek().isReturnTainted() || stmt.getExpression().isTainted());
         codeBlocks.peek().setReturnTainted(stmt.getExpression().isTainted());
         Util.throwAny(new ReturnFoundException("Found return statement at line " + stmt.getLine()));
     }
@@ -467,6 +482,9 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         codeBlock.setFullyExplored(true);
         for (Statement stmt : codeBlock.getStatements()) {
             stmt.accept(this);
+        }
+        if(this.returnStatementFound){
+            this.returnStatementFound = false;
         }
         codeBlocks.pop();
     }

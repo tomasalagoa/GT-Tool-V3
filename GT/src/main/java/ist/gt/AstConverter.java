@@ -110,8 +110,6 @@ public class AstConverter {
             }
             default -> throw new Exception("File extension not supported");
         }
-
-
     }
 
 
@@ -156,17 +154,18 @@ public class AstConverter {
         } else{
             isUsingFramework = false;
         }
+
         sw.start();
         List<File> files = getFilesFromDirectory(directoryPath, settings.getFileExtension());
 
-        if(isUsingFramework){
-            frameworkEntrypointsAnalysis(settings, files);
+        if(isUsingFramework || !settings.getSpecification().getFunctionsToAnalyze().isEmpty()){
+            entrypointsAnalysis(settings, files);
         } else{
-            TaintVisitor taintVisitor = new TaintVisitor(files, settings);
-            taintVisitor.setAnalyzedClasses(analyzedClasses);
-            taintVisitor.start();
+            startTaintVisitorAnalysis(settings, files);
             report.setFileName(settings.getSpecification().getFileName());
-            report.setAnalyzedFunctionName(settings.getSpecification().getFunction().getName());
+            if(settings.getSpecification().getFunction() != null){
+                report.setAnalyzedFunctionName(settings.getSpecification().getFunction().getName());
+            }
             //clearReport();
             if(!unknownMethodsLines.isEmpty() && !report.getVulnerabilities().isEmpty()){
                 createUnknownMethodWarningMessage();
@@ -250,26 +249,42 @@ public class AstConverter {
         }
     }
 
-    public static void frameworkEntrypointsAnalysis(Settings settings, List<File> files){
-        TaintVisitor taintVisitor;
-        for(String file : filesEntrypoints.keySet()){
-            HashMap<String, ArrayList<String>> entrypoints = filesEntrypoints.get(file);
-            for(String functionName : entrypoints.keySet()){
-                settings.getSpecification().setFunction(new FuncDefinition(functionName));
-                settings.getSpecification().setTaintedVarsOrArgs(entrypoints.get(functionName));
-                settings.getSpecification().setFileName(file);
-                settings.getSpecification().getFunction().setType(file.replace(".java", ""));
-                taintVisitor = new TaintVisitor(files, settings);
-                taintVisitor.setAnalyzedClasses(analyzedClasses);
-                taintVisitor.start();
-                addReportEntry(file, functionName);
+    public static void entrypointsAnalysis(Settings settings, List<File> files){
+        if(isUsingFramework){
+            for(String file : filesEntrypoints.keySet()){
+                HashMap<String, ArrayList<String>> entrypoints = filesEntrypoints.get(file);
+                for(String functionName : entrypoints.keySet()){
+                    settings.getSpecification().setFunction(new FuncDefinition(functionName, 
+                        file.replace(".java", "")));
+                    settings.getSpecification().setTaintedVarsOrArgs(entrypoints.get(functionName));
+                    settings.getSpecification().setFileName(file);
+                    startTaintVisitorAnalysis(settings, files);
+                    addReportEntry(file, functionName);
+                }
+            }
+        }
+        else{
+            for(FuncDefinition funcDef : settings.getSpecification().getFunctionsToAnalyze()){
+                System.out.println("Checking function " + funcDef.getName());
+                settings.getSpecification().setFunction(funcDef);
+                settings.getSpecification().setTaintedVarsOrArgs(funcDef.getParameters());
+                startTaintVisitorAnalysis(settings, files);
+                addReportEntry(settings.getSpecification().getFileName(), funcDef.getName());
             }
         }
     }
 
+    public static void startTaintVisitorAnalysis(Settings settings, List<File> files){
+        TaintVisitor taintVisitor = new TaintVisitor(files, settings);
+        taintVisitor.setAnalyzedClasses(analyzedClasses);
+        taintVisitor.start();
+    }
+
     public static void addReportEntry(String file, String functionName){
         //clearReport();
-        report.setFrameworkMessage("This is a report on " + frameworkName + " framework analysis. Please note the processed time is on the last entry");
+        if(isUsingFramework){
+            report.setFrameworkMessage("This is a report on " + frameworkName + " framework analysis. Please note the processed time is on the last entry");
+        }
         report.setAnalyzedFunctionName(functionName);
         report.setFileName(file);
         if(!unknownMethodsLines.isEmpty() && !report.getVulnerabilities().isEmpty()){
