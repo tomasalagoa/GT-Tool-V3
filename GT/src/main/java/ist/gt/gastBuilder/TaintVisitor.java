@@ -427,13 +427,13 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             return;
         }
 
-        if (spec.isAllFiles() && !spec.getGlobalTaintVariableRegex().isEmpty()) {
+        if (spec.getGlobalTaintVariableRegex() != null && !spec.getGlobalTaintVariableRegex().isEmpty()) {
             for (String regex : spec.getGlobalTaintVariableRegex()) {
                 if (Pattern.matches(regex, var.getName())) {
                     var.setTainted(true);
                 }
             }
-        }
+        } 
         currentPathVariables.put(var.getName(), var);
     }
 
@@ -820,6 +820,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
       */
      @Override
     public void track(Assignment assignment){
+        //Rare cases can appear when dealing with more complex (Python) code. 
+        if(!(assignment.getLeft() instanceof Variable)){
+            return;
+        }
+
         if(assignment.getRight() != null){
             Expression expression = assignment.getRight();
             Variable variable = (Variable) assignment.getLeft();

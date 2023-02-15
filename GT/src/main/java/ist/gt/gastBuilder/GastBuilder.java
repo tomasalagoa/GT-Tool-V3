@@ -878,7 +878,11 @@ public class GastBuilder {
                 Variable tempVar = (Variable) expression.getMembers().get(newAttributeAddedIdx);
                 members = Arrays.asList(tempVar.getName().split("\\."));
                 attributeName = members.get(1);
-                var = createNewVariableForAttributes(currentFunction.getVariables().get(members.get(0)));
+                if(currentFunction.getVariables().containsKey(members.get(0))){
+                    var = createNewVariableForAttributes(currentFunction.getVariables().get(members.get(0)));
+                } else{
+                    var = new Variable(members.get(0));
+                }
                 var.setSelectedAttribute(attributeName);
             }
             
@@ -1073,7 +1077,8 @@ public class GastBuilder {
     public void checkIfLeftSideIsExpr(){
         if(statements.peek() instanceof Assignment){
             Assignment assignment = (Assignment) statements.pop();
-            if(assignment.getLeft() instanceof Expression && assignment.getLeft().getMembers().size() == 1){
+            if(assignment.getLeft() instanceof Expression && assignment.getLeft().getMembers().size() == 1 &&
+            assignment.getLeft().getMembers().get(0) instanceof Variable){
                 Variable leftVar = (Variable) assignment.getLeft().getMembers().get(0);
                 assignment.setLeft(leftVar);
             }

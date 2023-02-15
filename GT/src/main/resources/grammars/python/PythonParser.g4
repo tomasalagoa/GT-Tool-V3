@@ -262,7 +262,6 @@ comparison
 expr
     : atom
     | method_chain
-    | function_call
     | <assoc=right> expr op=POWER expr
     | op=(ADD | MINUS | NOT_OP) expr
     | expr op=(STAR | DIV | MOD | IDIV | AT) expr
@@ -274,11 +273,7 @@ expr
     ;
 
 method_chain
-    : AWAIT? atom trailer
-    ;
-
-function_call
-    : AWAIT? atom arguments
+    : AWAIT? atom trailer*
     ;
 
 atom
@@ -359,6 +354,7 @@ yield_arg
 trailer
     : method_call
     | attribute_access
+    | arguments
     ;
 
 method_call

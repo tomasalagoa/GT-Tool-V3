@@ -1,4 +1,4 @@
-// Generated from C:/Users/mihail/Desktop/Tese/master-thesis/YASAT/src/main/resources/grammars/python\PythonParser.g4 by ANTLR 4.8
+// Generated from PythonParser.g4 by ANTLR 4.7.2
 package ist.gt.languages.python.parser;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
@@ -649,16 +649,6 @@ public interface PythonParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitMethod_chain(PythonParser.Method_chainContext ctx);
-	/**
-	 * Enter a parse tree produced by {@link PythonParser#function_call}.
-	 * @param ctx the parse tree
-	 */
-	void enterFunction_call(PythonParser.Function_callContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link PythonParser#function_call}.
-	 * @param ctx the parse tree
-	 */
-	void exitFunction_call(PythonParser.Function_callContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link PythonParser#atom}.
 	 * @param ctx the parse tree

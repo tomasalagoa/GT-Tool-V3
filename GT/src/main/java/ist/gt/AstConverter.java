@@ -2,8 +2,9 @@ package ist.gt;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import ist.gt.gastBuilder.TaintVisitor;
-import ist.gt.gastBuilder.FrameworkEntrypointFinder;
+import ist.gt.gastBuilder.frameworkEntrypointsFinder.FrameworkEntrypointsFinder;
 import ist.gt.languages.java.listener.JavaFileListener;
 import ist.gt.languages.java.parser.Java8Lexer;
 import ist.gt.languages.java.parser.Java8Parser;
@@ -23,10 +24,13 @@ import ist.gt.settings.FuncDefinition;
 import ist.gt.settings.Settings;
 import ist.gt.util.Report;
 import ist.gt.util.Vulnerability;
+
 import lombok.Data;
+
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.tree.ParseTreeListener;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.time.StopWatch;
@@ -53,6 +57,9 @@ public class AstConverter {
     private static String frameworkName;
     private static String fileName;
     private static HashMap<String, HashMap<String, ArrayList<String>>> filesEntrypoints = new HashMap<>();
+    private static HashMap<String, ArrayList<String>> filesGlobalTaintedVariables = new HashMap<>();
+    private static FrameworkEntrypointsFinder fef = new FrameworkEntrypointsFinder();
+    public static int vulnerabilitiesInReport = 0;
 
     private static File convertFile(String filePath) throws Exception {
         Path path = Path.of(filePath);
@@ -75,8 +82,12 @@ public class AstConverter {
                 var tree = new Java8Parser(tokens).compilationUnit();
                 if(isUsingFramework){
                     System.out.println(path.getFileName().toString());
-                    getFrameworkStrategy(path.getFileName().toString(), walker, tree);
-                    System.out.println("frameListener has ended!");
+                    //getFrameworkStrategy(path.getFileName().toString(), walker, tree);
+                    fef.useJavaFrameworkEntrypointsFinder(frameworkName, fileName, 
+                        path.getFileName().toString(), walker, tree);
+                    saveEntrypoints(path.getFileName().toString(), fef.getEntrypoints());
+                    fef.cleanUp();
+                    System.out.println("FrameworkEntrypointsFinder for Java has ended!");
                 }
                 var listener = new JavaFileListener(path.getFileName().toString());
                 if(!analyzedClasses.isEmpty()){
@@ -100,6 +111,16 @@ public class AstConverter {
             case "py" -> {
                 CommonTokenStream tokens = new CommonTokenStream(new PythonLexer(input));
                 var tree = new PythonParser(tokens).root();
+                if(isUsingFramework){
+                    System.out.println(path.getFileName().toString());
+                    //getFrameworkStrategy(path.getFileName().toString(), walker, tree);
+                    fef.usePythonFrameworkEntrypointsFinder(frameworkName, fileName, 
+                        path.getFileName().toString(), walker, tree);
+                    saveEntrypoints(path.getFileName().toString(), fef.getEntrypoints());
+                    saveGlobalTaintedVariables(path.getFileName().toString(), fef.getGlobalTaintedVariables());
+                    fef.cleanUp();
+                    System.out.println("FrameworkEntrypointsFinder for Python has ended!");
+                }
                 var listener = new PythonFileListener(path.getFileName().toString());
                 if(!analyzedClasses.isEmpty()){
                     listener.getGastBuilder().setAnalyzedClasses(analyzedClasses);
@@ -159,6 +180,7 @@ public class AstConverter {
         List<File> files = getFilesFromDirectory(directoryPath, settings.getFileExtension());
 
         if(isUsingFramework || !settings.getSpecification().getFunctionsToAnalyze().isEmpty()){
+            showEntrypoints();
             entrypointsAnalysis(settings, files);
         } else{
             startTaintVisitorAnalysis(settings, files);
@@ -215,37 +237,44 @@ public class AstConverter {
         if(!unknownMethodsLines.contains(lineNum)){
             unknownMethodsLines.add(lineNum);
         }
-    }
+    } 
 
-    public static void getFrameworkStrategy(String file, ParseTreeWalker walker, CompilationUnitContext tree){
-        FrameworkEntrypointFinder frameListener = new FrameworkEntrypointFinder();
+    /*public static void getFrameworkStrategy(String file, ParseTreeWalker walker, CompilationUnitContext tree){
+        JavaFrameworkEntrypointFinder frameListener = new JavaFrameworkEntrypointFinder();
         switch(frameworkName){
             case "Spring":
-            if(fileName != null){
-                if(fileName.equals(file)){
-                    System.out.println("Checking entrypoints of file: " + fileName);
+                if(fileName != null){
+                    if(fileName.equals(file)){
+                        System.out.println("Checking entrypoints of file: " + fileName);
+                        walker.walk(frameListener, tree);
+                        saveEntrypoints(file, frameListener);
+                        return;
+                    } else{
+                        return;
+                    }
+                } else {
+                    System.out.println("Checking entrypoints of all directory files");
                     walker.walk(frameListener, tree);
                     saveEntrypoints(file, frameListener);
                     return;
-                } else{
-                    return;
                 }
-            } else {
-                System.out.println("Checking entrypoints of all directory files");
-                walker.walk(frameListener, tree);
-                saveEntrypoints(file, frameListener);
-                return;
-            }
+            
 
             default:
-                System.out.println("Framework " + frameworkName + " is not supported. Current supported frameworks: Spring");
+                System.out.println("Framework " + frameworkName + " is not supported. Current supported frameworks: Spring for Java, Flask for Python.");
                 return;
+        }
+    }*/
+
+    public static void saveEntrypoints(String file, HashMap<String, ArrayList<String>> entrypoints){
+        if(!entrypoints.isEmpty()){
+            filesEntrypoints.put(file, new HashMap<>(entrypoints));
         }
     }
 
-    public static void saveEntrypoints(String file, FrameworkEntrypointFinder frameListener){
-        if(!frameListener.getEntrypoints().isEmpty()){
-            filesEntrypoints.put(file, frameListener.getEntrypoints());
+    public static void saveGlobalTaintedVariables(String file, ArrayList<String> globalTaintedVariables){
+        if(!globalTaintedVariables.isEmpty()){
+            filesGlobalTaintedVariables.put(file, new ArrayList<>(globalTaintedVariables));
         }
     }
 
@@ -254,10 +283,14 @@ public class AstConverter {
             for(String file : filesEntrypoints.keySet()){
                 HashMap<String, ArrayList<String>> entrypoints = filesEntrypoints.get(file);
                 for(String functionName : entrypoints.keySet()){
+                    System.out.println("---------------------------------------------------------------------------");
+                    System.out.println("Going to inspect function " + functionName + " from file " + file);
+                    System.out.println("---------------------------------------------------------------------------");
                     settings.getSpecification().setFunction(new FuncDefinition(functionName, 
-                        file.replace(".java", "")));
+                        getFunctionType(file, files, functionName, "." + settings.getFileExtension())));
                     settings.getSpecification().setTaintedVarsOrArgs(entrypoints.get(functionName));
                     settings.getSpecification().setFileName(file);
+                    settings.getSpecification().setGlobalTaintVariableRegex(filesGlobalTaintedVariables.get(file));
                     startTaintVisitorAnalysis(settings, files);
                     addReportEntry(file, functionName);
                 }
@@ -291,6 +324,7 @@ public class AstConverter {
             createUnknownMethodWarningMessage();
         }
         writeReport();
+        vulnerabilitiesInReport += report.getVulnerabilities().size();
         report = new Report();
     }
 
@@ -314,5 +348,30 @@ public class AstConverter {
         warning += " the vulnerabilities that arised from that detection are true vulnerabilities.";
 
         report.setUnknownMethodWarning(warning);
+    }
+
+    public static String getFunctionType(String fileName, List<File> files, String functionName, String extension){
+        for(File file : files){
+            if(file.getName().matches(fileName)){
+                if(!file.getClasses().isEmpty() && 
+                file.getClasses().get(fileName.replace(extension, "")).getMethods().containsKey(functionName)){
+                    return fileName.replace(extension, "");
+                } else{
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+
+    public static void showEntrypoints(){
+        for(String file : filesEntrypoints.keySet()){
+            HashMap<String, ArrayList<String>> entrypoints = filesEntrypoints.get(file);
+            System.out.println("Entrypoints found in file " + file);
+            for(String functionName : entrypoints.keySet()){
+                System.out.println("Function: " + functionName);
+            }
+            System.out.println("================================================");
+        }
     }
 }

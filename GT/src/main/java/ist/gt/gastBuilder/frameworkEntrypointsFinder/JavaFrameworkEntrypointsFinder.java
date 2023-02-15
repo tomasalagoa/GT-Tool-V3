@@ -1,4 +1,4 @@
-package ist.gt.gastBuilder;
+package ist.gt.gastBuilder.frameworkEntrypointsFinder;
 
 import ist.gt.languages.java.parser.Java8Parser;
 import ist.gt.languages.java.parser.Java8ParserBaseListener;
@@ -8,12 +8,12 @@ import java.util.HashMap;
 import java.util.ArrayList;
 
 @Data
-public class FrameworkEntrypointFinder extends Java8ParserBaseListener{
+public class JavaFrameworkEntrypointsFinder extends Java8ParserBaseListener{
     private HashMap<String, ArrayList<String>> entrypoints;
     private boolean annotationFound;
     private String functionName;
 
-    public FrameworkEntrypointFinder() {
+    public JavaFrameworkEntrypointsFinder() {
         this.entrypoints = new HashMap<>();
         this.annotationFound = false;
     }
