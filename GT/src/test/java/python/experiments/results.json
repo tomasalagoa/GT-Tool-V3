@@ -1,0 +1,26 @@
+{
+  "vulnerabilities" : [ {
+    "line" : 53,
+    "vulnerableMethod" : "executeQuery",
+    "functionCallStack" : [ ],
+    "conditions" : [ {
+      "line" : 52,
+      "condition" : "(num>=10)"
+    } ]
+  }, {
+    "line" : 41,
+    "vulnerableMethod" : "executeQuery",
+    "functionCallStack" : [ ],
+    "conditions" : [ {
+      "line" : 40,
+      "condition" : "(exp.age<100)"
+    } ]
+  }, {
+    "line" : 10,
+    "vulnerableMethod" : "executeQuery",
+    "functionCallStack" : [ ],
+    "conditions" : [ ]
+  } ],
+  "timeToProcessMilliseconds" : 311188
+}
+

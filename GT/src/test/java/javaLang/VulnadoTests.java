@@ -15,7 +15,7 @@ public class VulnadoTests {
 
     private TaintSpecification spec;
     private final Settings settings;
-    private final String DirectoryPath = "src/test/resources/javalang/vulnado";
+    private final String DirectoryPath = "src/test/resources/javaLang/vulnado";
 
     public VulnadoTests() {
         settings = new Settings();

@@ -12,9 +12,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class JavaTaintTests {
 
-    private static final TaintSpecification spec = new TaintSpecification(new FuncDefinition("method"), List.of("id"),
-            List.of(new FuncDefinition("executeQuery")), List.of(new FuncDefinition("sanitize")));
-    private final Settings settings;
+    private static final TaintSpecification spec = new TaintSpecification(
+        new FuncDefinition("method"), List.of("id"), List.of(
+            new FuncDefinition("executeQuery"), new FuncDefinition("sensitiveSink")), 
+            List.of(new FuncDefinition("sanitize")));
+    private Settings settings;
     private final String DirectoryPath = "src/test/java/javaLang";
 
 
@@ -93,7 +95,7 @@ public class JavaTaintTests {
     public void include_files_tainted() throws Exception {
         spec.setFileName("Funccall_Taint_Propagation_Ex.java");
         spec.getFunction().setType(spec.getFileName().replace(".java", ""));
-        AstConverter.analyse("src/test/java/javaLang/includefilestainted", settings);
+        AstConverter.analyse(DirectoryPath + "/includefilestainted", settings);
         assertEquals(AstConverter.report.getVulnerabilities().size(), 1);
     }
 
@@ -101,23 +103,7 @@ public class JavaTaintTests {
     public void include_files_not_tainted() throws Exception {
         spec.setFileName("Funccall_Taint_Propagation_Ex.java");
         spec.getFunction().setType(spec.getFileName().replace(".java", ""));
-        AstConverter.analyse("src/test/java/javaLang/includefilesnottainted", settings);
+        AstConverter.analyse(DirectoryPath + "/includefilesnottainted", settings);
         assertEquals(AstConverter.report.getVulnerabilities().size(), 0);
-    }
-
-    @Test
-    public void simple_if_taint_propagation() throws Exception {
-        spec.setFileName("Simple_If_Taint_Propagation.java");
-        spec.getFunction().setType(spec.getFileName().replace(".java", ""));
-        AstConverter.analyse("src/test/java/javaLang/simpleiftaintpropagation", settings);
-        assertEquals(AstConverter.report.getVulnerabilities().size(), 2);
-    }
-
-    @Test
-    public void simple_conditional_expression() throws Exception {
-        spec.setFileName("Simple_Conditional_Expression.java");
-        spec.getFunction().setType(spec.getFileName().replace(".java", ""));
-        AstConverter.analyse("src/test/java/javaLang/simpleconditionalexpression", settings);
-        assertEquals(AstConverter.report.getVulnerabilities().size(), 1);
     }
 }

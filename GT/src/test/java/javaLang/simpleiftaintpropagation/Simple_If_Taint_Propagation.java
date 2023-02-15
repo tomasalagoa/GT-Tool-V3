@@ -3,8 +3,8 @@ package javaLang.simpleiftaintpropagation;
 public class Simple_If_Taint_Propagation {
 
     public void method(String id){
-        String taint1;
-        String taint2;
+        String taint1 = "";
+        String taint2 = "";
 
         if(taint1.isEmpty()){
             taint1 = "" + id;
@@ -15,5 +15,7 @@ public class Simple_If_Taint_Propagation {
         executeQuery(taint1);
         executeQuery(taint2);
     }
+
+    public void executeQuery(String query){}
     
 }

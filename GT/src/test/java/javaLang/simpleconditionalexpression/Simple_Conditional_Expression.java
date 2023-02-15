@@ -8,4 +8,6 @@ public class Simple_Conditional_Expression {
 
         executeQuery(num);
     }
+
+    public void executeQuery(int query){}
 }

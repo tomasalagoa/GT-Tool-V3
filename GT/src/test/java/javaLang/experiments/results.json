@@ -1,0 +1,31 @@
+{
+  "vulnerabilities" : [ {
+    "line" : 19,
+    "vulnerableMethod" : "executeQuery",
+    "functionCallStack" : [ ],
+    "conditions" : [ ]
+  }, {
+    "line" : 57,
+    "vulnerableMethod" : "sensitiveSink",
+    "functionCallStack" : [ ],
+    "conditions" : [ {
+      "line" : 56,
+      "condition" : "exp.num<100"
+    } ]
+  }, {
+    "line" : 39,
+    "vulnerableMethod" : "executeQuery",
+    "functionCallStack" : [ ],
+    "conditions" : [ ]
+  }, {
+    "line" : 69,
+    "vulnerableMethod" : "executeQuery",
+    "functionCallStack" : [ ],
+    "conditions" : [ {
+      "line" : 68,
+      "condition" : "num>=10"
+    } ]
+  } ],
+  "timeToProcessMilliseconds" : 4035959
+}
+
