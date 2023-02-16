@@ -1,5 +1,7 @@
 package ist.gt.languages.python.listener;
 
+import java.util.ArrayList;
+
 import ist.gt.gastBuilder.GastBuilder;
 import ist.gt.languages.python.parser.PythonParser;
 import ist.gt.languages.python.parser.PythonParserBaseListener;
@@ -17,6 +19,7 @@ public class PythonFileListener extends PythonParserBaseListener {
     private boolean initFound = false;
     private String functionName;
     private boolean attributeAccessFound = false;
+    private ArrayList<String> attributeAccessNames = new ArrayList<>();
     private boolean classInstanceCreation = false;
     private boolean lambdaFunctionDetected = false;
 
@@ -207,9 +210,14 @@ public class PythonFileListener extends PythonParserBaseListener {
             attributeAccessFound = false;
         } 
         else{
-            if(!classInstanceCreation && (functionName == null || !functionName.equals(ctx.getText())) && !attributeAccessFound){
+            if(!attributeAccessNames.isEmpty() && attributeAccessNames.contains(ctx.getText())){
+                attributeAccessNames.remove(ctx.getText());
+                return;
+            }
+            if(!classInstanceCreation && (functionName == null || !functionName.equals(ctx.getText()))){
                 gastBuilder.addVariable(ctx, ctx.getText());
             }
+
         }
     }
 
@@ -263,6 +271,12 @@ public class PythonFileListener extends PythonParserBaseListener {
                     gastBuilder.addVariable(ctx, ctx.getText());
                     gastBuilder.accessedAttribute();
                 }
+                attributeAccessNames.add(ctx.atom().getText());
+                for(int i = 0; i < ctx.trailer().size(); i++){
+                    if(ctx.trailer(i).attribute_access() != null){
+                        attributeAccessNames.add(ctx.trailer(i).attribute_access().getText().replace(".", ""));
+                    }
+                }
             } else if (ctx.trailer(0).arguments() != null && ctx.trailer(0).arguments().OPEN_PAREN() != null){
                 /*System.out.println("Well, guess I am a FUNCTION CALL: " + ctx.trailer(0).arguments().getText());
                 System.out.println("And I got an atom named: " + ctx.atom().getText());
@@ -288,6 +302,7 @@ public class PythonFileListener extends PythonParserBaseListener {
             } else if(ctx.trailer(0).attribute_access() != null){
                 //System.out.println("Exiting ATTRIBUTE ACCESS");
                 attributeAccessFound = false;
+                attributeAccessNames.clear();
             } else if (ctx.trailer(0).arguments() != null && ctx.trailer(0).arguments().OPEN_PAREN() != null){
                 //System.out.println("Exiting FUNCTION CALL");
                 if(!classInstanceCreation){

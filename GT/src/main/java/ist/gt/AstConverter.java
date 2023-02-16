@@ -51,15 +51,15 @@ public class AstConverter {
     private static final ObjectMapper jsonMapper = new ObjectMapper();
     public static Report report = new Report();
     //Propagate analyzed classes between files, especially useful for Java
-    private static HashMap<String, Class> analyzedClasses = new HashMap<>();
-    private static ArrayList<Integer> unknownMethodsLines = new ArrayList<>();
+    private static HashMap<String, Class> analyzedClasses;
+    private static ArrayList<Integer> unknownMethodsLines;
     private static boolean isUsingFramework;
     private static String frameworkName;
     private static String fileName;
-    private static HashMap<String, HashMap<String, ArrayList<String>>> filesEntrypoints = new HashMap<>();
-    private static HashMap<String, ArrayList<String>> filesGlobalTaintedVariables = new HashMap<>();
-    private static FrameworkEntrypointsFinder fef = new FrameworkEntrypointsFinder();
-    public static int vulnerabilitiesInReport = 0;
+    private static HashMap<String, HashMap<String, ArrayList<String>>> filesEntrypoints;
+    private static HashMap<String, ArrayList<String>> filesGlobalTaintedVariables;
+    private static FrameworkEntrypointsFinder fef;
+    public static int vulnerabilitiesInReport;
 
     private static File convertFile(String filePath) throws Exception {
         Path path = Path.of(filePath);
@@ -165,6 +165,7 @@ public class AstConverter {
     public static void analyse(String directoryPath, Settings settings) throws IOException {
         report = new Report();
         StopWatch sw = new StopWatch();
+        setUpAstConverter();
         if(settings.getFramework() != null){
             isUsingFramework = true;
             frameworkName = settings.getFramework();
@@ -322,6 +323,7 @@ public class AstConverter {
         report.setFileName(file);
         if(!unknownMethodsLines.isEmpty() && !report.getVulnerabilities().isEmpty()){
             createUnknownMethodWarningMessage();
+            unknownMethodsLines.clear();
         }
         writeReport();
         vulnerabilitiesInReport += report.getVulnerabilities().size();
@@ -373,5 +375,17 @@ public class AstConverter {
             }
             System.out.println("================================================");
         }
+    }
+
+    public static void setUpAstConverter(){
+        isUsingFramework = false;
+        frameworkName = null;
+        fileName = null;
+        vulnerabilitiesInReport = 0;
+        analyzedClasses = new HashMap<>();
+        unknownMethodsLines = new ArrayList<>();
+        filesEntrypoints = new HashMap<>();
+        filesGlobalTaintedVariables = new HashMap<>();
+        fef = new FrameworkEntrypointsFinder();
     }
 }
