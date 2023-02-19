@@ -25,8 +25,6 @@ public class JavaFrameworkEntrypointsFinder extends Java8ParserBaseListener{
 
     @Override
     public void exitMethodDeclaration(Java8Parser.MethodDeclarationContext ctx) {
-        System.out.println("Ending entrypoint entry");
-        System.out.println("-----------------------------------------------------------");
         if(this.annotationFound){
             this.annotationFound = false;
         }
@@ -35,7 +33,6 @@ public class JavaFrameworkEntrypointsFinder extends Java8ParserBaseListener{
     @Override
     public void enterFormalParameter(Java8Parser.FormalParameterContext ctx) {
         if(this.annotationFound && this.entrypoints.containsKey(this.functionName)){
-            System.out.println("Parameter found: " + ctx.variableDeclaratorId().Identifier().getText() + " " + ctx.unannType().getText());
             this.entrypoints.get(this.functionName).add(ctx.variableDeclaratorId().Identifier().getText());
         }
     }
@@ -43,9 +40,6 @@ public class JavaFrameworkEntrypointsFinder extends Java8ParserBaseListener{
     @Override
     public void enterNormalAnnotation(Java8Parser.NormalAnnotationContext ctx){
         if(ctx.AT() != null && !ctx.elementValuePairList().isEmpty()){
-            System.out.println("NormalAnnotation - Found another annotation: " + ctx.getText());
-            System.out.println(ctx.typeName().getText());
-            System.out.println(ctx.elementValuePairList().getText());
             if(ctx.typeName().getText().equals("RequestMapping") || ctx.typeName().getText().equals("GetMapping")
             || ctx.typeName().getText().equals("PostMapping") || ctx.typeName().getText().equals("PutMapping")
             || ctx.typeName().getText().equals("DeleteMapping")){

@@ -92,6 +92,4 @@ public class FrameworkEntrypointsFinder {
         this.entrypoints.clear();
         this.globalTaintedVariables.clear();
     }
-
-
 }

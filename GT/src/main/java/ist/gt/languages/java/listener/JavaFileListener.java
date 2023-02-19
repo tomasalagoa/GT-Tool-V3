@@ -809,33 +809,4 @@ public class JavaFileListener extends Java8ParserBaseListener {
             gastBuilder.exitStatementOrExpression();
         }
     }
-
-    /*@Override
-    public void enterSingleElementAnnotation(Java8Parser.SingleElementAnnotationContext ctx){
-        if(ctx.AT() != null){
-            System.out.println("SingleElementAnnotation - Found annotation! " + ctx.getText());
-            System.out.println("This is the annotation found: " +  ctx.typeName().getText());
-            System.out.println("-----------------------------------------------------------");
-        }
-    }
-
-    @Override
-    public void enterMarkerAnnotation(Java8Parser.MarkerAnnotationContext ctx){
-        if(ctx.AT() != null){
-            System.out.println("MarkerAnnotation - Found another annotation: " + ctx.getText());
-            System.out.println(ctx.typeName().getText());
-            System.out.println("-----------------------------------------------------------");
-        }
-    }
-
-    @Override
-    public void enterNormalAnnotation(Java8Parser.NormalAnnotationContext ctx){
-        if(ctx.AT() != null && !ctx.elementValuePairList().isEmpty()){
-            System.out.println("NormalAnnotation - Found another annotation: " + ctx.getText());
-            System.out.println(ctx.typeName().getText());
-            System.out.println(ctx.elementValuePairList().getText());
-            System.out.println("-----------------------------------------------------------");
-        }
-    }*/
-
 }

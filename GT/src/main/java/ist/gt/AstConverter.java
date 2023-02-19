@@ -67,7 +67,7 @@ public class AstConverter {
 
         CharStream input = CharStreams.fromFileName(path.toString());
         ParseTreeWalker walker = new ParseTreeWalker();
-
+        System.out.println("Processing file: " + path.getFileName().toString());
         switch (fileExtension) {
             case "php" -> {
                 CommonTokenStream tokens = new CommonTokenStream(new PhpLexer(input));
@@ -81,13 +81,10 @@ public class AstConverter {
                 CommonTokenStream tokens = new CommonTokenStream(new Java8Lexer(input));
                 var tree = new Java8Parser(tokens).compilationUnit();
                 if(isUsingFramework){
-                    System.out.println(path.getFileName().toString());
-                    //getFrameworkStrategy(path.getFileName().toString(), walker, tree);
                     fef.useJavaFrameworkEntrypointsFinder(frameworkName, fileName, 
                         path.getFileName().toString(), walker, tree);
                     saveEntrypoints(path.getFileName().toString(), fef.getEntrypoints());
                     fef.cleanUp();
-                    System.out.println("FrameworkEntrypointsFinder for Java has ended!");
                 }
                 var listener = new JavaFileListener(path.getFileName().toString());
                 if(!analyzedClasses.isEmpty()){
@@ -112,14 +109,11 @@ public class AstConverter {
                 CommonTokenStream tokens = new CommonTokenStream(new PythonLexer(input));
                 var tree = new PythonParser(tokens).root();
                 if(isUsingFramework){
-                    System.out.println(path.getFileName().toString());
-                    //getFrameworkStrategy(path.getFileName().toString(), walker, tree);
                     fef.usePythonFrameworkEntrypointsFinder(frameworkName, fileName, 
                         path.getFileName().toString(), walker, tree);
                     saveEntrypoints(path.getFileName().toString(), fef.getEntrypoints());
                     saveGlobalTaintedVariables(path.getFileName().toString(), fef.getGlobalTaintedVariables());
                     fef.cleanUp();
-                    System.out.println("FrameworkEntrypointsFinder for Python has ended!");
                 }
                 var listener = new PythonFileListener(path.getFileName().toString());
                 if(!analyzedClasses.isEmpty()){
@@ -189,7 +183,7 @@ public class AstConverter {
             if(settings.getSpecification().getFunction() != null){
                 report.setAnalyzedFunctionName(settings.getSpecification().getFunction().getName());
             }
-            //clearReport();
+            
             if(!unknownMethodsLines.isEmpty() && !report.getVulnerabilities().isEmpty()){
                 createUnknownMethodWarningMessage();
             }
@@ -240,33 +234,6 @@ public class AstConverter {
         }
     } 
 
-    /*public static void getFrameworkStrategy(String file, ParseTreeWalker walker, CompilationUnitContext tree){
-        JavaFrameworkEntrypointFinder frameListener = new JavaFrameworkEntrypointFinder();
-        switch(frameworkName){
-            case "Spring":
-                if(fileName != null){
-                    if(fileName.equals(file)){
-                        System.out.println("Checking entrypoints of file: " + fileName);
-                        walker.walk(frameListener, tree);
-                        saveEntrypoints(file, frameListener);
-                        return;
-                    } else{
-                        return;
-                    }
-                } else {
-                    System.out.println("Checking entrypoints of all directory files");
-                    walker.walk(frameListener, tree);
-                    saveEntrypoints(file, frameListener);
-                    return;
-                }
-            
-
-            default:
-                System.out.println("Framework " + frameworkName + " is not supported. Current supported frameworks: Spring for Java, Flask for Python.");
-                return;
-        }
-    }*/
-
     public static void saveEntrypoints(String file, HashMap<String, ArrayList<String>> entrypoints){
         if(!entrypoints.isEmpty()){
             filesEntrypoints.put(file, new HashMap<>(entrypoints));
@@ -285,7 +252,7 @@ public class AstConverter {
                 HashMap<String, ArrayList<String>> entrypoints = filesEntrypoints.get(file);
                 for(String functionName : entrypoints.keySet()){
                     System.out.println("---------------------------------------------------------------------------");
-                    System.out.println("Going to inspect function " + functionName + " from file " + file);
+                    System.out.println("Going to inspect function " + functionName + "  from file " + file);
                     System.out.println("---------------------------------------------------------------------------");
                     settings.getSpecification().setFunction(new FuncDefinition(functionName, 
                         getFunctionType(file, files, functionName, "." + settings.getFileExtension())));
@@ -315,7 +282,6 @@ public class AstConverter {
     }
 
     public static void addReportEntry(String file, String functionName){
-        //clearReport();
         if(isUsingFramework){
             report.setFrameworkMessage("This is a report on " + frameworkName + " framework analysis. Please note the processed time is on the last entry");
         }
@@ -367,6 +333,7 @@ public class AstConverter {
     }
 
     public static void showEntrypoints(){
+        System.out.println("================================================");
         for(String file : filesEntrypoints.keySet()){
             HashMap<String, ArrayList<String>> entrypoints = filesEntrypoints.get(file);
             System.out.println("Entrypoints found in file " + file);

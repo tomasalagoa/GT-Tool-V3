@@ -567,8 +567,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             }
         }
 
-        //Check all else if statements until a condition is evaluated to true.
-        /* Will still have some impossible paths in more complex and difficult to
+        /* Check all else if statements until a condition is evaluated to true.
+         * Will still have some impossible paths in more complex and difficult to
          * analyse conditions. */
         if(ifStatement.getElseIfs() != null && ifStatement.getElseIfs().size() > 0){
             for(IfStatement elseIf : ifStatement.getElseIfs()){
