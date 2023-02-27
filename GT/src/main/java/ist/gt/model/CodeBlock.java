@@ -19,6 +19,9 @@ public class CodeBlock extends Element {
     private boolean hasReturn;
     private boolean isReturnTainted;
     private boolean fullyExplored;
+    private String returnType;
+    private String returnTrackedValue;
+    private Class returnClassReference;
 
     @Override
     public void accept(AstBuilderVisitorInterface visitor) {

@@ -34,6 +34,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     private ArrayList<Integer> unknownMethodsLines = new ArrayList<>();
     private HashMap<String, Class> analyzedClasses = new HashMap<>();
     private boolean returnStatementFound = false;
+    private boolean ifStatementFound = false;
 
 
     public TaintVisitor(List<File> files, Settings setting) {
@@ -224,6 +225,10 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
         function.accept(taintVisitor);
         functionCall.setTainted(function.getCodeBlock().isReturnTainted());
+        /* TODO CHeck if function codeblock has a tracked value or class reference and add it to functionCall
+         * if not, put it null
+         */
+        trackReturnValueFromFunction(function, functionCall);
         //Latest variable replacement for "this" already used
         if(this.currentThis != null && this.thisReplacements.size() > 1){
             this.currentThis = null;
@@ -335,9 +340,21 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             return;
         this.returnStatementFound = true; 
         stmt.getExpression().accept(this);
-        codeBlocks.peek().setHasReturn(true);
-        codeBlocks.peek().setReturnTainted(codeBlocks.peek().isReturnTainted() || stmt.getExpression().isTainted());
+        functions.peek().getCodeBlock().setHasReturn(true);
+        functions.peek().getCodeBlock().setReturnTainted(codeBlocks.peek().isReturnTainted() || stmt.getExpression().isTainted());
         codeBlocks.peek().setReturnTainted(stmt.getExpression().isTainted());
+        //TODO Check if expression has a value or class reference to add to the codeblock, if not put null
+        if(stmt.getExpression().getTrackedValue() != null){
+            functions.peek().getCodeBlock().setReturnTrackedValue(stmt.getExpression().getTrackedValue());
+            functions.peek().getCodeBlock().setReturnType(stmt.getExpression().getType());
+        } else if(stmt.getExpression().getClassReference() != null){
+            functions.peek().getCodeBlock().setReturnClassReference(stmt.getExpression().getClassReference());
+            functions.peek().getCodeBlock().setReturnType(stmt.getExpression().getType());
+        } else{
+            functions.peek().getCodeBlock().setReturnTrackedValue(null);
+            functions.peek().getCodeBlock().setReturnClassReference(null);
+            functions.peek().getCodeBlock().setReturnType(null);
+        }
         Util.throwAny(new ReturnFoundException("Found return statement at line " + stmt.getLine()));
     }
 
@@ -346,8 +363,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     public void visit(Variable var) {
         if (currentPathVariables.containsKey(var.getName())) {
             if(currentPathVariables.get(var.getName()).getClassReference() != null){
-                // "this" variable has no class reference, as opposed to class instances
-                if(var.getName().equals("this")){
+                /* "this" variable has no class reference, as opposed to class instances.
+                 * Can also have class instances (objects) that receive their reference 
+                 * later on through a function call e.g (and not directly through a constructor)
+                 */
+                if(var.getName().equals("this") || var.getClassReference() == null){
                     var.setClassReference(currentPathVariables.get(var.getName()).getClassReference());
                 }
                 /* var will almost always point to a different updated accessed attribute than the variable saved in
@@ -361,7 +381,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             } else{
                 var.setTainted(currentPathVariables.get(var.getName()).isTainted());
             }
-            currentPathVariables.get(var.getName()).setType(var.getType());
             var.setType(currentPathVariables.get(var.getName()).getType());
             return;
         }
@@ -422,7 +441,16 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 currentPathVariables.put(var.getName(), newVarRef);
             } else{
                 var.setTainted(variable.isTainted());
-                currentPathVariables.put(var.getName(), variable);
+                /* Variable could receive its class reference through a function call 
+                 * (and not directly through a constructor), but it is still a class instance so 
+                 * needs another object in currentPathVariables to avoid unwanted behavior.
+                */
+                if(this.analyzedClasses.containsKey(var.getType())){
+                    newVarRef = createNewVariableForAttributes(variable);
+                    currentPathVariables.put(var.getName(), newVarRef);
+                } else{
+                    currentPathVariables.put(var.getName(), variable);
+                }
             }
             return;
         }
@@ -472,6 +500,12 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             this.currentThis = null;
             this.thisReplacements.clear();
         }
+
+        if(ifStatementFound){
+            lookForIfStatementsToReset(function.getCodeBlock());
+            ifStatementFound = false;
+        }
+
         functions.pop();
     }
 
@@ -538,6 +572,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     //TODO: Check if code can be cleaner
     @Override
     public void visit(IfStatement ifStatement) {
+        ifStatementFound = true;
         Expression ifExpr = ifStatement.getExpression();
         boolean conditionFulfilled = false;
 
@@ -556,7 +591,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     return;
                 } else{
                     conditionFulfilled = false;
-                    ifStatement.getCodeBlock().setFullyExplored(true);
                 }
             } else {
                 currentPath.add(ifStatement);
@@ -570,7 +604,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         /* Check all else if statements until a condition is evaluated to true.
          * Will still have some impossible paths in more complex and difficult to
          * analyse conditions. */
-        if(ifStatement.getElseIfs() != null && ifStatement.getElseIfs().size() > 0){
+        if(ifStatement.getElseIfs() != null && !ifStatement.getElseIfs().isEmpty()){
             for(IfStatement elseIf : ifStatement.getElseIfs()){
                 if(!elseIf.isFullyExplored()){
                     if(elseIf.getExpression().getOperator() != null){
@@ -586,7 +620,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                             return;
                         } else{
                             conditionFulfilled = false;
-                            elseIf.getCodeBlock().setFullyExplored(true);
                         }
                     } else{
                         elseIf.accept(this);
@@ -597,7 +630,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
 
         if (ifStatement.getElseBlock() != null && !ifStatement.getElseBlock().isFullyExplored()
-        && ifStatement.getElseBlock().getStatements().size() > 0 && !conditionFulfilled) {
+        && !ifStatement.getElseBlock().getStatements().isEmpty() && !conditionFulfilled) {
             ifStatement.getElseBlock().accept(this);
         }
     }
@@ -622,8 +655,15 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
     @Override
     public void visit(MethodCallExpression methodCall) {
+        /* TODO This here is a bit tricky but if there is only a single member and it is a functionCall
+         * (best seen in processMethodCall), then check if it has a tracked value or class reference.
+         * If not, then put it null. After that, the assignments shouldn't need more tweaks as a methodCall
+         * extends Expression!
+         */
+
         if (methodCall.getSource() == null) {
             methodCall.getMembers().forEach(member -> member.accept(this));
+            trackReturnValueForMethodCall(methodCall);
             return;
         }
 
@@ -712,6 +752,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 isTainted = isTainted || member.isTainted() || (isTaintedSource && spec.isReturnTaintedIfTaintedSource());
             }
         }
+        trackReturnValueForMethodCall(methodCall);
         return isTainted;
     }
 
@@ -922,18 +963,19 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             assignment.setLeft(variable);
 
             if(currentPathVariables.containsKey(variable.getName())){
-                if(currentPathVariables.get(variable.getName()).getClassReference() == null){
+                if(currentPathVariables.get(variable.getName()).getClassReference() == null &&
+                variable.getClassReference() == null){
                     currentPathVariables.replace(variable.getName(), variable);
+                } else if(variable.getClassReference() != null){
+                    /* If class reference is the same, there is no problem. 
+                     * But if class reference changes to another class (eg subclass to superclass), 
+                     * then it needs to change in currentPathVariables to reflect! */
+                    currentPathVariables.get(variable.getName()).setClassReference(variable.getClassReference());
+                    currentPathVariables.get(variable.getName()).setType(variable.getType());
                 }
             } else {
                 currentPathVariables.put(variable.getName(), variable);
             }
-
-            if(functions.peek().getVariables().containsKey(variable.getName())){
-                if(functions.peek().getVariables().get(variable.getName()).getClassReference() == null){
-                    functions.peek().getVariables().replace(variable.getName(), variable);
-                }
-            } 
         }
     }
 
@@ -1077,6 +1119,36 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             default:
             System.out.println("Unknown operator: " + expression.getOperator());
             return;
+        }
+    }
+
+    public void trackReturnValueFromFunction(Function function, FunctionCall functionCall){
+        if(function.getCodeBlock().getReturnTrackedValue() != null){
+            functionCall.setTrackedValue(function.getCodeBlock().getReturnTrackedValue());
+            functionCall.setType(function.getCodeBlock().getReturnType());
+        } else if(function.getCodeBlock().getReturnClassReference() != null){
+            functionCall.setClassReference(function.getCodeBlock().getReturnClassReference());
+            functionCall.setType(function.getCodeBlock().getReturnType());
+        } else{
+            functionCall.setTrackedValue(null);
+            functionCall.setClassReference(null);
+        }
+    }
+
+    public void trackReturnValueForMethodCall(MethodCallExpression methodCall){
+        if(methodCall.getMembers().size() == 1 && methodCall.getMembers().get(0) instanceof FunctionCall){
+            FunctionCall functionCall = (FunctionCall) methodCall.getMembers().get(0);
+            if(functionCall.getTrackedValue() != null){
+                methodCall.setType(functionCall.getType());
+                methodCall.setTrackedValue(functionCall.getTrackedValue());
+            } else if(functionCall.getClassReference() != null){
+                methodCall.setType(functionCall.getType());
+                methodCall.setClassReference(functionCall.getClassReference());
+            } else{
+                methodCall.setType(null);
+                methodCall.setTrackedValue(null);
+                methodCall.setClassReference(null);
+            }
         }
     }
 
@@ -1235,6 +1307,35 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 }
             } else{
                 return attributes;
+            }
+        }
+    }
+ 
+    public void resetIfStatementsExploredStatus(IfStatement ifStatement){
+        if(ifStatement.getCodeBlock().isFullyExplored()){
+            ifStatement.getCodeBlock().setFullyExplored(false);
+            lookForIfStatementsToReset(ifStatement.getCodeBlock());
+        }
+
+        if(ifStatement.getElseIfs() != null && !ifStatement.getElseIfs().isEmpty()){
+            for(IfStatement elseIf : ifStatement.getElseIfs()){
+                if(elseIf.getCodeBlock().isFullyExplored()){
+                    elseIf.getCodeBlock().setFullyExplored(false);
+                    lookForIfStatementsToReset(elseIf.getCodeBlock());
+                }
+            }
+        }
+
+        if(ifStatement.getElseBlock().isFullyExplored()){
+            ifStatement.getElseBlock().setFullyExplored(false);
+            lookForIfStatementsToReset(ifStatement.getElseBlock());
+        }
+    }
+
+    public void lookForIfStatementsToReset(CodeBlock codeBlock){
+        for(Statement statement : codeBlock.getStatements()){
+            if(statement instanceof IfStatement){
+                resetIfStatementsExploredStatus((IfStatement) statement);
             }
         }
     }
