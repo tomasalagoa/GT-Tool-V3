@@ -210,10 +210,12 @@ public class PythonFileListener extends PythonParserBaseListener {
             attributeAccessFound = false;
         } 
         else{
+            //avoid creating new variables with the name of variables used in attribute access
             if(!attributeAccessNames.isEmpty() && attributeAccessNames.contains(ctx.getText())){
                 attributeAccessNames.remove(ctx.getText());
                 return;
             }
+            //avoid creating new variables with the name of functions
             if(!classInstanceCreation && (functionName == null || !functionName.equals(ctx.getText()))){
                 gastBuilder.addVariable(ctx, ctx.getText());
             }
@@ -252,6 +254,11 @@ public class PythonFileListener extends PythonParserBaseListener {
         gastBuilder.exitConditionalStatement();
     }
 
+    /** 
+     * @function enterMethod_chain
+     * A complex function that deals with method calls (eg, x.someMethodCall()), 
+     * attribute accesses and function calls/object creation.
+     **/
     @Override
     public void enterMethod_chain(PythonParser.Method_chainContext ctx){
         if(ctx.trailer() != null && !ctx.trailer().isEmpty()){

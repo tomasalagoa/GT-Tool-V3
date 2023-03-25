@@ -30,11 +30,18 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     private Variable currentThis;
     private Variable tempThis;
     private List<Variable> thisReplacements = new ArrayList<>();
+    /* Allows the propagation of null if no class reference is found in a method call's source.
+     * See processFunction and processMethodCall.*/
+    private boolean noClassReferencePropagation = false;
+    private String methodCallReferencePropagation = null;
+    private boolean defaultReferencePropagation = false;
     private boolean unknownMethodFound = false;
     private ArrayList<Integer> unknownMethodsLines = new ArrayList<>();
     private HashMap<String, Class> analyzedClasses = new HashMap<>();
     private boolean returnStatementFound = false;
     private boolean ifStatementFound = false;
+    private Variable firstTaintedReturnValue;
+    private int possibleFunctionReturns = 0;
 
 
     public TaintVisitor(List<File> files, Settings setting) {
@@ -88,13 +95,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             Util.throwAny(new Exception("Function not found"));
 
         taintFunctionOrMethod(specification, function);
-        if (!spec.getTaintedAttributes().isEmpty() && spec.getFunction().getType() != null) {
-            var clazz = file.getClasses().get(spec.getFunction().getType());
-            for (String taintedArgument : spec.getTaintedAttributes()) {
-                clazz.getAttributes().get(taintedArgument).setTainted(true);
-            }
-        }
-
     }
 
 
@@ -135,9 +135,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 processFunction(constructorDetails.getFunction(), functionCall, 
                 constructorDetails.getFile(), constructorDetails.getClazz());
             } else{
-                /*Can happen with library/framework functions that use the "new" expression,
-                 * so if the tool can't find it, this counts as unknown method/function.
-                */
+                /* Can happen with library/framework functions that use the "new" expression,
+                 * so if the tool can't find it, this counts as unknown method/function. */
                 functionCall.setTainted(propagateTaintInExpressionList(functionCall.getMembers()));
                 if(functionCall.isTainted()){
                     AstConverter.addUnknownMethodsLines(functionCall.getLine());
@@ -205,7 +204,15 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 }
             }
         }
-        if(this.tempThis != null){
+
+        /* Allows us to have a more precise propagation of objects: in a method call, GT propagates
+         * the object's class reference (if it has any or null is given) and in a function call it
+         * propagates the current this.*/
+        boolean giveTempClassReferenceForFunction = this.methodCallReferencePropagation != null 
+        && this.methodCallReferencePropagation.equals(function.getName());
+        
+        if((this.tempThis != null || this.noClassReferencePropagation) 
+        && giveTempClassReferenceForFunction){
             this.currentThis = this.tempThis;
             this.thisReplacements.add(this.tempThis);
             this.tempThis = null;
@@ -221,17 +228,24 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         } else{
             taintVisitor.setCurrentThis(this.currentThis);
             taintVisitor.setThisReplacements(new ArrayList<>(this.thisReplacements));
+            if(giveTempClassReferenceForFunction){
+                taintVisitor.setNoClassReferencePropagation(this.noClassReferencePropagation);
+                taintVisitor.setDefaultReferencePropagation(this.noClassReferencePropagation);
+            } else{
+                taintVisitor.setNoClassReferencePropagation(this.defaultReferencePropagation);
+                taintVisitor.setDefaultReferencePropagation(this.defaultReferencePropagation);
+            }
         }
 
         function.accept(taintVisitor);
         functionCall.setTainted(function.getCodeBlock().isReturnTainted());
-        /* TODO CHeck if function codeblock has a tracked value or class reference and add it to functionCall
-         * if not, put it null
-         */
+
         trackReturnValueFromFunction(function, functionCall);
         //Latest variable replacement for "this" already used
-        if(this.currentThis != null && this.thisReplacements.size() > 1){
+        if((this.currentThis != null || (this.noClassReferencePropagation && giveTempClassReferenceForFunction)) 
+        && this.thisReplacements.size() > 1){
             this.currentThis = null;
+            this.noClassReferencePropagation = this.defaultReferencePropagation;
             this.thisReplacements.remove(this.thisReplacements.size() - 1);
             if(!this.thisReplacements.isEmpty()){
                 this.currentThis = this.thisReplacements.get(this.thisReplacements.size() - 1);
@@ -329,7 +343,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 assignment.getLeft().setTainted(assignment.getLeft().getClassReference().areAttributesTainted());
             }
         } else{
-            assignment.getLeft().setTainted(assignment.getRight().isTainted());
+                assignment.getLeft().setTainted(assignment.getRight().isTainted());
+        }
+
+        if(assignment.getLeft() instanceof Variable && checkIfUntrustedDataSource((Variable)assignment.getLeft())){
+            currentPathVariables.get(((Variable) assignment.getLeft()).getName()).setTainted(true);
         }
     }
 
@@ -343,7 +361,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         functions.peek().getCodeBlock().setHasReturn(true);
         functions.peek().getCodeBlock().setReturnTainted(codeBlocks.peek().isReturnTainted() || stmt.getExpression().isTainted());
         codeBlocks.peek().setReturnTainted(stmt.getExpression().isTainted());
-        //TODO Check if expression has a value or class reference to add to the codeblock, if not put null
+        this.possibleFunctionReturns++;
+        
         if(stmt.getExpression().getTrackedValue() != null){
             functions.peek().getCodeBlock().setReturnTrackedValue(stmt.getExpression().getTrackedValue());
             functions.peek().getCodeBlock().setReturnType(stmt.getExpression().getType());
@@ -355,6 +374,13 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             functions.peek().getCodeBlock().setReturnClassReference(null);
             functions.peek().getCodeBlock().setReturnType(null);
         }
+
+        if((stmt.getExpression().isTainted() || 
+        (stmt.getExpression().getClassReference() != null && 
+        stmt.getExpression().getClassReference().areAttributesTainted())) && this.firstTaintedReturnValue == null){
+            saveFirstTaintedReturnValueFound(stmt.getExpression().getTrackedValue(), 
+            stmt.getExpression().getClassReference(), stmt.getExpression().getType(), stmt.getExpression().getText());
+        }
         Util.throwAny(new ReturnFoundException("Found return statement at line " + stmt.getLine()));
     }
 
@@ -362,7 +388,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     @Override
     public void visit(Variable var) {
         if (currentPathVariables.containsKey(var.getName())) {
-            if(currentPathVariables.get(var.getName()).getClassReference() != null){
+            if(checkIfUntrustedDataSource(var) && var.getSelectedAttribute() == null){
+                currentPathVariables.get(var.getName()).setTainted(true);
+                var.setTainted(true);
+            }
+            else if(currentPathVariables.get(var.getName()).getClassReference() != null){
                 /* "this" variable has no class reference, as opposed to class instances.
                  * Can also have class instances (objects) that receive their reference 
                  * later on through a function call e.g (and not directly through a constructor)
@@ -480,6 +510,10 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     @Override
     public void visit(Function function) {
         functions.push(function);
+        if(this.currentThis == null && !this.defaultReferencePropagation){
+            this.currentThis = function.getThisVar();
+            this.thisReplacements.add(function.getThisVar());
+        }
         while (!function.getCodeBlock().isFullyExplored()) {
             try {
                 currentPath.clear();
@@ -501,11 +535,20 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             this.thisReplacements.clear();
         }
 
-        if(ifStatementFound){
+        if(this.ifStatementFound){
             lookForIfStatementsToReset(function.getCodeBlock());
             ifStatementFound = false;
         }
 
+        if(this.firstTaintedReturnValue != null && this.possibleFunctionReturns > 1){
+            function.getCodeBlock().setReturnTrackedValue(this.firstTaintedReturnValue.getTrackedValue());
+            function.getCodeBlock().setReturnClassReference(this.firstTaintedReturnValue.getClassReference());
+            function.getCodeBlock().setReturnType(this.firstTaintedReturnValue.getType());
+            function.getCodeBlock().setReturnTainted(true);
+        }
+        
+        this.firstTaintedReturnValue = null;
+        this.possibleFunctionReturns = 0;
         functions.pop();
     }
 
@@ -564,12 +607,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
     @Override
     public void visit(GenericStatement statement) {
-        if (statement.getStatement() != null) //TODO happens because in php assignments go under this
+        if (statement.getStatement() != null) //happens because in php assignments go under this
             statement.getStatement().accept(this);
     }
 
 
-    //TODO: Check if code can be cleaner
     @Override
     public void visit(IfStatement ifStatement) {
         ifStatementFound = true;
@@ -655,12 +697,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
     @Override
     public void visit(MethodCallExpression methodCall) {
-        /* TODO This here is a bit tricky but if there is only a single member and it is a functionCall
-         * (best seen in processMethodCall), then check if it has a tracked value or class reference.
-         * If not, then put it null. After that, the assignments shouldn't need more tweaks as a methodCall
-         * extends Expression!
-         */
-
         if (methodCall.getSource() == null) {
             methodCall.getMembers().forEach(member -> member.accept(this));
             trackReturnValueForMethodCall(methodCall);
@@ -676,7 +712,21 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
         } else if (methodCall.getSource() instanceof Variable) {
             var source = currentPathVariables.get(((Variable) methodCall.getSource()).getName());
-            isTainted = processMethodCall(methodCall, source.getType() != null ? source.getType() : source.getName(), source.isTainted());
+            String sourceType = null;
+            boolean sourceTaint = false;
+            if(source.getClassReference() != null && source.getSelectedAttribute() != null){
+                String attributeName = source.getSelectedAttribute();
+                sourceType = source.getClassReference().getAttributes().get(attributeName).getType();
+                sourceTaint = source.getClassReference().getAttributes().get(attributeName).isTainted();
+            } else{
+                sourceType = source.getType() != null ? source.getType() : source.getName();
+                if(source.getClassReference() != null && !source.getClassReference().getAttributes().isEmpty()){
+                    sourceTaint = source.getClassReference().areAttributesTainted();
+                } else{
+                    sourceTaint = source.isTainted();
+                }
+            }
+            isTainted = processMethodCall(methodCall, sourceType, sourceTaint);
             source.setTainted(isTainted);
         }
         methodCall.setTainted(isTainted);
@@ -721,8 +771,30 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                                 //Independently of the method invoked, if collection is tainted, it will return tainted
                                 isTainted = isTaintedSource ? true : false; 
                             }
-                        } else if(variable.getClassReference() != null && !variable.getName().equals("this")){
-                            this.tempThis = variable;
+                        } else if(variable.getClassReference() != null){
+                            if(variable.getSelectedAttribute() != null){
+                                if(variable.getClassReference().getAttributes().get(variable.getSelectedAttribute()).getClassReference() == null){
+                                    this.tempThis = null;
+                                    //No class reference found. null will be propagated as reference for corresponding function
+                                    this.noClassReferencePropagation = true;
+                                    this.methodCallReferencePropagation = funcCall.getFunctionName();
+                                } else{
+                                    this.tempThis = variable.getClassReference().getAttributes().get(variable.getSelectedAttribute());
+                                    //Class reference found & will be propagated as reference for corresponding function
+                                    this.noClassReferencePropagation = false;
+                                    this.methodCallReferencePropagation = funcCall.getFunctionName();
+                                }
+                            } else{
+                                this.tempThis = variable;
+                                //Class reference found & will be propagated as reference for corresponding function
+                                this.noClassReferencePropagation = false;
+                                this.methodCallReferencePropagation = funcCall.getFunctionName();
+                            }
+                        } else{
+                            this.tempThis = null;
+                            //No class reference found. null will be propagated as reference for corresponding function
+                            this.noClassReferencePropagation = true;
+                            this.methodCallReferencePropagation = funcCall.getFunctionName();
                         }
                     }
 
@@ -950,13 +1022,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                         variable.getClassReference().getAttributes().get(attribute).setType(null);
                     } else{
                         variable.setClassReference(null);
-                        variable.setType(null);
                     }
 
                 } else{
                     variable.setTrackedValue(null);
                     variable.setLambdaFunc(null);
-                    variable.setType(null);
                 }
             }
 
@@ -1010,7 +1080,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         if((expr1.getTrackedValue() == null && expr1.getClassReference() == null) 
         || (expr2.getTrackedValue() == null && expr2.getClassReference() == null)){
             expression.setTrackedValue(null);
-            expression.setType("null");
             return;
         }
 
@@ -1122,6 +1191,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
     }
 
+    /**
+     * @function trackReturnValueFromFunction
+     * Adds the current found return value (normal value, an object - class reference or null)
+     * of a function to the corresponding functionCall.
+     */
     public void trackReturnValueFromFunction(Function function, FunctionCall functionCall){
         if(function.getCodeBlock().getReturnTrackedValue() != null){
             functionCall.setTrackedValue(function.getCodeBlock().getReturnTrackedValue());
@@ -1135,6 +1209,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
     }
 
+    /**
+     * @function trackReturnValueForMethodCall
+     * Adds the current found return value (normal value, an object - class reference or null),
+     * previously added to a function call, to the corresponding methodCall (if applicable).
+     */
     public void trackReturnValueForMethodCall(MethodCallExpression methodCall){
         if(methodCall.getMembers().size() == 1 && methodCall.getMembers().get(0) instanceof FunctionCall){
             FunctionCall functionCall = (FunctionCall) methodCall.getMembers().get(0);
@@ -1269,7 +1348,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         variable.setCollection(false);
     }
 
-
+    /**
+     * @function updateClassReferenceAttributes
+     * Whenever an object should be updated (eg, it has a superclass that was analysed after this
+     * object was analysed), then all attributes are searched and given to it.
+     */
     public void updateClassReferenceAttributes(Variable variable){
         ArrayList<Attribute> attributes = new ArrayList<>();
         if(!variable.getClassReference().getAttributes().isEmpty()){
@@ -1289,7 +1372,10 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
     }
 
-
+    /** 
+     * @function getAllSuperAttributes
+     * Retrieves all attributes from a given class and from their superclasses, if any.
+     **/
     public ArrayList<Attribute> getAllSuperAttributes(String superclassName){
         ArrayList<Attribute> attributes = new ArrayList<>();
         
@@ -1310,7 +1396,12 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             }
         }
     }
- 
+    
+    /** 
+     * @function resetIfStatementsExploredStatus
+     * Resets the explored status of the current if statement (be it an if, else if, else) and
+     * checks if its code block also possesses more if statements.
+     **/
     public void resetIfStatementsExploredStatus(IfStatement ifStatement){
         if(ifStatement.getCodeBlock().isFullyExplored()){
             ifStatement.getCodeBlock().setFullyExplored(false);
@@ -1332,6 +1423,10 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
     }
 
+    /** 
+     * @function lookForIfStatementsToReset
+     * Analyses the code block until it finds an if statement to reset the explored status.
+     **/
     public void lookForIfStatementsToReset(CodeBlock codeBlock){
         for(Statement statement : codeBlock.getStatements()){
             if(statement instanceof IfStatement){
@@ -1340,7 +1435,34 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
     }
 
-    
+    /**
+     * @function saveFirstTaintedReturnValueFound
+     * Stores information (in a TaintVisitor's attribute) regarding the 1st tainted value
+     * found in a return statement. This applies primarily to functions that have more than
+     * one return (indicative of more than one possible path).
+     **/
+    public void saveFirstTaintedReturnValueFound(String trackedValue, Class classReference, String type, String name){
+        this.firstTaintedReturnValue = new Variable(name);
+        this.firstTaintedReturnValue.setTrackedValue(trackedValue);
+        this.firstTaintedReturnValue.setClassReference(classReference);
+        this.firstTaintedReturnValue.setTainted(true);
+        this.firstTaintedReturnValue.setType(type);
+    }
+
+    /**
+     * @function checkIfUntrustedDataSource
+     * Checks if a given variable's type is an untrusted data source. Could be, for
+     * example, a buffer reader or any other bad source that can appear in the code.
+     */
+    public boolean checkIfUntrustedDataSource(Variable variable){
+        if(!spec.getUntrustedDataSources().isEmpty() && 
+        spec.getUntrustedDataSources().contains(variable.getType())){
+            return true;
+        }
+        return false;
+    }
+
+    // Not used currently. Could be handy in the future
     public boolean getSuperclassTypeHierarchy(String classType, String matchingType){
         if(classType.matches(matchingType)){
             return true;

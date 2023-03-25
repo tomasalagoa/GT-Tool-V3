@@ -8,7 +8,6 @@ import ist.gt.gastBuilder.frameworkEntrypointsFinder.FrameworkEntrypointsFinder;
 import ist.gt.languages.java.listener.JavaFileListener;
 import ist.gt.languages.java.parser.Java8Lexer;
 import ist.gt.languages.java.parser.Java8Parser;
-import ist.gt.languages.java.parser.Java8Parser.CompilationUnitContext;
 import ist.gt.languages.js.listener.JsFileListener;
 import ist.gt.languages.js.parser.JavaScriptLexer;
 import ist.gt.languages.js.parser.JavaScriptParser;
@@ -30,7 +29,6 @@ import lombok.Data;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
-import org.antlr.v4.runtime.tree.ParseTreeListener;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.time.StopWatch;
@@ -60,7 +58,14 @@ public class AstConverter {
     private static HashMap<String, ArrayList<String>> filesGlobalTaintedVariables;
     private static FrameworkEntrypointsFinder fef;
     public static int vulnerabilitiesInReport;
+    private static List<String> taintedAttributes;
+    private static String fileNameForTaintedAttributes;
 
+    /** 
+     * @function convertFile
+     * Converts a given file's code into an AST which will then be converted into a GAST
+     * in order for GT to analyse it and find vulnerabilities.
+     **/
     private static File convertFile(String filePath) throws Exception {
         Path path = Path.of(filePath);
         var fileExtension = FilenameUtils.getExtension(filePath);
@@ -87,6 +92,10 @@ public class AstConverter {
                     fef.cleanUp();
                 }
                 var listener = new JavaFileListener(path.getFileName().toString());
+                if(path.getFileName().toString().equals(fileNameForTaintedAttributes)){
+                    listener.getGastBuilder().setTaintedAttributes(taintedAttributes);
+                }
+                
                 if(!analyzedClasses.isEmpty()){
                     listener.getGastBuilder().setAnalyzedClasses(analyzedClasses);
                 }
@@ -116,6 +125,10 @@ public class AstConverter {
                     fef.cleanUp();
                 }
                 var listener = new PythonFileListener(path.getFileName().toString());
+                if(path.getFileName().toString().equals(fileNameForTaintedAttributes)){
+                    listener.getGastBuilder().setTaintedAttributes(taintedAttributes);
+                }
+
                 if(!analyzedClasses.isEmpty()){
                     listener.getGastBuilder().setAnalyzedClasses(analyzedClasses);
                 }
@@ -127,7 +140,11 @@ public class AstConverter {
         }
     }
 
-
+    /** 
+     * @function getFilesFromDirectory
+     * Based on the path to the directory, as well as the extension of the files to analyse,
+     * GT will pass each file to the converter so their code can be analysed. 
+     **/
     public static List<File> getFilesFromDirectory(String directoryPath, String extension) throws IOException {
         var files = new ArrayList<File>();
         try (Stream<Path> paths = Files.walk(Paths.get(directoryPath))) {
@@ -156,6 +173,11 @@ public class AstConverter {
         writeReport();
     }
 
+    /** 
+     * @function analyse
+     * ASTConverter's main function. Connects a given language parser (and GastBuilder) 
+     * with the TaintVisitor.
+     **/
     public static void analyse(String directoryPath, Settings settings) throws IOException {
         report = new Report();
         StopWatch sw = new StopWatch();
@@ -169,6 +191,11 @@ public class AstConverter {
             }
         } else{
             isUsingFramework = false;
+        }
+
+        if(!settings.getSpecification().getTaintedAttributes().isEmpty()){
+            taintedAttributes = new ArrayList<>(settings.getSpecification().getTaintedAttributes());
+            fileNameForTaintedAttributes = settings.getSpecification().getFileName();
         }
 
         sw.start();
@@ -234,18 +261,32 @@ public class AstConverter {
         }
     } 
 
+    /** 
+     * @function saveEntrypoints
+     * Saves all the entrypoints in a given file found by FrameworkEntrypointsFinder
+     * for further analysis.
+     **/
     public static void saveEntrypoints(String file, HashMap<String, ArrayList<String>> entrypoints){
         if(!entrypoints.isEmpty()){
             filesEntrypoints.put(file, new HashMap<>(entrypoints));
         }
     }
 
+    /** 
+     * @function saveGlobalTaintedVariables
+     * Same logic as saveEntrypoints but for global variables found in a given file.
+     **/
     public static void saveGlobalTaintedVariables(String file, ArrayList<String> globalTaintedVariables){
         if(!globalTaintedVariables.isEmpty()){
             filesGlobalTaintedVariables.put(file, new ArrayList<>(globalTaintedVariables));
         }
     }
 
+    /** 
+     * @function entrypointsAnalysis
+     * Analyses every entrypoint found in every given file or every entrypoint provided by
+     * the user. After each analysis, its results are written in a report.
+     **/
     public static void entrypointsAnalysis(Settings settings, List<File> files){
         if(isUsingFramework){
             for(String file : filesEntrypoints.keySet()){
@@ -275,12 +316,22 @@ public class AstConverter {
         }
     }
 
+    /** 
+     * @function startTaintVisitorAnalysis
+     * Auxiliary function of starting up TaintVisitor. Here to avoid code repetition.
+     **/
     public static void startTaintVisitorAnalysis(Settings settings, List<File> files){
         TaintVisitor taintVisitor = new TaintVisitor(files, settings);
         taintVisitor.setAnalyzedClasses(analyzedClasses);
         taintVisitor.start();
     }
 
+    /** 
+     * @function addReportEntry
+     * Gives a detailed entry regarding the function that was analysed: what framework
+     * it is a part of, its name, if it encountered unknown methods (unreachable code),
+     * vulnerabilities found (if any) and the name of the file it belongs to.
+     **/
     public static void addReportEntry(String file, String functionName){
         if(isUsingFramework){
             report.setFrameworkMessage("This is a report on " + frameworkName + " framework analysis. Please note the processed time is on the last entry");
@@ -296,6 +347,11 @@ public class AstConverter {
         report = new Report();
     }
 
+    /** 
+     * @function createUnknownMethodWarningMessage
+     * Auxiliary function. Simply creates an unknown method warning message with the lines' number
+     * where it found one.
+     **/
     private static void createUnknownMethodWarningMessage(){
         String warning = "";
         if(unknownMethodsLines.size() == 1){
@@ -318,6 +374,12 @@ public class AstConverter {
         report.setUnknownMethodWarning(warning);
     }
 
+    /** 
+     * @function getFunctionType
+     * Auxiliary function. Checks if a given file exists and if that file possesses the current
+     * function to analyse. If it does and that file possesses a class, then the function type will
+     * be the same as the name of the file (without the extension). If not, no type is given.
+     **/
     public static String getFunctionType(String fileName, List<File> files, String functionName, String extension){
         for(File file : files){
             if(file.getName().matches(fileName)){
@@ -332,6 +394,11 @@ public class AstConverter {
         return null;
     }
 
+    /** 
+     * @function showEntrypoints
+     * Auxiliary function. Provides information in the terminal regarding the entrypoints
+     * that were found + what file they belong to.
+     **/
     public static void showEntrypoints(){
         System.out.println("================================================");
         for(String file : filesEntrypoints.keySet()){
@@ -344,6 +411,11 @@ public class AstConverter {
         }
     }
 
+    /** 
+     * @function setUpAstConverter
+     * Auxiliary function. In multiple unit tests, AstConverter's information could be reutilized
+     * which is not intended. This function cleans up the AstConverter every time it is used.
+     **/
     public static void setUpAstConverter(){
         isUsingFramework = false;
         frameworkName = null;

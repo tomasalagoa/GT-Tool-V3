@@ -22,6 +22,7 @@ public class Function extends Element {
     private Map<String, Variable> variables = new HashMap<>();
     private CodeBlock codeBlock = new CodeBlock();
     private String returnType;
+    private Variable thisVar = new Variable();
 
     public Function(String functionName) {
         this.name = functionName;

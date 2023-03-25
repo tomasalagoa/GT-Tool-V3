@@ -18,6 +18,9 @@ public class TaintSpecification {
      * (leave it empty if framework was provided in settings)
      */
     private List<FuncDefinition> functionsToAnalyze = new ArrayList<>();
+    /* For external configuration: data source classes that could introduce taintedness are to
+     * be specified here! (eg BufferedReader in Java) */
+    private List<String> untrustedDataSources = new ArrayList<>();
     /* For internal configuration: given to TaintVisitor to know the function to analyze */
     private FuncDefinition function;
     /* For external configuration: allows TaintVisitor to know what are the tainted variables 

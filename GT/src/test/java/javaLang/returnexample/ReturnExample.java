@@ -41,8 +41,10 @@ public class ReturnExample {
     public Animal someCatClassRef(int number){
         if(number < 10){
             return new Animal("Something", 7, "Hello");
-        } else{
+        } else if(number > 10) {
             return new Cat(number);
+        } else{
+            return new Cat(10);
         }
     }
 

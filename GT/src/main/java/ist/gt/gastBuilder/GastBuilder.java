@@ -26,6 +26,7 @@ public class GastBuilder {
     private final Stack<TryCatch> tryCatches = new Stack<>();
     private Function currentLambdaFunction;
     private boolean needsFurtherSuperclassUpdate = false;
+    private List<String> taintedAttributes = null;
 
     private <E> void popIfNotEmpty(Stack<E> stack) {
         if (!stack.empty())
@@ -161,13 +162,28 @@ public class GastBuilder {
         }
         /* If the variable is not in current function nor is it a parameter of it,
          * then it could be a parameter of a lambda function (declared in an interface to run it). */
-        else if(currentLambdaFunction != null){
-            if(currentLambdaFunction.getParameters().containsKey(var.getName())){
-                var = currentLambdaFunction.getParameters().get(var.getName());
-            }
+        else if(currentLambdaFunction != null && 
+        currentLambdaFunction.getParameters().containsKey(var.getName())){
+            var = currentLambdaFunction.getParameters().get(var.getName());
+        }
+        /* If the variable is not in the current function (not a local variable),
+         * not a parameter neither is it a parameter of a lambda function, then it could be
+         * an attribute that is being used without the keyword "this". */
+        else if(!classes.isEmpty() && classes.peek().getAttributes().containsKey(var.getName())){
+            String attribute = var.getName();
+            var.setName("this");
+            var.setSelectedAttribute(attribute);
         }
 
-        currentFunction.getVariables().putIfAbsent(var.getName(), var);
+        if(!var.getName().equals("this")){
+            currentFunction.getVariables().putIfAbsent(var.getName(), var);
+        } else{
+            if(!currentFunction.getVariables().containsKey("this")){
+                Variable ths = new Variable("this");
+                ths.setType(classes.peek().getName());
+                currentFunction.getVariables().put("this", ths);
+            }
+        }
         processExpression(var);
         return var;
     }
@@ -206,10 +222,13 @@ public class GastBuilder {
         currentFunction = function;
         statements.clear();
         codeBlocks.push(function.getCodeBlock());
-        if (classes.empty())
+        if (classes.empty()){
             file.getFunctions().put(function.getName(), function);
-        else
+        }
+        else{
             classes.peek().getMethods().put(function.getName(), function);
+            function.getThisVar().setClassReference(this.analyzedClasses.get(classes.peek().getName()));
+        }
         return function;
     }
 
@@ -317,6 +336,9 @@ public class GastBuilder {
 
     public Attribute addAttribute(ParserRuleContext ctx, String name) {
         var attribute = new Attribute(ctx, name);
+        if(this.taintedAttributes != null && this.taintedAttributes.contains(attribute.getName())){
+            attribute.setTainted(true);
+        }
         classes.peek().getAttributes().put(attribute.getName(), attribute);
         processExpression(attribute);
         return attribute;
@@ -419,6 +441,7 @@ public class GastBuilder {
             if(superclassAttributes != null){
                 if(this.needsFurtherSuperclassUpdate){
                     trackedClass.setNeedSuperclassUpdate(true);
+                    originalClass.setNeedSuperclassUpdate(true);
                     this.needsFurtherSuperclassUpdate = false;
                 }
 
@@ -427,6 +450,7 @@ public class GastBuilder {
                 }
             } else if(superclassAttributes == null && trackedClass.getSuperClass() != null){
                 trackedClass.setNeedSuperclassUpdate(true);
+                originalClass.setNeedSuperclassUpdate(true);
             }
             trackedClass.setAttributes(attributes);
             trackedClass.setMethods(new HashMap<String, Function>(originalClass.getMethods()));
@@ -855,13 +879,13 @@ public class GastBuilder {
             String fileNameExtension = Arrays.asList(this.file.getName().split("\\.")).get(1);
             Expression expression = (Expression) statements.pop();
 
-            if(fileNameExtension.equals("java") || fileNameExtension.equals("js")){
+            if(fileNameExtension.equals("js")){
                 /* 2 here relates to the members that exist in an expression when we have an attribute access,
-                    * e.g., for someClass.someAttribute it would have Variable (someClass) and 
-                    * Variable (someAttribute). So if we have a complex expression (someClass.someAttribute + 
-                    * anotherClass.anotherAttribute), it would have 3 members (the already parsed someClass and the
-                    * to-be-parsed anotherClass).
-                */
+                 * e.g., for someClass.someAttribute it would have Variable (someClass) and 
+                 * Variable (someAttribute). So if we have a complex expression (someClass.someAttribute + 
+                 * anotherClass.anotherAttribute), it would have 3 members (the already parsed someClass and the
+                 * to-be-parsed anotherClass).
+                 */
                 newAttributeAddedIdx = expression.getMembers().size() - 2;
                 attribute = (Variable) expression.getMembers().get(newAttributeAddedIdx + 1);
                 attributeName = attribute.getName();
@@ -869,9 +893,9 @@ public class GastBuilder {
                 expression.getMembers().remove(newAttributeAddedIdx + 1);
                 var = createNewVariableForAttributes((Variable) expression.getMembers().get(newAttributeAddedIdx));
                 var.setSelectedAttribute(attributeName);
-            } else if(fileNameExtension.equals("py")){
+            } else if(fileNameExtension.equals("java") || fileNameExtension.equals("py")){
                 /**
-                 * For more complex expressions (using +, -, +=, etc), Python adds the Expression object
+                 * For more complex expressions (using +, -, +=, etc), Python/Java adds the Expression object,
                  * however, the accessed attribute is done with one object only: a Variable with source.attribute name.
                  */
                 newAttributeAddedIdx = expression.getMembers().size() - 1;

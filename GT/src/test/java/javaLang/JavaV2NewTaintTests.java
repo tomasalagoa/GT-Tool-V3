@@ -41,4 +41,21 @@ public class JavaV2NewTaintTests {
         AstConverter.analyse(DirectoryPath + "/returnexample", settings);
         assertEquals(AstConverter.report.getVulnerabilities().size(), 4);
     }
+
+    @Test
+    public void hidden_this_example() throws Exception {
+        spec.setFileName("HiddenThisExample.java");
+        spec.getFunction().setType(spec.getFileName().replace(".java", ""));
+        AstConverter.analyse(DirectoryPath + "/hiddenthisexample", settings);
+        assertEquals(AstConverter.report.getVulnerabilities().size(), 1);
+    }
+
+    @Test
+    public void untrusted_data_source_example() throws Exception {
+        spec.setFileName("UntrustedDataSource.java");
+        spec.getFunction().setType(spec.getFileName().replace(".java", ""));
+        spec.setUntrustedDataSources(List.of("BufferedReader"));
+        AstConverter.analyse(DirectoryPath + "/untrusteddatasourceexample", settings);
+        assertEquals(AstConverter.report.getVulnerabilities().size(), 1);
+    }
 }

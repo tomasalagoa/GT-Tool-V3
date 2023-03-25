@@ -79,7 +79,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
             String rmvQuotes = ctx.getText().substring(1, ctx.getText().length()-1).replace("\"\"", "\"");
             gastBuilder.addConstant(ctx, rmvQuotes, "String");
         } else if(ctx.NullLiteral() != null){
-            gastBuilder.addConstant(ctx, ctx.getText(), "null");
+            gastBuilder.addConstant(ctx, ctx.getText(), null);
         }
         
     }
@@ -172,18 +172,18 @@ public class JavaFileListener extends Java8ParserBaseListener {
             /* This function will be used, primarily, because with a Generic Statement GT will lose some
              * information about an attribute access. */
             isGenStmt = gastBuilder.isGenericStatement();
-            gastBuilder.addVariable(ctx, ctx.ambiguousName().Identifier().getText());
+            gastBuilder.addVariable(ctx, ctx.ambiguousName().Identifier().getText() + "." + ctx.Identifier().getText());
             accessedAttribute = true;
         }
-
-            gastBuilder.addVariable(ctx, ctx.Identifier().getText());
-
+  
         if(isGenStmt){
             gastBuilder.exitStatementOrExpression();
         }
         if(accessedAttribute){
             //New function to help with attribute value tracking
             gastBuilder.accessedAttribute();
+        } else{
+            gastBuilder.addVariable(ctx, ctx.Identifier().getText());
         }
     }
 
@@ -788,6 +788,10 @@ public class JavaFileListener extends Java8ParserBaseListener {
         }
     }
 
+    /** 
+     * @function enterExplicitConstructorInvocation
+     * Distiguishes between the super() function and the this() function used in constructors.
+     **/
     @Override
     public void enterExplicitConstructorInvocation(Java8Parser.ExplicitConstructorInvocationContext ctx){
         if(ctx.SUPER() != null){
