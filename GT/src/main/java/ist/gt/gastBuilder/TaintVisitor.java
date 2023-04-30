@@ -84,6 +84,9 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
         if (spec.isRootSpecification()) {
             spec.getTaintedVarsOrArgs().forEach(var -> file.getRootFunc().getVariables().get(var).setTainted(true));
+            if(!file.getRootFunc().getParameters().isEmpty()){
+                spec.getTaintedVarsOrArgs().forEach(var -> file.getRootFunc().getParameters().get(var).setTainted(true));
+            }
             return;
         }
 
@@ -728,6 +731,9 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             }
             isTainted = processMethodCall(methodCall, sourceType, sourceTaint);
             source.setTainted(isTainted);
+        } else if(methodCall.getSource() instanceof Expression){
+            isTainted = processMethodCall(methodCall, methodCall.getSource().getType(), 
+                methodCall.getSource().isTainted());
         }
         methodCall.setTainted(isTainted);
         methodCall.getSource().setTainted(isTainted || methodCall.getSource().isTainted());
@@ -1090,6 +1096,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
         if(expr2.getClassReference() != null && expr2.getSelectedAttribute() != null){
             expr2 = (Expression) expr2.getClassReference().getAttributes().get(expr2.getSelectedAttribute());
+        }
+        //Test new expressions once again to avoid errors due to null
+        if(expr1.getTrackedValue() == null || expr2.getTrackedValue() == null){
+            expression.setTrackedValue(null);
+            return;
         }
 
         boolean areNumbers = (expr1.getType().equals("int") ||
@@ -1455,7 +1466,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
      * example, a buffer reader or any other bad source that can appear in the code.
      */
     public boolean checkIfUntrustedDataSource(Variable variable){
-        if(!spec.getUntrustedDataSources().isEmpty() && 
+        if(spec.getUntrustedDataSources() != null && !spec.getUntrustedDataSources().isEmpty() && 
         spec.getUntrustedDataSources().contains(variable.getType())){
             return true;
         }

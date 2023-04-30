@@ -60,7 +60,7 @@ public class PythonFrameworkEntrypointsFinder extends PythonParserBaseListener{
 
     @Override
     public void enterDecorator(PythonParser.DecoratorContext ctx){
-        if(ctx.AT() != null && ctx.dotted_name().getText().matches("app.route")){
+        if(ctx.AT() != null && ctx.dotted_name().getText().contains(".route")){
             this.annotationFound = true;
         }
     }

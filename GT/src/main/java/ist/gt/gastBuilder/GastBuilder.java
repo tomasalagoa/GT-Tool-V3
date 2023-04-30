@@ -1099,7 +1099,7 @@ public class GastBuilder {
 
     //Used in Assignments from PythonParser
     public void checkIfLeftSideIsExpr(){
-        if(statements.peek() instanceof Assignment){
+        if(!statements.isEmpty() && statements.peek() instanceof Assignment){
             Assignment assignment = (Assignment) statements.pop();
             if(assignment.getLeft() instanceof Expression && assignment.getLeft().getMembers().size() == 1 &&
             assignment.getLeft().getMembers().get(0) instanceof Variable){
@@ -1125,11 +1125,13 @@ public class GastBuilder {
 
     public void collectionInitFound(){
         //Curently in assignment context
-        Expression expression = (Expression) statements.pop();
-        Assignment assignment = (Assignment) statements.pop();
-        assignment.getLeft().setCollection(true);
-        statements.push(assignment);
-        statements.push(expression);
+        if(!statements.isEmpty() && statements.size() >= 2){
+            Expression expression = (Expression) statements.pop();
+            Assignment assignment = (Assignment) statements.pop();
+            assignment.getLeft().setCollection(true);
+            statements.push(assignment);
+            statements.push(expression);
+        }
     }
 
     /**
@@ -1216,5 +1218,57 @@ public class GastBuilder {
             functionName = classes.peek().getName();
         }
         addSuperMethodCall(ctx, functionName, true);
+    }
+
+    /**
+     * @function rearrangeMethodClassWithClassSource
+     * Auxiliary function used in Java context (for now) to tackle the problem of
+     * having a class being the source of a method call, eg (new someClass()).someMethodCall();
+     * This function makes the following assumptions based on observations regarding this case:
+     * first, the method call will have as source the function it wants to call and second,
+     * that same function will have as first member the class creation expression 
+     * we want to have as source!
+     * 
+     * If you want to also extend this to other languages (might be needed), care
+     * for these assumptions!
+     */
+    public void rearrangeMethodClassWithClassSource(){
+        if(!statements.isEmpty()){
+            FunctionCall functionCall = (FunctionCall) statements.pop();
+            MethodCallExpression methodCall = (MethodCallExpression) statements.pop();
+
+            Expression classExpression = functionCall.getMembers().remove(0);
+            methodCall.getMembers().add(functionCall);
+            methodCall.setSource(classExpression);
+
+            statements.push(methodCall);
+            statements.push(functionCall);
+        }
+    }
+
+    /**
+     * @function addAttributeTrackedValue
+     * @param attributeName
+     * @param type
+     * @param value
+     * Auxiliary function used in Java context (for now) to initialize a class's
+     * fields/attributes in case primitive data types (or Lists/Maps/Sets/Stacks) are
+     * used. Doesn't support other classes due to the complexity involved!
+     */
+    public void addAttributeTrackedValue(String attributeName, String type, String value){
+        if(type.equals("int") || type.equals("double") || 
+            type.equals("float") || type.equals("char") || 
+            type.equals("boolean")){
+            this.classes.peek().getAttributes().get(attributeName).setTrackedValue(value);
+        } else if(type.equals("String")){
+            //Remove quotes from ctx text due to the appearance of double quotes later on
+            String rmvQuotes = value.substring(1, value.length()-1).replace("\"\"", "\"");
+            this.classes.peek().getAttributes().get(attributeName).setTrackedValue(rmvQuotes);
+        } else if(type.equals("List") || type.equals("ArrayList") ||
+            type.equals("LinkedList") || type.equals("Map") ||
+            type.equals("HashMap") || type.equals("Stack") || 
+            type.equals("HashSet") || type.equals("Set")){
+                this.classes.peek().getAttributes().get(attributeName).setCollection(true);
+        }
     }
 }

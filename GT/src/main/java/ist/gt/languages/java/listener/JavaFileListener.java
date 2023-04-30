@@ -18,6 +18,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
     private boolean wasVarDecl = false;
     private boolean genStmtInserted = false;
     private boolean collectionFound = false;
+    private boolean classInMethodCallSource = false;
     private final GastBuilder gastBuilder;
 
     public JavaFileListener(String filename) {
@@ -240,8 +241,17 @@ public class JavaFileListener extends Java8ParserBaseListener {
         } else {
             gastBuilder.addMethodCall(ctx);
             // "this" is stored in primary
-            if(ctx.primary() != null && ctx.primary().getText().equals("this")){
-                gastBuilder.addVariable(ctx, ctx.primary().getText());
+            if(ctx.primary() != null){
+                System.out.println(ctx.primary().getText());
+            }
+
+            if(ctx.primary() != null){
+                if(ctx.primary().getText().equals("this")){
+                    gastBuilder.addVariable(ctx, ctx.primary().getText());
+                } else{
+                    // This most certaintly could be a case of (new SomeClass()).someMethod()
+                    this.classInMethodCallSource = true;
+                }
             }
             gastBuilder.addFunctionCall(ctx, ctx.Identifier().getText());
         }
@@ -259,6 +269,10 @@ public class JavaFileListener extends Java8ParserBaseListener {
             gastBuilder.exitStatementOrExpression();
             gastBuilder.exitStatementOrExpression();
         } else{
+            if(this.classInMethodCallSource){
+                gastBuilder.rearrangeMethodClassWithClassSource();
+                this.classInMethodCallSource = false;
+            }
             gastBuilder.exitStatementOrExpression();
             gastBuilder.exitStatementOrExpression();
         }
@@ -350,6 +364,12 @@ public class JavaFileListener extends Java8ParserBaseListener {
     public void enterFieldDeclaration(Java8Parser.FieldDeclarationContext ctx) {
         for(int i = 0; i < ctx.variableDeclaratorList().variableDeclarator().size(); i++){
             gastBuilder.addAttribute(ctx, ctx.variableDeclaratorList().variableDeclarator(i).variableDeclaratorId().getText(), ctx.unannType().getText());
+            if(ctx.variableDeclaratorList().variableDeclarator(i).ASSIGN() != null){
+                gastBuilder.addAttributeTrackedValue(
+                    ctx.variableDeclaratorList().variableDeclarator(i).variableDeclaratorId().getText(), 
+                    ctx.unannType().getText(),
+                    ctx.variableDeclaratorList().variableDeclarator(i).variableInitializer().getText());
+            }
         }
     }
 

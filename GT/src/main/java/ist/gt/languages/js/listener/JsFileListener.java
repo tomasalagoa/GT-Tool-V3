@@ -231,22 +231,26 @@ public class JsFileListener extends JavaScriptParserBaseListener {
 
     @Override
     public void exitAssignmentExpression(JavaScriptParser.AssignmentExpressionContext ctx) {
-        if(this.assignmentExpression){
-            gastBuilder.trackExpressionValue();
+        if(!gastBuilder.getStatements().isEmpty()){
+            if(this.assignmentExpression){
+                gastBuilder.trackExpressionValue();
+                gastBuilder.exitStatementOrExpression();
+                this.assignmentExpression = false;
+            }
+        
+            gastBuilder.checkIfLeftSideIsExpr();
+            gastBuilder.trackLeftVariableValue();
+            //Used in situations where assignment has +=, -=, *=, /=, %=
+            gastBuilder.modifyAssignmentWithOperator();
+        
             gastBuilder.exitStatementOrExpression();
-            this.assignmentExpression = false;
+            //Remove inserted GenericStatement from Stack
+            if(wasAssignmentFound && genericStatementInserted){
+                gastBuilder.exitStatementOrExpression();
+                genericStatementInserted = false;
+            }
+            wasAssignmentFound = false;
         }
-        gastBuilder.checkIfLeftSideIsExpr();
-        gastBuilder.trackLeftVariableValue();
-        //Used in situations where assignment has +=, -=, *=, /=, %=
-        gastBuilder.modifyAssignmentWithOperator();
-        gastBuilder.exitStatementOrExpression();
-        //Remove inserted GenericStatement from Stack
-        if(wasAssignmentFound && genericStatementInserted){
-            gastBuilder.exitStatementOrExpression();
-            genericStatementInserted = false;
-        }
-        wasAssignmentFound = false;
     }
 
     @Override
@@ -287,22 +291,24 @@ public class JsFileListener extends JavaScriptParserBaseListener {
 
     @Override
     public void exitVariableDeclaration(JavaScriptParser.VariableDeclarationContext ctx) {
-        if(this.assignmentExpression){
-            gastBuilder.trackExpressionValue();
+        if(!gastBuilder.getStatements().isEmpty()){
+            if(this.assignmentExpression){
+                gastBuilder.trackExpressionValue();
+                gastBuilder.exitStatementOrExpression();
+                this.assignmentExpression = false;
+            }
+            gastBuilder.checkIfLeftSideIsExpr();
+            gastBuilder.trackLeftVariableValue();
+            //Used in situations where assignment has +=, -=, *=, /=, %=
+            gastBuilder.modifyAssignmentWithOperator();
             gastBuilder.exitStatementOrExpression();
-            this.assignmentExpression = false;
+            //Remove inserted GenericStatement from Stack
+            if(wasAssignmentFound && genericStatementInserted){
+                gastBuilder.exitStatementOrExpression();
+                genericStatementInserted = false;
+            }
+            wasAssignmentFound = false;
         }
-        gastBuilder.checkIfLeftSideIsExpr();
-        gastBuilder.trackLeftVariableValue();
-        //Used in situations where assignment has +=, -=, *=, /=, %=
-        gastBuilder.modifyAssignmentWithOperator();
-        gastBuilder.exitStatementOrExpression();
-        //Remove inserted GenericStatement from Stack
-        if(wasAssignmentFound && genericStatementInserted){
-            gastBuilder.exitStatementOrExpression();
-            genericStatementInserted = false;
-        }
-        wasAssignmentFound = false;
     }
 
     @Override
@@ -329,8 +335,10 @@ public class JsFileListener extends JavaScriptParserBaseListener {
 
     @Override
     public void exitArgument(JavaScriptParser.ArgumentContext ctx) {
-        gastBuilder.trackExpressionValue();
-        gastBuilder.exitStatementOrExpression();
+        if(!gastBuilder.getStatements().isEmpty()){
+            gastBuilder.trackExpressionValue();
+            gastBuilder.exitStatementOrExpression();
+        }
     }
 
     @Override
