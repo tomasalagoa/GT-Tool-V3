@@ -185,14 +185,15 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             Expression parameter = functionCall.getMembers().get(i);
             if(parameter.getType() != null){
                 if(parameter.getClassReference() != null){
-                    if(parameter.getSelectedAttribute() != null){
+                    if(parameter.getSelectedAttribute() != null && 
+                    !parameter.getClassReference().getAttributes().isEmpty()){
                         String attributeName = parameter.getSelectedAttribute();
                         function.getParameters().getElement(i).setTrackedValue(
                             parameter.getClassReference().getAttributes().get(attributeName).getTrackedValue());
                         
                         function.getParameters().getElement(i).setType(
                             parameter.getClassReference().getAttributes().get(attributeName).getType());
-                    } else{
+                    } else if(parameter.getSelectedAttribute() == null){
                         function.getParameters().getElement(i).setClassReference(parameter.getClassReference());
                         function.getParameters().getElement(i).setType(parameter.getType());
                     }
@@ -337,7 +338,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         propagateSetTainted(assignment.getLeft(), assignment.getRight().isTainted());
         assignment.setTainted(assignment.getRight().isTainted());
         //Same logic as in @function visit(Variable)
-        if(assignment.getLeft().getClassReference() != null){
+        /*if(assignment.getLeft().getClassReference() != null){
             if(assignment.getLeft().getSelectedAttribute() != null){
                 String attribute = assignment.getLeft().getSelectedAttribute();
                 assignment.getLeft().setTainted(assignment.getLeft().getClassReference()
@@ -347,7 +348,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             }
         } else{
                 assignment.getLeft().setTainted(assignment.getRight().isTainted());
-        }
+        }*/
 
         if(assignment.getLeft() instanceof Variable && checkIfUntrustedDataSource((Variable)assignment.getLeft())){
             currentPathVariables.get(((Variable) assignment.getLeft()).getName()).setTainted(true);
@@ -453,7 +454,9 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
             var.setType(variable.getType());
             if(variable.getClassReference() != null){
-                if(variable.getSelectedAttribute() != null){
+                if(variable.getClassReference().getAttributes().isEmpty()){
+                    var.setTainted(variable.isTainted());
+                } else if(variable.getSelectedAttribute() != null){
                     String attribute = variable.getSelectedAttribute();
                     var.setTainted(variable.getClassReference().getAttributes().get(attribute).isTainted());
                 } else if(newVarRef != null && newVarRef.getSelectedAttribute() != null){
@@ -717,13 +720,15 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             var source = currentPathVariables.get(((Variable) methodCall.getSource()).getName());
             String sourceType = null;
             boolean sourceTaint = false;
-            if(source.getClassReference() != null && source.getSelectedAttribute() != null){
+            if(source.getClassReference() != null && source.getSelectedAttribute() != null &&
+            !source.getClassReference().getAttributes().isEmpty()){
                 String attributeName = source.getSelectedAttribute();
                 sourceType = source.getClassReference().getAttributes().get(attributeName).getType();
                 sourceTaint = source.getClassReference().getAttributes().get(attributeName).isTainted();
             } else{
                 sourceType = source.getType() != null ? source.getType() : source.getName();
-                if(source.getClassReference() != null && !source.getClassReference().getAttributes().isEmpty()){
+                if(source.getClassReference() != null && 
+                !source.getClassReference().getAttributes().isEmpty()){
                     sourceTaint = source.getClassReference().areAttributesTainted();
                 } else{
                     sourceTaint = source.isTainted();
@@ -778,7 +783,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                                 isTainted = isTaintedSource ? true : false; 
                             }
                         } else if(variable.getClassReference() != null){
-                            if(variable.getSelectedAttribute() != null){
+                            if(variable.getSelectedAttribute() != null &&
+                            !variable.getClassReference().getAttributes().isEmpty()){
                                 if(variable.getClassReference().getAttributes().get(variable.getSelectedAttribute()).getClassReference() == null){
                                     this.tempThis = null;
                                     //No class reference found. null will be propagated as reference for corresponding function
@@ -892,7 +898,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         boolean taint = false;
         for (Expression expr : expressions) {
             expr.accept(this);
-            if(expr.getClassReference() != null && expr.getSelectedAttribute() != null){
+            if(expr.getClassReference() != null && expr.getSelectedAttribute() != null &&
+            !expr.getClassReference().getAttributes().isEmpty()){
                 String attribute = expr.getSelectedAttribute();
                 taint = taint || expr.getClassReference().getAttributes().get(attribute).isTainted();
             } else{
@@ -908,7 +915,9 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         if (expression instanceof Variable) {
             var variable = (Variable) expression;
             if(variable.getClassReference() != null){
-                if(variable.getSelectedAttribute() != null){
+                if(variable.getClassReference().getAttributes().isEmpty()){
+                    currentPathVariables.get(variable.getName()).setTainted(variable.isTainted());
+                } else if(variable.getSelectedAttribute() != null){
                     String attributeName = variable.getSelectedAttribute();
                     currentPathVariables.get(variable.getName()).getClassReference().getAttributes()
                     .get(attributeName).setTainted(variable.isTainted());
@@ -955,7 +964,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     variable.setClassReference(null);
                     variable.setLambdaFunc(null);
                     variable.setType(expression.getType());
-                } else{
+                } else if(!variable.getClassReference().getAttributes().isEmpty()){
                     String leftAttribute = assignment.getLeft().getSelectedAttribute();
                     variable.getClassReference().getAttributes().get(leftAttribute)
                     .setTrackedValue(expression.getTrackedValue());
@@ -974,7 +983,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                  */
                 if(expression.getSelectedAttribute() == null){
                     if(variable.getClassReference() != null && 
-                    variable.getSelectedAttribute() != null){
+                    variable.getSelectedAttribute() != null && 
+                    !variable.getClassReference().getAttributes().isEmpty()){
                         String leftAttribute = variable.getSelectedAttribute();
                         variable.getClassReference().getAttributes().get(leftAttribute)
                         .setClassReference(expression.getClassReference());
@@ -989,9 +999,10 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                         variable.setLambdaFunc(null);
                     }
                 }
-                else{
+                else if(expression.getClassReference().getAttributes() != null){
                     if(variable.getClassReference() != null && 
-                    variable.getSelectedAttribute() != null){
+                    variable.getSelectedAttribute() != null &&
+                    !variable.getClassReference().getAttributes().isEmpty()){
                         String leftAttribute = variable.getSelectedAttribute();
                         String rightAttribute = expression.getSelectedAttribute();
                         variable.getClassReference().getAttributes().get(leftAttribute)
@@ -1020,7 +1031,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 variable.setTrackedValue(null);
             } else{
                 if(variable.getClassReference() != null){
-                    if(variable.getSelectedAttribute() != null){
+                    if(variable.getSelectedAttribute() != null &&
+                    !variable.getClassReference().getAttributes().isEmpty()){
                         String attribute = variable.getSelectedAttribute();
                         variable.getClassReference().getAttributes().get(attribute).setTrackedValue(null);
                         variable.getClassReference().getAttributes().get(attribute).setClassReference(null);
@@ -1090,11 +1102,13 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
 
         //Have to check if any of the expressions is an attribute access
-        if(expr1.getClassReference() != null && expr1.getSelectedAttribute() != null){
+        if(expr1.getClassReference() != null && expr1.getSelectedAttribute() != null &&
+        !expr1.getClassReference().getAttributes().isEmpty()){
             expr1 = (Expression) expr1.getClassReference().getAttributes().get(expr1.getSelectedAttribute());
         }
 
-        if(expr2.getClassReference() != null && expr2.getSelectedAttribute() != null){
+        if(expr2.getClassReference() != null && expr2.getSelectedAttribute() != null &&
+        !expr2.getClassReference().getAttributes().isEmpty()){
             expr2 = (Expression) expr2.getClassReference().getAttributes().get(expr2.getSelectedAttribute());
         }
         //Test new expressions once again to avoid errors due to null
