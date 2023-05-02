@@ -381,6 +381,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
         if((stmt.getExpression().isTainted() || 
         (stmt.getExpression().getClassReference() != null && 
+        !stmt.getExpression().getClassReference().getAttributes().isEmpty() &&
         stmt.getExpression().getClassReference().areAttributesTainted())) && this.firstTaintedReturnValue == null){
             saveFirstTaintedReturnValueFound(stmt.getExpression().getTrackedValue(), 
             stmt.getExpression().getClassReference(), stmt.getExpression().getType(), stmt.getExpression().getText());
@@ -410,7 +411,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 /* The class reference will always have the attributes' taintedness updated but if the object
                  * (class instance) is being used then we have to update its own taintedness. */
                 if(currentPathVariables.get(var.getName()).getSelectedAttribute() == null){
-                    var.setTainted(currentPathVariables.get(var.getName()).getClassReference().areAttributesTainted());
+                    if(!currentPathVariables.get(var.getName()).getClassReference().getAttributes().isEmpty()){
+                        var.setTainted(currentPathVariables.get(var.getName()).getClassReference().areAttributesTainted());
+                    } else{
+                        var.setTainted(currentPathVariables.get(var.getName()).isTainted());
+                    }
                 }
             } else{
                 var.setTainted(currentPathVariables.get(var.getName()).isTainted());

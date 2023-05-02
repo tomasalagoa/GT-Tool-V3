@@ -242,10 +242,6 @@ public class JavaFileListener extends Java8ParserBaseListener {
             gastBuilder.addMethodCall(ctx);
             // "this" is stored in primary
             if(ctx.primary() != null){
-                System.out.println(ctx.primary().getText());
-            }
-
-            if(ctx.primary() != null){
                 if(ctx.primary().getText().equals("this")){
                     gastBuilder.addVariable(ctx, ctx.primary().getText());
                 } else{
@@ -578,6 +574,16 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void exitCatchClause(Java8Parser.CatchClauseContext ctx) {
         gastBuilder.exitCatchBlock();
+    }
+
+    @Override
+    public void enterFinally_(Java8Parser.Finally_Context ctx){
+        gastBuilder.enterFinallyBlock();
+    }
+
+    @Override
+    public void exitFinally_(Java8Parser.Finally_Context ctx){
+        gastBuilder.exitFinallyBlock();
     }
 
     /*==================================================================* 

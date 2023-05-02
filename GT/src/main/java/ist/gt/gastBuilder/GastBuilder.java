@@ -81,7 +81,7 @@ public class GastBuilder {
     }
 
     public void enterCatchBlock() {
-        popIfNotEmpty(codeBlocks);
+        //popIfNotEmpty(codeBlocks);
         CodeBlock block = new CodeBlock();
         tryCatches.peek().getCatchBlock().add(block);
         codeBlocks.push(block);
@@ -91,7 +91,16 @@ public class GastBuilder {
         popIfNotEmpty(codeBlocks);
     }
 
+    public void enterFinallyBlock(){
+        codeBlocks.push(tryCatches.peek().getFinallyBlock());
+    }
+
+    public void exitFinallyBlock(){
+        popIfNotEmpty(codeBlocks);
+    }
+
     public void exitTryCatchBlock() {
+        popIfNotEmpty(codeBlocks);
         tryCatches.pop();
     }
 
