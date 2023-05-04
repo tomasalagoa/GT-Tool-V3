@@ -1238,20 +1238,40 @@ public class GastBuilder {
      * that same function will have as first member the class creation expression 
      * we want to have as source!
      * 
+     * (new someClass()).someMethodCall() can also appear in the right side of an assignment and
+     * GT will not consider that a method call and will separate them in different statements (also
+     * couldn't find a rule in Parser that allowed me to know reliably that it is a methodCall).
+     * 
      * If you want to also extend this to other languages (might be needed), care
      * for these assumptions!
      */
     public void rearrangeMethodClassWithClassSource(){
         if(!statements.isEmpty()){
-            FunctionCall functionCall = (FunctionCall) statements.pop();
-            MethodCallExpression methodCall = (MethodCallExpression) statements.pop();
+            if(statements.peek() instanceof FunctionCall){
+                FunctionCall functionCall = (FunctionCall) statements.pop();
+                MethodCallExpression methodCall = (MethodCallExpression) statements.pop();
 
-            Expression classExpression = functionCall.getMembers().remove(0);
-            methodCall.getMembers().add(functionCall);
-            methodCall.setSource(classExpression);
+                Expression classExpression = functionCall.getMembers().remove(0);
+                methodCall.getMembers().add(functionCall);
+                methodCall.setSource(classExpression);
 
-            statements.push(methodCall);
-            statements.push(functionCall);
+                statements.push(methodCall);
+                statements.push(functionCall);
+            } else if(statements.peek() instanceof MethodCallExpression){
+                /* This part represents the appearance of (new someClass()).someMethodCall() 
+                 * in the right side of an assignment!
+                */
+                MethodCallExpression methodCall = (MethodCallExpression) statements.pop();
+                Expression expression = (Expression) statements.pop();
+                if(!statements.isEmpty() && statements.peek() instanceof Assignment){
+                    Assignment assignment = (Assignment) statements.pop();
+                    methodCall.setSource(assignment.getRight().getMembers().remove(0));
+                    statements.push(assignment);
+                }
+
+                statements.push(expression);
+                statements.push(methodCall);
+            }
         }
     }
 
@@ -1279,5 +1299,28 @@ public class GastBuilder {
             type.equals("HashSet") || type.equals("Set")){
                 this.classes.peek().getAttributes().get(attributeName).setCollection(true);
         }
+    }
+
+    /**
+     * @function finishExpressionForCase
+     * @param isElseIf
+     * Auxiliary function used in Java context (for now) to give a case 
+     * (from a switch statement) the following expression: switchExpression == caseExpression.
+     */
+    public void finishExpressionForCase(boolean isElseIf) {
+        IfStatement ifStatement = (IfStatement) statements.pop();
+        Expression switchExpression = (Expression) statements.pop();
+
+        if(!isElseIf){
+            ifStatement.getExpression().getMembers().add(switchExpression.getMembers().get(0));
+            ifStatement.getExpression().setOperator("==");
+        } else{
+            int lastElseIf = ifStatement.getElseIfs().size() - 1;
+            ifStatement.getElseIfs().get(lastElseIf).getExpression().getMembers().add(switchExpression.getMembers().get(0));
+            ifStatement.getElseIfs().get(lastElseIf).getExpression().setOperator("==");
+        }
+
+        statements.push(switchExpression);
+        statements.push(ifStatement);
     }
 }

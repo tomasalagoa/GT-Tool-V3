@@ -19,6 +19,9 @@ public class JavaFileListener extends Java8ParserBaseListener {
     private boolean genStmtInserted = false;
     private boolean collectionFound = false;
     private boolean classInMethodCallSource = false;
+    private String switchExpression = "";
+    private int totalSwitchCases;
+    private int casesBuilt = 0;
     private final GastBuilder gastBuilder;
 
     public JavaFileListener(String filename) {
@@ -190,12 +193,19 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterMethodInvocation_lf_primary(Java8Parser.MethodInvocation_lf_primaryContext ctx) {
+        if(ctx.DOT() != null){
+            gastBuilder.addMethodCall(ctx);
+            gastBuilder.rearrangeMethodClassWithClassSource();
+        }
         gastBuilder.addFunctionCall(ctx, ctx.Identifier().getText());
     }
 
     @Override
     public void exitMethodInvocation_lf_primary(Java8Parser.MethodInvocation_lf_primaryContext ctx) {
         gastBuilder.exitStatementOrExpression();
+        if(ctx.DOT() != null){
+            gastBuilder.exitStatementOrExpression();
+        }
 
     }
 
@@ -584,6 +594,58 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void exitFinally_(Java8Parser.Finally_Context ctx){
         gastBuilder.exitFinallyBlock();
+    }
+
+    /**
+     * Switch case statement here will function like a If-ElseIf-Else statement.
+     * This allows the tool to reuse the model (as a switch case isn't that different
+     * from an if-else) and to also reuse code of a similar logic already implemented!
+     */
+    @Override
+    public void enterSwitchStatement(Java8Parser.SwitchStatementContext ctx){
+        this.switchExpression = ctx.expression().getText();
+        gastBuilder.addExpression(ctx);
+    }
+
+    @Override
+    public void exitSwitchStatement(Java8Parser.SwitchStatementContext ctx){
+        gastBuilder.exitElseIfOrElseStatement();
+            while(this.casesBuilt > 1){
+                gastBuilder.exitElseIfOrElseStatement();
+                this.casesBuilt--;
+            }
+            this.casesBuilt = 0;
+            gastBuilder.exitIfStatement();
+    
+        gastBuilder.exitStatementOrExpression();
+    }
+
+    @Override
+    public void enterSwitchLabel(Java8Parser.SwitchLabelContext ctx){
+        if(ctx.CASE() != null){
+            if(this.casesBuilt == 0){
+                gastBuilder.addIfStatement(ctx, ctx.constantExpression().getText(), false);
+                this.casesBuilt++;
+            } else{
+                gastBuilder.addIfStatement(ctx, ctx.constantExpression().getText(), true);
+                this.casesBuilt++;
+            }
+        } else if(ctx.DEFAULT() != null){
+            gastBuilder.enterElseStatement(ctx);
+        }
+    }
+
+    @Override
+    public void exitSwitchLabel(Java8Parser.SwitchLabelContext ctx){
+        if(ctx.CASE() != null){
+            if(this.casesBuilt == 1){
+                //if statement for first case
+                gastBuilder.finishExpressionForCase(false);
+            } else{
+                //else if statement for subsequent cases
+                gastBuilder.finishExpressionForCase(true);
+            }
+        } 
     }
 
     /*==================================================================* 

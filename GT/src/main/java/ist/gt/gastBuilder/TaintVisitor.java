@@ -277,10 +277,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     private void IsVulnerability(FunctionCall functionCall, boolean isTaintedSource, String sourceType) {
         if (spec.getSensitiveFunctions().stream().anyMatch(func -> functionCall.getFunctionName().equals(func.getName())
                 && (sourceType == null || func.getType() == null || func.getType().equals(sourceType)))
-                && ((isTaintedSource && spec.isReturnTaintedIfTaintedSource()) || propagateTaintInExpressionList(functionCall.getMembers()))) {
-
+                && ((!functionCall.getMembers().isEmpty() && propagateTaintInExpressionList(functionCall.getMembers()))
+                || (functionCall.getMembers().isEmpty() && (isTaintedSource && spec.isReturnTaintedIfTaintedSource())))) {
+            
             Vulnerability vulnerability = new Vulnerability(functionCall.getLine(), functionCall.getFunctionName());
-
+            
             for (ConditionalStatement stmt : currentPath) {
                 vulnerability.getConditions().add(new VulnerabilityCondition(stmt.getLine(), stmt.getCondition()));
             }
@@ -337,19 +338,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
         propagateSetTainted(assignment.getLeft(), assignment.getRight().isTainted());
         assignment.setTainted(assignment.getRight().isTainted());
-        //Same logic as in @function visit(Variable)
-        /*if(assignment.getLeft().getClassReference() != null){
-            if(assignment.getLeft().getSelectedAttribute() != null){
-                String attribute = assignment.getLeft().getSelectedAttribute();
-                assignment.getLeft().setTainted(assignment.getLeft().getClassReference()
-                .getAttributes().get(attribute).isTainted());
-            } else{
-                assignment.getLeft().setTainted(assignment.getLeft().getClassReference().areAttributesTainted());
-            }
-        } else{
-                assignment.getLeft().setTainted(assignment.getRight().isTainted());
-        }*/
-
+        
         if(assignment.getLeft() instanceof Variable && checkIfUntrustedDataSource((Variable)assignment.getLeft())){
             currentPathVariables.get(((Variable) assignment.getLeft()).getName()).setTainted(true);
         }
@@ -493,17 +482,23 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     currentPathVariables.put(var.getName(), variable);
                 }
             }
-            return;
         }
 
         if (spec.getGlobalTaintVariableRegex() != null && !spec.getGlobalTaintVariableRegex().isEmpty()) {
             for (String regex : spec.getGlobalTaintVariableRegex()) {
                 if (Pattern.matches(regex, var.getName())) {
-                    var.setTainted(true);
+                    if(currentPathVariables.containsKey(var.getName())){
+                        currentPathVariables.get(var.getName()).setTainted(true);
+                    } else{
+                        var.setTainted(true);
+                    }
                 }
             }
-        } 
-        currentPathVariables.put(var.getName(), var);
+        }
+        
+        if(!currentPathVariables.containsKey(var.getName())){
+            currentPathVariables.put(var.getName(), var);
+        }
     }
 
 
@@ -627,23 +622,33 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     public void visit(IfStatement ifStatement) {
         ifStatementFound = true;
         Expression ifExpr = ifStatement.getExpression();
-        boolean conditionFulfilled = false;
 
         if(ifExpr.getOperator() != null){
             ifExpr.addValue(this);
+        } else{
+            ifExpr.accept(this);
         }
 
         if (!ifStatement.isFullyExplored()) {
             if(ifExpr.getTrackedValue() != null && 
             ifExpr.getType().equals("boolean")){
                 if(Boolean.parseBoolean(ifExpr.getTrackedValue())){
-                    conditionFulfilled = true;
                     currentPath.add(ifStatement);
                     ifStatement.getCodeBlock().accept(this);
+                    ifStatement.getCodeBlock().setFullyExplored(false);
                     currentPath.remove(ifStatement);
                     return;
-                } else{
-                    conditionFulfilled = false;
+                }
+            } else if(ifExpr.getClassReference() != null && 
+            ifExpr.getSelectedAttribute() != null &&
+            !ifExpr.getClassReference().getAttributes().isEmpty() &&
+            ifExpr.getClassReference().getAttributes().get(ifExpr.getSelectedAttribute()).getType().equals("boolean")){
+                if(Boolean.parseBoolean(ifExpr.getClassReference().getAttributes().get(ifExpr.getSelectedAttribute()).getTrackedValue())){
+                    currentPath.add(ifStatement);
+                    ifStatement.getCodeBlock().accept(this);
+                    ifStatement.getCodeBlock().setFullyExplored(false);
+                    currentPath.remove(ifStatement);
+                    return;
                 }
             } else {
                 currentPath.add(ifStatement);
@@ -662,17 +667,27 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 if(!elseIf.isFullyExplored()){
                     if(elseIf.getExpression().getOperator() != null){
                         elseIf.getExpression().addValue(this);
+                    } else{
+                        elseIf.getExpression().accept(this);
                     }
 
                     if(elseIf.getExpression().getTrackedValue() != null && 
                     elseIf.getExpression().getType().equals("boolean")){
                         //Found an else if with a true condition
                         if(Boolean.parseBoolean(elseIf.getExpression().getTrackedValue())){
-                            conditionFulfilled = true;
                             elseIf.accept(this);
                             return;
-                        } else{
-                            conditionFulfilled = false;
+                        } 
+                    } else if(elseIf.getExpression().getClassReference() != null && 
+                    elseIf.getExpression().getSelectedAttribute() != null &&
+                    !elseIf.getExpression().getClassReference().getAttributes().isEmpty() &&
+                    elseIf.getExpression().getClassReference().getAttributes()
+                    .get(elseIf.getExpression().getSelectedAttribute()).getType().equals("boolean")){
+                        
+                        if(Boolean.parseBoolean(elseIf.getExpression().getClassReference().getAttributes()
+                        .get(elseIf.getExpression().getSelectedAttribute()).getTrackedValue())){
+                            elseIf.accept(this);
+                            return;
                         }
                     } else{
                         elseIf.accept(this);
@@ -683,8 +698,9 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
 
         if (ifStatement.getElseBlock() != null && !ifStatement.getElseBlock().isFullyExplored()
-        && !ifStatement.getElseBlock().getStatements().isEmpty() && !conditionFulfilled) {
+        && !ifStatement.getElseBlock().getStatements().isEmpty()) {
             ifStatement.getElseBlock().accept(this);
+            ifStatement.getElseBlock().setFullyExplored(false);
         }
     }
 
@@ -1486,7 +1502,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
      */
     public boolean checkIfUntrustedDataSource(Variable variable){
         if(spec.getUntrustedDataSources() != null && !spec.getUntrustedDataSources().isEmpty() && 
-        spec.getUntrustedDataSources().contains(variable.getType())){
+        variable.getType() != null && spec.getUntrustedDataSources().contains(variable.getType())){
             return true;
         }
         return false;

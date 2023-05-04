@@ -383,4 +383,14 @@ public class PythonFileListener extends PythonParserBaseListener {
             }
         }
     }
+
+    @Override
+    public void enterReturn_stmt(PythonParser.Return_stmtContext ctx){
+        gastBuilder.addReturnStatement(ctx);
+    }
+
+    @Override
+    public void exitReturn_stmt(PythonParser.Return_stmtContext ctx){
+        gastBuilder.exitStatementOrExpression();
+    }
 }
