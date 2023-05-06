@@ -138,8 +138,10 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void exitExpression(Java8Parser.ExpressionContext ctx) {
-        gastBuilder.trackExpressionValue();
-        gastBuilder.exitStatementOrExpression();
+        if(!gastBuilder.getStatements().isEmpty()){
+            gastBuilder.trackExpressionValue();
+            gastBuilder.exitStatementOrExpression();
+        }
     }
 
 
@@ -156,16 +158,17 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void exitLocalVariableDeclarationStatement(Java8Parser.LocalVariableDeclarationStatementContext ctx) {
-        gastBuilder.trackLeftVariableValue();
-        //Used in situations where assignment has +=, -=, *=, /=, %=
-        gastBuilder.modifyAssignmentWithOperator();
-        gastBuilder.exitStatementOrExpression();
-        wasVarDecl = false;
-        if(genStmtInserted){
-            genStmtInserted = false;
+        if(!gastBuilder.getStatements().isEmpty()){
+            gastBuilder.trackLeftVariableValue();
+            //Used in situations where assignment has +=, -=, *=, /=, %=
+            gastBuilder.modifyAssignmentWithOperator();
             gastBuilder.exitStatementOrExpression();
+            wasVarDecl = false;
+            if(genStmtInserted){
+                genStmtInserted = false;
+                gastBuilder.exitStatementOrExpression();
+            }
         }
-        
     }
 
     @Override
