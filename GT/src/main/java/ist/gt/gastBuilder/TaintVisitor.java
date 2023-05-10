@@ -277,8 +277,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     private void IsVulnerability(FunctionCall functionCall, boolean isTaintedSource, String sourceType) {
         if (spec.getSensitiveFunctions().stream().anyMatch(func -> functionCall.getFunctionName().equals(func.getName())
                 && (sourceType == null || func.getType() == null || func.getType().equals(sourceType)))
-                && ((!functionCall.getMembers().isEmpty() && propagateTaintInExpressionList(functionCall.getMembers()))
-                || (functionCall.getMembers().isEmpty() && (isTaintedSource && spec.isReturnTaintedIfTaintedSource())))) {
+                && ((isTaintedSource && spec.isReturnTaintedIfTaintedSource()) || propagateTaintInExpressionList(functionCall.getMembers()))) {
             
             Vulnerability vulnerability = new Vulnerability(functionCall.getLine(), functionCall.getFunctionName());
             
@@ -525,6 +524,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 currentPath.clear();
                 currentPathVariables.clear();
                 codeBlocks.clear();
+                resetFunctionVariablesTaintedness(function);
                 function.getCodeBlock().accept(this);
             } catch (Exception e) {
                 if (e.getMessage() != null)
@@ -630,7 +630,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
 
         if (!ifStatement.isFullyExplored()) {
-            if(ifExpr.getTrackedValue() != null && 
+            if(ifExpr.getTrackedValue() != null && ifExpr.getType() != null &&
             ifExpr.getType().equals("boolean")){
                 if(Boolean.parseBoolean(ifExpr.getTrackedValue())){
                     currentPath.add(ifStatement);
@@ -642,6 +642,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             } else if(ifExpr.getClassReference() != null && 
             ifExpr.getSelectedAttribute() != null &&
             !ifExpr.getClassReference().getAttributes().isEmpty() &&
+            //ifExpr.getClassReference().getAttributes().get(ifExpr.getSelectedAttribute()).getType() != null &&
             ifExpr.getClassReference().getAttributes().get(ifExpr.getSelectedAttribute()).getType().equals("boolean")){
                 if(Boolean.parseBoolean(ifExpr.getClassReference().getAttributes().get(ifExpr.getSelectedAttribute()).getTrackedValue())){
                     currentPath.add(ifStatement);
@@ -672,6 +673,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     }
 
                     if(elseIf.getExpression().getTrackedValue() != null && 
+                    elseIf.getExpression().getType() != null &&
                     elseIf.getExpression().getType().equals("boolean")){
                         //Found an else if with a true condition
                         if(Boolean.parseBoolean(elseIf.getExpression().getTrackedValue())){
@@ -681,6 +683,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     } else if(elseIf.getExpression().getClassReference() != null && 
                     elseIf.getExpression().getSelectedAttribute() != null &&
                     !elseIf.getExpression().getClassReference().getAttributes().isEmpty() &&
+                    //elseIf.getExpression().getClassReference().getAttributes().get(elseIf.getExpression().getSelectedAttribute()).getType() != null &&
                     elseIf.getExpression().getClassReference().getAttributes()
                     .get(elseIf.getExpression().getSelectedAttribute()).getType().equals("boolean")){
                         
@@ -1117,7 +1120,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         Expression expr1 = expression.getMembers().get(0);
         Expression expr2 = expression.getMembers().get(1);
         if((expr1.getTrackedValue() == null && expr1.getClassReference() == null) 
-        || (expr2.getTrackedValue() == null && expr2.getClassReference() == null)){
+        || (expr2.getTrackedValue() == null && expr2.getClassReference() == null)
+        || (expr1.getType() == null || expr2.getType() == null)){
             expression.setTrackedValue(null);
             return;
         }
@@ -1133,7 +1137,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             expr2 = (Expression) expr2.getClassReference().getAttributes().get(expr2.getSelectedAttribute());
         }
         //Test new expressions once again to avoid errors due to null
-        if(expr1.getTrackedValue() == null || expr2.getTrackedValue() == null){
+        if(expr1.getTrackedValue() == null || expr2.getTrackedValue() == null || expr1.getType() == null
+        || expr2.getType() == null){
             expression.setTrackedValue(null);
             return;
         }
@@ -1506,6 +1511,30 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             return true;
         }
         return false;
+    }
+
+    public void resetFunctionVariablesTaintedness(Function function){
+        if (spec.isRootSpecification()) {
+            for(Variable variable : file.getRootFunc().getVariables().values()){
+                if(spec.getTaintedVarsOrArgs().contains(variable.getName())){
+                    variable.setTainted(true);
+                } else{
+                    variable.setTainted(false);
+                }
+            }
+            if(!file.getRootFunc().getParameters().isEmpty()){
+                spec.getTaintedVarsOrArgs().forEach(var -> file.getRootFunc().getParameters().get(var).setTainted(true));
+            }
+            return;
+        }
+        
+        if(spec.getFunction().getName().equals(function.getName()) && spec.getFileName().equals(this.file.getName())){
+            taintFunctionOrMethod(spec, function);
+        }
+
+        for(Variable variable : function.getVariables().values()){
+            variable.setTainted(false);
+        }
     }
 
     // Not used currently. Could be handy in the future

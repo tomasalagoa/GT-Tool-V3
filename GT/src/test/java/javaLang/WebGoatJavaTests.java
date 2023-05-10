@@ -52,7 +52,7 @@ public class WebGoatJavaTests {
         spec.setFileName("SqlInjectionLesson4.java");
         spec.getFunction().setType(spec.getFileName().replace(".java", ""));
         AstConverter.analyse(DirectoryPath + "introduction/lesson4", settings);
-        assertEquals(AstConverter.report.getVulnerabilities().size(), 1);
+        assertEquals(AstConverter.report.getVulnerabilities().size(), 2);
     }
 
     @Test

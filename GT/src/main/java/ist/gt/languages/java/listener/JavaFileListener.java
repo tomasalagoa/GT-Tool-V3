@@ -109,26 +109,21 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterConditionalExpression(Java8Parser.ConditionalExpressionContext ctx) {
-        if(isConditionalExpression(ctx)){
+        if(ctx.QUESTION() != null && ctx.COLON() != null){
+            System.out.println("CondStatement: " + ctx.getText());
+            //gastBuilder.addExpression(ctx);
+            gastBuilder.addIfStatement(ctx, ctx.getText(), false);
             gastBuilder.addExpression(ctx);
         }
     }
 
     @Override
     public void exitConditionalExpression(Java8Parser.ConditionalExpressionContext ctx) {
-        if(isConditionalExpression(ctx)){
+        if(ctx.QUESTION() != null && ctx.COLON() != null){
+            gastBuilder.buildConditionalExpressionAsIfStatement();
             gastBuilder.exitStatementOrExpression();
+            gastBuilder.exitIfStatement();
         }
-    }
-
-    /*  Auxiliary function: 
-     * ConditionalExpression is of the form: expression ? expression : expression; */
-    public boolean isConditionalExpression(Java8Parser.ConditionalExpressionContext ctx){
-        if(ctx.getToken(Java8Parser.QUESTION, 0) != null && ctx.getToken(Java8Parser.COLON, 0) != null){
-            return true;
-        }
-
-        return false;
     }
 
     @Override
@@ -520,6 +515,30 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void exitBasicForStatementNoShortIf(Java8Parser.BasicForStatementNoShortIfContext ctx) {
+        gastBuilder.exitConditionalStatement();
+    }
+
+    //for(Variable variable : variables)
+    @Override
+    public void enterEnhancedForStatement(Java8Parser.EnhancedForStatementContext ctx){
+        gastBuilder.addConditionalStatement(ctx);
+        gastBuilder.addAssignment(ctx);
+        gastBuilder.addVariable(ctx, ctx.variableDeclaratorId().getText(), ctx.unannType().getText());
+    }
+
+    @Override
+    public void exitEnhancedForStatement(Java8Parser.EnhancedForStatementContext ctx){
+        gastBuilder.exitStatementOrExpression();
+        gastBuilder.exitConditionalStatement();
+    }
+
+    @Override
+    public void enterEnhancedForStatementNoShortIf(Java8Parser.EnhancedForStatementNoShortIfContext ctx){
+        gastBuilder.addConditionalStatement(ctx);
+    }
+
+    @Override
+    public void exitEnhancedForStatementNoShortIf(Java8Parser.EnhancedForStatementNoShortIfContext ctx){
         gastBuilder.exitConditionalStatement();
     }
 

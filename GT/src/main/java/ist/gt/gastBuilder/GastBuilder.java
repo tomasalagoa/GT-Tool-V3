@@ -27,6 +27,7 @@ public class GastBuilder {
     private Function currentLambdaFunction;
     private boolean needsFurtherSuperclassUpdate = false;
     private List<String> taintedAttributes = null;
+    private boolean isParameter = false;
 
     private <E> void popIfNotEmpty(Stack<E> stack) {
         if (!stack.empty())
@@ -168,12 +169,14 @@ public class GastBuilder {
         else if(!currentFunction.getVariables().containsKey(var.getName()) &&
         currentFunction.getParameters().containsKey(var.getName())){
             var = currentFunction.getParameters().get(var.getName());
+            isParameter = true;
         }
         /* If the variable is not in current function nor is it a parameter of it,
          * then it could be a parameter of a lambda function (declared in an interface to run it). */
         else if(currentLambdaFunction != null && 
         currentLambdaFunction.getParameters().containsKey(var.getName())){
             var = currentLambdaFunction.getParameters().get(var.getName());
+            isParameter = true;
         }
         /* If the variable is not in the current function (not a local variable),
          * not a parameter neither is it a parameter of a lambda function, then it could be
@@ -185,7 +188,11 @@ public class GastBuilder {
         }
 
         if(!var.getName().equals("this")){
-            currentFunction.getVariables().putIfAbsent(var.getName(), var);
+            if(!isParameter){
+                currentFunction.getVariables().putIfAbsent(var.getName(), var);
+            } else{
+                isParameter = false;
+            }
         } else{
             if(!currentFunction.getVariables().containsKey("this")){
                 Variable ths = new Variable("this");
@@ -655,7 +662,16 @@ public class GastBuilder {
      */ 
     public void addExpressionOperator(String operator){
         Expression expression = (Expression) statements.pop();
-        expression.setOperator(operator);
+        if(!expression.getMembers().isEmpty() && expression.getMembers().size() == 2){
+            Expression expr = new Expression();
+            expr.getMembers().add(expression.getMembers().remove(0));
+            expr.getMembers().add(expression.getMembers().remove(0));
+            expr.setOperator(operator);
+            expression.getMembers().add(expr);
+        } else{
+            expression.setOperator(operator);
+        }
+
         statements.push(expression);
     }
 
@@ -1322,5 +1338,57 @@ public class GastBuilder {
 
         statements.push(switchExpression);
         statements.push(ifStatement);
+    }
+
+    /**
+     * @function buildConditionalExpressionasIfStatement
+     *
+     * Function used in Java context (for now) that converts a conditional expression:
+     * (variable = someComparison ? ifTrueExpression : ifFalseExpression;), into an IfStatement.
+     * For Java context, the information will all be on the IfStatement condition's expression.
+     * Assumptions are made here from testing in Java, might need some tweaks for other languages.
+     */
+    public void buildConditionalExpressionAsIfStatement(){
+        if(!statements.isEmpty() && statements.peek() instanceof Expression){
+            Expression expression = (Expression) statements.pop();
+            IfStatement ifStatement = (IfStatement) statements.pop();
+            if(statements.size() >= 3){
+                Expression unneededExpression = (Expression) statements.pop();
+                Assignment assignment = (Assignment) statements.pop();
+
+                Assignment ifTrueAssignment = new Assignment();
+                ifTrueAssignment.setOperator("=");
+                ifTrueAssignment.setLeft(assignment.getLeft());
+                ifTrueAssignment.setRight(expression.getMembers().remove(1));
+                ifStatement.getCodeBlock().getStatements().add(ifTrueAssignment);
+
+                Assignment ifFalseAssignment = new Assignment();
+                ifFalseAssignment.setOperator("=");
+                ifFalseAssignment.setLeft(assignment.getLeft());
+                ifFalseAssignment.setRight(expression.getMembers().remove(1));
+                ifStatement.getElseBlock().getStatements().add(ifFalseAssignment);
+
+                statements.push(assignment);
+                statements.push(unneededExpression);
+            }
+
+            statements.push(ifStatement);
+            statements.push(expression);
+        }
+    }
+
+    public void createEnhancedForExpression(){
+        if(!statements.isEmpty() && statements.peek() instanceof Expression){
+            Expression expression = (Expression) statements.pop();
+            ConditionalStatement conditionalStatement = (ConditionalStatement) statements.pop();
+
+            Assignment assignment = new Assignment();
+            assignment.setLeft(expression.getMembers().remove(0));
+            assignment.setRight(expression);
+
+            //conditionalStatement.setExpression(assignment);
+
+            statements.push(conditionalStatement);
+        }
     }
 }
