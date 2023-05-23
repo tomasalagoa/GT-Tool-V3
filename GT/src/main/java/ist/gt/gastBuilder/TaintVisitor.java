@@ -125,14 +125,14 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             return;
         }
 
-        /*if(functionCall.isSuper()){
+        if(functionCall.isSuper()){
             List<FileAndFunction> foundFunctions = getFunctionsForType(classes.peek().getSuperClass(), functionCall);
             //As the functionCall is a super invocation, only the superclass should have that function
             if(foundFunctions.size() == 1){
                 processFunction(foundFunctions.get(0).getFunction(), functionCall, 
                 foundFunctions.get(0).getFile(), foundFunctions.get(0).getClazz());
             }
-        }*/ if((functionCall.isSuper() || functionCall.isConstructor()) && !classes.empty()){
+        }else if(functionCall.isConstructor() && !classes.empty()){
             FileAndFunction constructorDetails = tryToGetConstructor(functionCall);
             if(constructorDetails != null){
                 processFunction(constructorDetails.getFunction(), functionCall, 
