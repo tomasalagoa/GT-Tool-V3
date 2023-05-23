@@ -393,4 +393,24 @@ public class PythonFileListener extends PythonParserBaseListener {
     public void exitReturn_stmt(PythonParser.Return_stmtContext ctx){
         gastBuilder.exitStatementOrExpression();
     }
+
+    @Override
+    public void enterTry_stmt(PythonParser.Try_stmtContext ctx){
+        gastBuilder.addTryCatch(ctx);
+    }
+
+    @Override
+    public void exitTry_stmt(PythonParser.Try_stmtContext ctx){
+        gastBuilder.exitTryCatchBlock();
+    }
+
+    @Override
+    public void enterExcept_clause(PythonParser.Except_clauseContext ctx){
+        gastBuilder.enterCatchBlock();
+    }
+
+    @Override
+    public void exitExcept_clause(PythonParser.Except_clauseContext ctx){
+        gastBuilder.exitCatchBlock();
+    }
 }

@@ -24,7 +24,7 @@ public class PythonFrameworkEntrypointsFinder extends PythonParserBaseListener{
 
     @Override
     public void enterFrom_stmt(PythonParser.From_stmtContext ctx){
-        if(ctx.IMPORT() != null){
+        if(ctx.IMPORT() != null && ctx.dotted_name() != null){
             if(ctx.dotted_name().getText().matches("flask")){
                 for(int i = 0; i < ctx.import_as_names().import_as_name().size(); i++){
                     /* request global variable imported from flask could be tainted */

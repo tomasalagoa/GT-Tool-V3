@@ -110,8 +110,6 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void enterConditionalExpression(Java8Parser.ConditionalExpressionContext ctx) {
         if(ctx.QUESTION() != null && ctx.COLON() != null){
-            System.out.println("CondStatement: " + ctx.getText());
-            //gastBuilder.addExpression(ctx);
             gastBuilder.addIfStatement(ctx, ctx.getText(), false);
             gastBuilder.addExpression(ctx);
         }
@@ -284,7 +282,8 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterPrimary(Java8Parser.PrimaryContext ctx) {
-        if(ctx.getText().matches("this\\.[a-zA-Z0-9_]+")){
+        if(ctx.getText().matches("this\\.[a-zA-Z0-9_]+") || 
+        ctx.getText().matches("this\\.[a-zA-Z0-9_]+\\.[a-zA-Z0-9_()]+")){
             List<String> members = Arrays.asList(ctx.getText().split("\\."));
             gastBuilder.addVariable(ctx, members.get(0));
             gastBuilder.addSelectedAttributeToThis(members.get(1));

@@ -39,13 +39,32 @@ public class JavaFrameworkEntrypointsFinder extends Java8ParserBaseListener{
 
     @Override
     public void enterNormalAnnotation(Java8Parser.NormalAnnotationContext ctx){
-        if(ctx.AT() != null && !ctx.elementValuePairList().isEmpty()){
-            if(ctx.typeName().getText().equals("RequestMapping") || ctx.typeName().getText().equals("GetMapping")
-            || ctx.typeName().getText().equals("PostMapping") || ctx.typeName().getText().equals("PutMapping")
-            || ctx.typeName().getText().equals("DeleteMapping")){
-                this.annotationFound = true;
-                this.entrypoints.put(this.functionName, new ArrayList<>());
-            }
+        if(ctx.AT() != null && this.functionName != null){
+            isAnnotationValid(ctx.typeName().getText());
         }
     }
+
+    @Override
+    public void enterMarkerAnnotation(Java8Parser.MarkerAnnotationContext ctx){
+        if(ctx.AT() != null && this.functionName != null){
+            isAnnotationValid(ctx.typeName().getText());
+        }
+    }
+
+    @Override
+    public void enterSingleElementAnnotation(Java8Parser.SingleElementAnnotationContext ctx){
+        if(ctx.AT() != null && this.functionName != null){
+            isAnnotationValid(ctx.typeName().getText());
+        }
+    }
+
+    public void isAnnotationValid(String annotationName){
+        if(annotationName.equals("RequestMapping") || annotationName.equals("GetMapping")
+        || annotationName.equals("PostMapping") || annotationName.equals("PutMapping")
+        || annotationName.equals("DeleteMapping")){
+            this.annotationFound = true;
+            this.entrypoints.putIfAbsent(this.functionName, new ArrayList<>());
+        }
+    }
+
 }

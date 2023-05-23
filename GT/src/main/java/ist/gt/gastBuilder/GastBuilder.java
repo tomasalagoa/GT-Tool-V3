@@ -138,7 +138,9 @@ public class GastBuilder {
         if(currentLambdaFunction == null){
             codeBlocks.peek().getStatements().add(assignment);
         } else{
-            addStatementsToLambdaFunc(assignment);
+            if(!addStatementsToLambdaFunc(assignment)){
+                codeBlocks.peek().getStatements().add(assignment);
+            }
         }
         statements.push(assignment);
         return assignment;
@@ -150,7 +152,9 @@ public class GastBuilder {
         if(currentLambdaFunction == null){
             codeBlocks.peek().getStatements().add(stmt);
         } else{
-            addStatementsToLambdaFunc(stmt);
+            if(!addStatementsToLambdaFunc(stmt)){
+                codeBlocks.peek().getStatements().add(stmt);
+            }
         }
         statements.push(stmt);
         return stmt;
@@ -278,7 +282,13 @@ public class GastBuilder {
             ifStatements.peek().getElseIfs().add(ifStatement);
         } else {
             ifStatements.push(ifStatement);
-            codeBlocks.peek().getStatements().add(ifStatement);
+            if(currentLambdaFunction == null){
+                codeBlocks.peek().getStatements().add(ifStatement);
+            } else{
+                if(!addStatementsToLambdaFunc(ifStatement)){
+                    codeBlocks.peek().getStatements().add(ifStatement);
+                }
+            }
         }
         setConditionalStmt(ifStatement);
         return ifStatement;
@@ -287,7 +297,13 @@ public class GastBuilder {
 
     public void addConditionalStatement(ParserRuleContext ctx) {
         var conditionalStatement = new ConditionalStatement(ctx);
-        codeBlocks.peek().getStatements().add(conditionalStatement);
+        if(currentLambdaFunction == null){
+            codeBlocks.peek().getStatements().add(conditionalStatement);
+        } else{
+            if(!addStatementsToLambdaFunc(conditionalStatement)){
+                codeBlocks.peek().getStatements().add(conditionalStatement);
+            }
+        }
         setConditionalStmt(conditionalStatement);
     }
 
@@ -297,7 +313,9 @@ public class GastBuilder {
         if(currentLambdaFunction == null){
             codeBlocks.peek().getStatements().add(statement);
         } else{
-            addStatementsToLambdaFunc(statement);
+            if(!addStatementsToLambdaFunc(statement)){
+                codeBlocks.peek().getStatements().add(statement);
+            }
         }
         statements.push(statement);
         return statement;
@@ -431,6 +449,7 @@ public class GastBuilder {
         NewExpression newExpression = null;
         /* FunctionCall represents a constructor's invocation (for class instances' creation)*/
         FunctionCall functionCall = null;
+        Expression expression = null;
         if(statements.peek() instanceof NewExpression){
             newExpression = (NewExpression) statements.pop();
         } else if(statements.peek() instanceof FunctionCall){
@@ -438,58 +457,62 @@ public class GastBuilder {
             functionCall.setConstructor(true);
         }
 
-        Expression expression = (Expression) statements.pop();
-        Class trackedClass = new Class(className);
+        if(statements.peek() instanceof Expression){
+            expression = (Expression) statements.pop();
+            Class trackedClass = new Class(className);
 
-        if(this.analyzedClasses.containsKey(className)){
-            Class originalClass = this.analyzedClasses.get(className);
-            trackedClass.setSuperClass(originalClass.getSuperClass());
-            HashMap<String, Attribute> superclassAttributes = getAllSuperclassesAttributes(
-                originalClass.getSuperClass());
-            
-            //Needed so that attributes do not share same reference between different instances
-            HashMap<String, Attribute> attributes = new HashMap<String, Attribute>();
-            for(Attribute attribute : originalClass.getAttributes().values()){
-                Attribute newAttribute = createNewAttributeReference(attribute);
-                attributes.put(newAttribute.getName(), newAttribute);
-            }
+            if(this.analyzedClasses.containsKey(className)){
+                Class originalClass = this.analyzedClasses.get(className);
+                trackedClass.setSuperClass(originalClass.getSuperClass());
+                HashMap<String, Attribute> superclassAttributes = getAllSuperclassesAttributes(
+                    originalClass.getSuperClass());
+                
+                //Needed so that attributes do not share same reference between different instances
+                HashMap<String, Attribute> attributes = new HashMap<String, Attribute>();
+                for(Attribute attribute : originalClass.getAttributes().values()){
+                    Attribute newAttribute = createNewAttributeReference(attribute);
+                    attributes.put(newAttribute.getName(), newAttribute);
+                }
 
-            if(superclassAttributes != null){
-                if(this.needsFurtherSuperclassUpdate){
+                if(superclassAttributes != null){
+                    if(this.needsFurtherSuperclassUpdate){
+                        trackedClass.setNeedSuperclassUpdate(true);
+                        originalClass.setNeedSuperclassUpdate(true);
+                        this.needsFurtherSuperclassUpdate = false;
+                    }
+
+                    for(Attribute attribute : superclassAttributes.values()){
+                        attributes.put(attribute.getName(), attribute);
+                    }
+                } else if(superclassAttributes == null && trackedClass.getSuperClass() != null){
                     trackedClass.setNeedSuperclassUpdate(true);
                     originalClass.setNeedSuperclassUpdate(true);
-                    this.needsFurtherSuperclassUpdate = false;
                 }
+                trackedClass.setAttributes(attributes);
+                trackedClass.setMethods(new HashMap<String, Function>(originalClass.getMethods()));
 
-                for(Attribute attribute : superclassAttributes.values()){
-                    attributes.put(attribute.getName(), attribute);
+                expression.setClassReference(trackedClass);
+                if(functionCall != null){
+                    functionCall.getHiddenThis().setClassReference(trackedClass);
                 }
-            } else if(superclassAttributes == null && trackedClass.getSuperClass() != null){
+                expression.setType(trackedClass.getName());
+            } else{
                 trackedClass.setNeedSuperclassUpdate(true);
-                originalClass.setNeedSuperclassUpdate(true);
+                if(functionCall != null){
+                    functionCall.getHiddenThis().setClassReference(trackedClass);
+                }
+                expression.setClassReference(trackedClass);
+                expression.setType(trackedClass.getName());
             }
-            trackedClass.setAttributes(attributes);
-            trackedClass.setMethods(new HashMap<String, Function>(originalClass.getMethods()));
-
-            expression.setClassReference(trackedClass);
-            if(functionCall != null){
-                functionCall.getHiddenThis().setClassReference(trackedClass);
-            }
-            expression.setType(trackedClass.getName());
-        } else{
-            trackedClass.setNeedSuperclassUpdate(true);
-            if(functionCall != null){
-                functionCall.getHiddenThis().setClassReference(trackedClass);
-            }
-            expression.setClassReference(trackedClass);
-            expression.setType(trackedClass.getName());
         }
         
         if(newExpression != null){
             statements.push(newExpression);
         }
 
-        statements.push(expression);
+        if(expression != null){
+            statements.push(expression);
+        }
 
         if(functionCall != null){
             statements.push(functionCall);
@@ -569,47 +592,49 @@ public class GastBuilder {
      * tracked later if not). Also supports class reference and lambda function tracking.
      */
     public void trackLeftVariableValue(){
-        Assignment assignment = (Assignment) statements.pop();
+        if(statements.peek() instanceof Assignment){
+            Assignment assignment = (Assignment) statements.pop();
 
-        if(assignment.getRight() != null && assignment.getRight().getType() != null && 
-        (assignment.getOperator() == null || (assignment.getOperator() != null && assignment.getOperator().equals("=")))){
-            Variable var = (Variable) assignment.getLeft();
-            //Is the right-side a simple variable?
-            if(assignment.getRight().getTrackedValue() != null){
-                //Check if left has class reference or not
-                if(var.getClassReference() == null || 
-                    (var.getClassReference() != null && var.getSelectedAttribute() == null)){
-                    var.setTrackedValue(assignment.getRight().getTrackedValue());
+            if(assignment.getRight() != null && assignment.getRight().getType() != null && 
+            (assignment.getOperator() == null || (assignment.getOperator() != null && assignment.getOperator().equals("=")))){
+                Variable var = (Variable) assignment.getLeft();
+                //Is the right-side a simple variable?
+                if(assignment.getRight().getTrackedValue() != null){
+                    //Check if left has class reference or not
+                    if(var.getClassReference() == null || 
+                        (var.getClassReference() != null && var.getSelectedAttribute() == null)){
+                        var.setTrackedValue(assignment.getRight().getTrackedValue());
+                        var.setClassReference(null);
+                        var.setLambdaFunc(null);
+                        var.setType(assignment.getRight().getType());
+                    }
+                }
+
+                else if(assignment.getRight().getClassReference() != null){
+                    /* A new class reference is assigned to the variable on the left side of the assignment. */
+                    if(assignment.getRight().getSelectedAttribute() == null && var.getSelectedAttribute() == null){
+                        var.setClassReference(assignment.getRight().getClassReference());
+                        var.setType(assignment.getRight().getType());
+                        var.setTrackedValue(null);
+                        var.setLambdaFunc(null);
+                    
+                    }
+                } else if(assignment.getRight().getLambdaFunc() != null){
+                    var.setLambdaFunc(assignment.getRight().getLambdaFunc());
                     var.setClassReference(null);
-                    var.setLambdaFunc(null);
-                    var.setType(assignment.getRight().getType());
-                }
-            }
-
-            else if(assignment.getRight().getClassReference() != null){
-                /* A new class reference is assigned to the variable on the left side of the assignment. */
-                if(assignment.getRight().getSelectedAttribute() == null && var.getSelectedAttribute() == null){
-                    var.setClassReference(assignment.getRight().getClassReference());
-                    var.setType(assignment.getRight().getType());
                     var.setTrackedValue(null);
-                    var.setLambdaFunc(null);
-                
                 }
-            } else if(assignment.getRight().getLambdaFunc() != null){
-                var.setLambdaFunc(assignment.getRight().getLambdaFunc());
-                var.setClassReference(null);
-                var.setTrackedValue(null);
-            }
 
-            if(var.getTrackedValue() != null || var.getClassReference() != null 
-                || var.getLambdaFunc() != null){
-                if(var.getSelectedAttribute() == null){
-                    currentFunction.getVariables().replace(var.getName(), var);
+                if(var.getTrackedValue() != null || var.getClassReference() != null 
+                    || var.getLambdaFunc() != null){
+                    if(var.getSelectedAttribute() == null){
+                        currentFunction.getVariables().replace(var.getName(), var);
+                    }
+                    assignment.setLeft(var);
                 }
-                assignment.setLeft(var);
             }
+            statements.push(assignment);
         }
-        statements.push(assignment);
     }
 
     /**
@@ -621,33 +646,35 @@ public class GastBuilder {
      * value in this stage.
     */
     public void trackExpressionValue(){
-        Expression expression = (Expression) statements.pop();
-        //Most likely this expression only has one element
-        if(expression.getMembers().size() == 1){
-            if(expression.getTrackedValue() == null && expression.getMembers()
-            .get(0).getClassReference() == null){
-                expression.setTrackedValue(expression.getMembers().get(0).getTrackedValue());
-                expression.setType(expression.getMembers().get(0).getType());
-            } 
-            else if(expression.getMembers().get(0).getClassReference() != null && 
-                    expression.getClassReference() == null){
-                expression.setClassReference(expression.getMembers().get(0).getClassReference());
-                if(expression.getMembers().get(0).getSelectedAttribute() != null){
-                    String attribute = expression.getMembers().get(0).getSelectedAttribute();
-                    expression.setSelectedAttribute(attribute);
-                    //Avoid exception in case subclass appears before superclass
-                    if(expression.getMembers().get(0).getClassReference()
-                    .getAttributes().containsKey(attribute)){
-                        expression.setType(expression.getMembers().get(0).getClassReference()
-                    .getAttributes().get(attribute).getType());
-                    }
-                } else{
+        if(statements.peek() instanceof Expression){
+            Expression expression = (Expression) statements.pop();
+            //Most likely this expression only has one element
+            if(expression.getMembers().size() == 1){
+                if(expression.getTrackedValue() == null && expression.getMembers()
+                .get(0).getClassReference() == null){
+                    expression.setTrackedValue(expression.getMembers().get(0).getTrackedValue());
                     expression.setType(expression.getMembers().get(0).getType());
+                } 
+                else if(expression.getMembers().get(0).getClassReference() != null && 
+                        expression.getClassReference() == null){
+                    expression.setClassReference(expression.getMembers().get(0).getClassReference());
+                    if(expression.getMembers().get(0).getSelectedAttribute() != null){
+                        String attribute = expression.getMembers().get(0).getSelectedAttribute();
+                        expression.setSelectedAttribute(attribute);
+                        //Avoid exception in case subclass appears before superclass
+                        if(expression.getMembers().get(0).getClassReference()
+                        .getAttributes().containsKey(attribute)){
+                            expression.setType(expression.getMembers().get(0).getClassReference()
+                        .getAttributes().get(attribute).getType());
+                        }
+                    } else{
+                        expression.setType(expression.getMembers().get(0).getType());
+                    }
                 }
             }
-        }
 
-        statements.push(expression);
+            statements.push(expression);
+        }
     }
 
     /**
@@ -661,18 +688,20 @@ public class GastBuilder {
      * tracking its value in TaintVisitor.
      */ 
     public void addExpressionOperator(String operator){
-        Expression expression = (Expression) statements.pop();
-        if(!expression.getMembers().isEmpty() && expression.getMembers().size() == 2){
-            Expression expr = new Expression();
-            expr.getMembers().add(expression.getMembers().remove(0));
-            expr.getMembers().add(expression.getMembers().remove(0));
-            expr.setOperator(operator);
-            expression.getMembers().add(expr);
-        } else{
-            expression.setOperator(operator);
-        }
+        if(!statements.isEmpty() && statements.peek() instanceof Expression){
+            Expression expression = (Expression) statements.pop();
+            if(!expression.getMembers().isEmpty() && expression.getMembers().size() == 2){
+                Expression expr = new Expression();
+                expr.getMembers().add(expression.getMembers().remove(0));
+                expr.getMembers().add(expression.getMembers().remove(0));
+                expr.setOperator(operator);
+                expression.getMembers().add(expr);
+            } else{
+                expression.setOperator(operator);
+            }
 
-        statements.push(expression);
+            statements.push(expression);
+        }
     }
 
     /**
@@ -685,9 +714,11 @@ public class GastBuilder {
      * @function modifyAssignmentWithOperator.
      */
     public void addAssignmentOperator(String operator){
-        Assignment assignment = (Assignment) statements.pop();
-        assignment.setOperator(operator);
-        statements.push(assignment);
+        if(statements.peek() instanceof Assignment){
+            Assignment assignment = (Assignment) statements.pop();
+            assignment.setOperator(operator);
+            statements.push(assignment);
+        }
     }
 
     /** 
@@ -698,48 +729,50 @@ public class GastBuilder {
      * y += x, is then transformed in an equivalent, for example y = y + x.
     */
     public void modifyAssignmentWithOperator(){
-        Assignment assignment = (Assignment) statements.pop();
-        if(assignment.getOperator() != null){
-            if(assignment.getOperator().equals("=")){
-                statements.push(assignment);
-                return;
-            } else{
-                Variable variable = (Variable) assignment.getLeft();
-                Expression expression;
-                if(statements.peek() instanceof Expression){
-                    expression = assignment.getRight();
+        if(statements.peek() instanceof Assignment){
+            Assignment assignment = (Assignment) statements.pop();
+            if(assignment.getOperator() != null){
+                if(assignment.getOperator().equals("=")){
+                    statements.push(assignment);
+                    return;
                 } else{
-                    expression = new Expression();
-                    expression.getMembers().add(assignment.getRight());
-                }
-                expression.getMembers().add(0, variable);
+                    Variable variable = (Variable) assignment.getLeft();
+                    Expression expression;
+                    if(statements.peek() instanceof Expression){
+                        expression = assignment.getRight();
+                    } else{
+                        expression = new Expression();
+                        expression.getMembers().add(assignment.getRight());
+                    }
+                    expression.getMembers().add(0, variable);
 
-                switch(assignment.getOperator()){
-                    case "+=":
-                        expression.setOperator("+");
-                        break;
-                    case "-=":
-                        expression.setOperator("-");
-                        break;
-                    case "*=":
-                        expression.setOperator("*");
-                        break;
-                    case "/=":
-                        expression.setOperator("/");
-                        break;
-                    case "%=":
-                        expression.setOperator("%");
-                        break;
-                    default:
-                        statements.push(assignment);
-                        return;
-                }
+                    switch(assignment.getOperator()){
+                        case "+=":
+                            expression.setOperator("+");
+                            break;
+                        case "-=":
+                            expression.setOperator("-");
+                            break;
+                        case "*=":
+                            expression.setOperator("*");
+                            break;
+                        case "/=":
+                            expression.setOperator("/");
+                            break;
+                        case "%=":
+                            expression.setOperator("%");
+                            break;
+                        default:
+                            statements.push(assignment);
+                            return;
+                    }
 
-                assignment.setRight(expression);
+                    assignment.setRight(expression);
+                    statements.push(assignment);
+                }
+            } else {
                 statements.push(assignment);
             }
-        } else {
-            statements.push(assignment);
         }
     }
 
@@ -809,45 +842,47 @@ public class GastBuilder {
         Expression expression = new Expression(ctx);
         Assignment assignment = new Assignment(ctx);
         Constant constant = new Constant(ctx, "1", "int");
-        Expression assignExp = (Expression) statements.pop();
-        Assignment assignmentStack = (Assignment) statements.pop();
-        GenericStatement genStmt = (GenericStatement) statements.pop();
-        Variable variable = (Variable) assignExp.getMembers().get(0);
-        
-        expression.getMembers().add(variable);
-        expression.getMembers().add(constant);
-        
-        switch(operator){
-            case "+":
-                expression.setOperator("+");
-                break;
-            case "-":
-                expression.setOperator("-");
-                break;
-            default:
-                //Should never enter here!
-                System.out.println("Invalid operator");
-                return;
-        }
-        //x = ++id; -> id = id + 1; x = id;
-        if(condType.equals("pre")){
-            assignment.setLeft(variable);
-            assignment.setRight(expression);
-            genStmt.setStatement(assignment);
-        
-        // x = id++; -> x = id; id = id + 1;
-        } else if(condType.equals("post")){
-            assignment.setLeft(assignmentStack.getLeft());
-            assignment.setRight(assignExp);
-            genStmt.setStatement(assignment);
+        if(!statements.isEmpty() && statements.peek() instanceof Expression){
+            Expression assignExp = (Expression) statements.pop();
+            Assignment assignmentStack = (Assignment) statements.pop();
+            GenericStatement genStmt = (GenericStatement) statements.pop();
+            Variable variable = (Variable) assignExp.getMembers().get(0);
+            
+            expression.getMembers().add(variable);
+            expression.getMembers().add(constant);
+            
+            switch(operator){
+                case "+":
+                    expression.setOperator("+");
+                    break;
+                case "-":
+                    expression.setOperator("-");
+                    break;
+                default:
+                    //Should never enter here!
+                    System.out.println("Invalid operator");
+                    return;
+            }
+            //x = ++id; -> id = id + 1; x = id;
+            if(condType.equals("pre")){
+                assignment.setLeft(variable);
+                assignment.setRight(expression);
+                genStmt.setStatement(assignment);
+            
+            // x = id++; -> x = id; id = id + 1;
+            } else if(condType.equals("post")){
+                assignment.setLeft(assignmentStack.getLeft());
+                assignment.setRight(assignExp);
+                genStmt.setStatement(assignment);
 
-            assignmentStack.setLeft(variable);
-            assignmentStack.setRight(expression);
-        }
+                assignmentStack.setLeft(variable);
+                assignmentStack.setRight(expression);
+            }
 
-        statements.push(genStmt);
-        statements.push(assignmentStack);
-        statements.push(assignExp);
+            statements.push(genStmt);
+            statements.push(assignmentStack);
+            statements.push(assignExp);
+        }
     }
 
     /**
@@ -1016,17 +1051,22 @@ public class GastBuilder {
         addGenericStatement(ctx);
         genStmt = (GenericStatement) statements.pop();
         expression = (Expression) statements.pop();
-        Assignment assignment = (Assignment) statements.pop();
+        if(statements.peek() instanceof Assignment){
+            Assignment assignment = (Assignment) statements.pop();
 
-        statements.push(genStmt);
-        statements.push(assignment);
-        statements.push(expression);
+            statements.push(genStmt);
+            statements.push(assignment);
+            statements.push(expression);
 
-        int idx = this.getCodeBlocks().peek().getStatements().size();
-        genStmt = (GenericStatement) this.getCodeBlocks().peek().getStatements().remove(idx-1); 
-        assignment = (Assignment) this.getCodeBlocks().peek().getStatements().remove(idx-2);
-        this.getCodeBlocks().peek().getStatements().add(genStmt);
-        this.getCodeBlocks().peek().getStatements().add(assignment);
+            int idx = this.getCodeBlocks().peek().getStatements().size();
+            genStmt = (GenericStatement) this.getCodeBlocks().peek().getStatements().remove(idx-1); 
+            assignment = (Assignment) this.getCodeBlocks().peek().getStatements().remove(idx-2);
+            this.getCodeBlocks().peek().getStatements().add(genStmt);
+            this.getCodeBlocks().peek().getStatements().add(assignment);
+        } else{
+            statements.push(expression);
+            statements.push(genStmt);
+        }
     }
 
     /**
@@ -1086,7 +1126,7 @@ public class GastBuilder {
                 isLambdaFuncExpr = true;
             }
             statements.push(expression);
-        }
+        } 
 
         if(genStmt != null){
             statements.push(genStmt);
@@ -1126,7 +1166,7 @@ public class GastBuilder {
     public void checkIfLeftSideIsExpr(){
         if(!statements.isEmpty() && statements.peek() instanceof Assignment){
             Assignment assignment = (Assignment) statements.pop();
-            if(assignment.getLeft() instanceof Expression && assignment.getLeft().getMembers().size() == 1 &&
+            if(assignment.getLeft() instanceof Expression && !assignment.getLeft().getMembers().isEmpty() &&
             assignment.getLeft().getMembers().get(0) instanceof Variable){
                 Variable leftVar = (Variable) assignment.getLeft().getMembers().get(0);
                 assignment.setLeft(leftVar);
@@ -1273,7 +1313,7 @@ public class GastBuilder {
 
                 statements.push(methodCall);
                 statements.push(functionCall);
-            } else if(statements.peek() instanceof MethodCallExpression){
+            } else if(statements.peek() instanceof MethodCallExpression && statements.size() >= 2){
                 /* This part represents the appearance of (new someClass()).someMethodCall() 
                  * in the right side of an assignment!
                 */
@@ -1354,21 +1394,23 @@ public class GastBuilder {
             IfStatement ifStatement = (IfStatement) statements.pop();
             if(statements.size() >= 3){
                 Expression unneededExpression = (Expression) statements.pop();
-                Assignment assignment = (Assignment) statements.pop();
+                if(statements.peek() instanceof Assignment){
+                    Assignment assignment = (Assignment) statements.pop();
 
-                Assignment ifTrueAssignment = new Assignment();
-                ifTrueAssignment.setOperator("=");
-                ifTrueAssignment.setLeft(assignment.getLeft());
-                ifTrueAssignment.setRight(expression.getMembers().remove(1));
-                ifStatement.getCodeBlock().getStatements().add(ifTrueAssignment);
+                    Assignment ifTrueAssignment = new Assignment();
+                    ifTrueAssignment.setOperator("=");
+                    ifTrueAssignment.setLeft(assignment.getLeft());
+                    ifTrueAssignment.setRight(expression.getMembers().remove(1));
+                    ifStatement.getCodeBlock().getStatements().add(ifTrueAssignment);
 
-                Assignment ifFalseAssignment = new Assignment();
-                ifFalseAssignment.setOperator("=");
-                ifFalseAssignment.setLeft(assignment.getLeft());
-                ifFalseAssignment.setRight(expression.getMembers().remove(1));
-                ifStatement.getElseBlock().getStatements().add(ifFalseAssignment);
+                    Assignment ifFalseAssignment = new Assignment();
+                    ifFalseAssignment.setOperator("=");
+                    ifFalseAssignment.setLeft(assignment.getLeft());
+                    ifFalseAssignment.setRight(expression.getMembers().remove(1));
+                    ifStatement.getElseBlock().getStatements().add(ifFalseAssignment);
 
-                statements.push(assignment);
+                    statements.push(assignment);
+                }
                 statements.push(unneededExpression);
             }
 

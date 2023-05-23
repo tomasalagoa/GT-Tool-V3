@@ -28,12 +28,12 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     private static Settings settings;
 
     private Variable currentThis;
-    private Variable tempThis;
+    private List<Variable> tempThis = new ArrayList<>();
     private List<Variable> thisReplacements = new ArrayList<>();
     /* Allows the propagation of null if no class reference is found in a method call's source.
      * See processFunction and processMethodCall.*/
-    private boolean noClassReferencePropagation = false;
-    private String methodCallReferencePropagation = null;
+    private List<Boolean> noClassReferencePropagation = new ArrayList<>();
+    private List<String> methodCallReferencePropagation = new ArrayList<>();
     private boolean defaultReferencePropagation = false;
     private boolean unknownMethodFound = false;
     private ArrayList<Integer> unknownMethodsLines = new ArrayList<>();
@@ -125,14 +125,14 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             return;
         }
 
-        if(functionCall.isSuper()){
+        /*if(functionCall.isSuper()){
             List<FileAndFunction> foundFunctions = getFunctionsForType(classes.peek().getSuperClass(), functionCall);
             //As the functionCall is a super invocation, only the superclass should have that function
             if(foundFunctions.size() == 1){
                 processFunction(foundFunctions.get(0).getFunction(), functionCall, 
                 foundFunctions.get(0).getFile(), foundFunctions.get(0).getClazz());
             }
-        } else if(functionCall.isConstructor() && !classes.empty()){
+        }*/ if((functionCall.isSuper() || functionCall.isConstructor()) && !classes.empty()){
             FileAndFunction constructorDetails = tryToGetConstructor(functionCall);
             if(constructorDetails != null){
                 processFunction(constructorDetails.getFunction(), functionCall, 
@@ -146,7 +146,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 }
             }
             return;
-        } else if (!classes.empty() && classes.peek().getMethods().containsKey(functionCall.getFunctionName())) {
+        } else if (!classes.empty() && functionCall.getType() == null && classes.peek().getMethods().containsKey(functionCall.getFunctionName())) {
             processFunction(classes.peek().getMethods().get(functionCall.getFunctionName()), functionCall, file, classes.peek());
 
         } else if (file.getFunctions().containsKey(functionCall.getFunctionName())) {
@@ -186,7 +186,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             if(parameter.getType() != null){
                 if(parameter.getClassReference() != null){
                     if(parameter.getSelectedAttribute() != null && 
-                    !parameter.getClassReference().getAttributes().isEmpty()){
+                    !parameter.getClassReference().getAttributes().isEmpty() &&
+                    parameter.getClassReference().getAttributes().get(parameter.getSelectedAttribute()) != null){
                         String attributeName = parameter.getSelectedAttribute();
                         function.getParameters().getElement(i).setTrackedValue(
                             parameter.getClassReference().getAttributes().get(attributeName).getTrackedValue());
@@ -202,24 +203,39 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     function.getParameters().getElement(i).setType(parameter.getType());
                 } else if(parameter.isCollection()){
                     function.getParameters().getElement(i).setCollection(true);
-                } else{
+                } else if(parameter.getMembers().size() == 1 && parameter.getMembers().get(0).getLambdaFunc() != null){
+                    function.getParameters().getElement(i).setLambdaFunc(parameter.getMembers().get(0).getLambdaFunc());
+                }else{
                     //Null parameter, clean everything
                     cleanVariable(function.getParameters().getElement(i));
                 }
+            } else{
+                //Null parameter, clean everything
+                cleanVariable(function.getParameters().getElement(i));
             }
         }
 
         /* Allows us to have a more precise propagation of objects: in a method call, GT propagates
          * the object's class reference (if it has any or null is given) and in a function call it
          * propagates the current this.*/
-        boolean giveTempClassReferenceForFunction = this.methodCallReferencePropagation != null 
-        && this.methodCallReferencePropagation.equals(function.getName());
+        /*boolean giveTempClassReferenceForFunction = this.methodCallReferencePropagation != null 
+        && this.methodCallReferencePropagation.equals(function.getName());*/
+        boolean giveTempClassReferenceForFunction = !this.methodCallReferencePropagation.isEmpty()
+        && this.methodCallReferencePropagation.get(this.methodCallReferencePropagation.size() - 1).equals(function.getName());
         
-        if((this.tempThis != null || this.noClassReferencePropagation) 
+        /*if((this.tempThis != null || this.noClassReferencePropagation) 
         && giveTempClassReferenceForFunction){
             this.currentThis = this.tempThis;
             this.thisReplacements.add(this.tempThis);
             this.tempThis = null;
+        }*/
+        if(((!this.tempThis.isEmpty() && this.tempThis.get(this.tempThis.size() - 1) != null) 
+        || (!this.noClassReferencePropagation.isEmpty() && 
+        this.noClassReferencePropagation.get(this.noClassReferencePropagation.size() - 1))) 
+        && giveTempClassReferenceForFunction){
+            this.currentThis = this.tempThis.remove(this.tempThis.size() - 1);
+            this.thisReplacements.add(this.currentThis);
+            this.methodCallReferencePropagation.remove(this.methodCallReferencePropagation.size() - 1);
         }
         //In order to propagate the currentThis (and replacements), need to set it on new TaintVisitor
         TaintVisitor taintVisitor = new TaintVisitor(files, spec, functionNames, file, clazz);
@@ -233,10 +249,12 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             taintVisitor.setCurrentThis(this.currentThis);
             taintVisitor.setThisReplacements(new ArrayList<>(this.thisReplacements));
             if(giveTempClassReferenceForFunction){
-                taintVisitor.setNoClassReferencePropagation(this.noClassReferencePropagation);
-                taintVisitor.setDefaultReferencePropagation(this.noClassReferencePropagation);
+                //taintVisitor.setNoClassReferencePropagation(this.noClassReferencePropagation);
+                //taintVisitor.setDefaultReferencePropagation(this.noClassReferencePropagation);
+                //taintVisitor.setNoClassReferencePropagation(this.noClassReferencePropagation.get(this.noClassReferencePropagation.size() - 1));
+                taintVisitor.setDefaultReferencePropagation(this.noClassReferencePropagation.get(this.noClassReferencePropagation.size() - 1));
             } else{
-                taintVisitor.setNoClassReferencePropagation(this.defaultReferencePropagation);
+                //taintVisitor.setNoClassReferencePropagation(this.defaultReferencePropagation);
                 taintVisitor.setDefaultReferencePropagation(this.defaultReferencePropagation);
             }
         }
@@ -246,10 +264,14 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
         trackReturnValueFromFunction(function, functionCall);
         //Latest variable replacement for "this" already used
-        if((this.currentThis != null || (this.noClassReferencePropagation && giveTempClassReferenceForFunction)) 
+        if((this.currentThis != null || (!this.noClassReferencePropagation.isEmpty() &&
+        this.noClassReferencePropagation.get(this.noClassReferencePropagation.size() - 1) 
+        && giveTempClassReferenceForFunction)) 
         && this.thisReplacements.size() > 1){
             this.currentThis = null;
-            this.noClassReferencePropagation = this.defaultReferencePropagation;
+            if(!this.noClassReferencePropagation.isEmpty()){
+                this.noClassReferencePropagation.remove(this.noClassReferencePropagation.size() - 1);
+            }
             this.thisReplacements.remove(this.thisReplacements.size() - 1);
             if(!this.thisReplacements.isEmpty()){
                 this.currentThis = this.thisReplacements.get(this.thisReplacements.size() - 1);
@@ -320,7 +342,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 !expression.getMembers().get(0).isCollection()){
                     //Tracking cleaning. Useful when re-using statements in analysis.
                     expression.setTrackedValue(null);
-                }
+            }
         }
     }
 
@@ -449,10 +471,12 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             if(variable.getClassReference() != null){
                 if(variable.getClassReference().getAttributes().isEmpty()){
                     var.setTainted(variable.isTainted());
-                } else if(variable.getSelectedAttribute() != null){
+                } else if(variable.getSelectedAttribute() != null &&
+                variable.getClassReference().getAttributes().get(variable.getSelectedAttribute()) != null){
                     String attribute = variable.getSelectedAttribute();
                     var.setTainted(variable.getClassReference().getAttributes().get(attribute).isTainted());
-                } else if(newVarRef != null && newVarRef.getSelectedAttribute() != null){
+                } else if(newVarRef != null && newVarRef.getSelectedAttribute() != null &&
+                newVarRef.getClassReference().getAttributes().get(newVarRef.getSelectedAttribute()) != null){
                     // For the "this" variable
                     String attribute = newVarRef.getSelectedAttribute();
                     var.setTainted(newVarRef.getClassReference().getAttributes().get(attribute).isTainted());
@@ -642,7 +666,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             } else if(ifExpr.getClassReference() != null && 
             ifExpr.getSelectedAttribute() != null &&
             !ifExpr.getClassReference().getAttributes().isEmpty() &&
-            //ifExpr.getClassReference().getAttributes().get(ifExpr.getSelectedAttribute()).getType() != null &&
+            ifExpr.getClassReference().getAttributes().get(ifExpr.getSelectedAttribute()) != null &&
             ifExpr.getClassReference().getAttributes().get(ifExpr.getSelectedAttribute()).getType().equals("boolean")){
                 if(Boolean.parseBoolean(ifExpr.getClassReference().getAttributes().get(ifExpr.getSelectedAttribute()).getTrackedValue())){
                     currentPath.add(ifStatement);
@@ -683,7 +707,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     } else if(elseIf.getExpression().getClassReference() != null && 
                     elseIf.getExpression().getSelectedAttribute() != null &&
                     !elseIf.getExpression().getClassReference().getAttributes().isEmpty() &&
-                    //elseIf.getExpression().getClassReference().getAttributes().get(elseIf.getExpression().getSelectedAttribute()).getType() != null &&
+                    elseIf.getExpression().getClassReference().getAttributes().get(elseIf.getExpression().getSelectedAttribute()) != null &&
                     elseIf.getExpression().getClassReference().getAttributes()
                     .get(elseIf.getExpression().getSelectedAttribute()).getType().equals("boolean")){
                         
@@ -745,7 +769,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             String sourceType = null;
             boolean sourceTaint = false;
             if(source.getClassReference() != null && source.getSelectedAttribute() != null &&
-            !source.getClassReference().getAttributes().isEmpty()){
+            !source.getClassReference().getAttributes().isEmpty() && 
+            source.getClassReference().getAttributes().get(source.getSelectedAttribute()) != null){
                 String attributeName = source.getSelectedAttribute();
                 sourceType = source.getClassReference().getAttributes().get(attributeName).getType();
                 sourceTaint = source.getClassReference().getAttributes().get(attributeName).isTainted();
@@ -763,6 +788,10 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         } else if(methodCall.getSource() instanceof Expression){
             isTainted = processMethodCall(methodCall, methodCall.getSource().getType(), 
                 methodCall.getSource().isTainted());
+        } else if(methodCall.getSource() instanceof FunctionCall){
+            FunctionCall source = (FunctionCall) methodCall.getSource();
+            source.accept(this);
+            isTainted = processMethodCall(methodCall, source.getType(), source.isTainted());
         }
         methodCall.setTainted(isTainted);
         methodCall.getSource().setTainted(isTainted || methodCall.getSource().isTainted());
@@ -774,6 +803,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         var isTainted = false;
         boolean gotLambdaFunc = false;
         boolean gotCollection = false;
+        boolean checkedClassReferenceForPropagation = false;
         for (Expression member : methodCall.getMembers()) {
             if (member instanceof FunctionCall) {
                 FunctionCall funcCall = (FunctionCall) member;
@@ -806,31 +836,9 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                                 //Independently of the method invoked, if collection is tainted, it will return tainted
                                 isTainted = isTaintedSource ? true : false; 
                             }
-                        } else if(variable.getClassReference() != null){
-                            if(variable.getSelectedAttribute() != null &&
-                            !variable.getClassReference().getAttributes().isEmpty()){
-                                if(variable.getClassReference().getAttributes().get(variable.getSelectedAttribute()).getClassReference() == null){
-                                    this.tempThis = null;
-                                    //No class reference found. null will be propagated as reference for corresponding function
-                                    this.noClassReferencePropagation = true;
-                                    this.methodCallReferencePropagation = funcCall.getFunctionName();
-                                } else{
-                                    this.tempThis = variable.getClassReference().getAttributes().get(variable.getSelectedAttribute());
-                                    //Class reference found & will be propagated as reference for corresponding function
-                                    this.noClassReferencePropagation = false;
-                                    this.methodCallReferencePropagation = funcCall.getFunctionName();
-                                }
-                            } else{
-                                this.tempThis = variable;
-                                //Class reference found & will be propagated as reference for corresponding function
-                                this.noClassReferencePropagation = false;
-                                this.methodCallReferencePropagation = funcCall.getFunctionName();
-                            }
                         } else{
-                            this.tempThis = null;
-                            //No class reference found. null will be propagated as reference for corresponding function
-                            this.noClassReferencePropagation = true;
-                            this.methodCallReferencePropagation = funcCall.getFunctionName();
+                            checkedClassReferenceForPropagation = true;
+                            canPropagateClassReferenceToFunction(variable, funcCall.getFunctionName(), methodCall);
                         }
                     }
 
@@ -838,7 +846,15 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                         List<FileAndFunction> functions = getFunctionsForType(methodCall.getCurrentType(), funcCall);
                         if (functions.isEmpty()) {
                             System.out.println("Could not find any function for type " + methodCall.getCurrentType() + " and function: " + funcCall.getFunctionName() + " file: " + file.getName());
+                            /** Avoid recursion if class possesses a method with the same name as the source is not
+                             * an object of that class! */
+                            funcCall.setType(methodCall.getCurrentType());
                             funcCall.accept(this);
+                            if(checkedClassReferenceForPropagation){
+                                this.tempThis.remove(this.tempThis.size() - 1);
+                                this.noClassReferencePropagation.remove(this.noClassReferencePropagation.size() - 1);
+                                this.methodCallReferencePropagation.remove(this.methodCallReferencePropagation.size() - 1);
+                            }
                             methodCall.setCurrentType(funcCall.getReturnType());
                             isTainted = isTainted || funcCall.isTainted() || (isTaintedSource && spec.isReturnTaintedIfTaintedSource());
                         }
@@ -925,7 +941,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             if(expr.getClassReference() != null && expr.getSelectedAttribute() != null &&
             !expr.getClassReference().getAttributes().isEmpty()){
                 String attribute = expr.getSelectedAttribute();
-                taint = taint || expr.getClassReference().getAttributes().get(attribute).isTainted();
+                if(expr.getClassReference().getAttributes().get(attribute) != null){
+                    taint = taint || expr.getClassReference().getAttributes().get(attribute).isTainted();
+                } else{
+                    taint = taint || expr.getClassReference().areAttributesTainted();
+                }
             } else{
                 taint = taint || expr.isTainted();
             }
@@ -941,7 +961,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             if(variable.getClassReference() != null){
                 if(variable.getClassReference().getAttributes().isEmpty()){
                     currentPathVariables.get(variable.getName()).setTainted(variable.isTainted());
-                } else if(variable.getSelectedAttribute() != null){
+                } else if(variable.getSelectedAttribute() != null && 
+                variable.getClassReference().getAttributes().get(variable.getSelectedAttribute()) != null){
                     String attributeName = variable.getSelectedAttribute();
                     currentPathVariables.get(variable.getName()).getClassReference().getAttributes()
                     .get(attributeName).setTainted(variable.isTainted());
@@ -988,7 +1009,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     variable.setClassReference(null);
                     variable.setLambdaFunc(null);
                     variable.setType(expression.getType());
-                } else if(!variable.getClassReference().getAttributes().isEmpty()){
+                } else if(!variable.getClassReference().getAttributes().isEmpty() &&
+                variable.getClassReference().getAttributes().get(variable.getSelectedAttribute()) != null){
                     String leftAttribute = assignment.getLeft().getSelectedAttribute();
                     variable.getClassReference().getAttributes().get(leftAttribute)
                     .setTrackedValue(expression.getTrackedValue());
@@ -1008,7 +1030,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 if(expression.getSelectedAttribute() == null){
                     if(variable.getClassReference() != null && 
                     variable.getSelectedAttribute() != null && 
-                    !variable.getClassReference().getAttributes().isEmpty()){
+                    !variable.getClassReference().getAttributes().isEmpty() &&
+                    variable.getClassReference().getAttributes().get(variable.getSelectedAttribute()) != null){
                         String leftAttribute = variable.getSelectedAttribute();
                         variable.getClassReference().getAttributes().get(leftAttribute)
                         .setClassReference(expression.getClassReference());
@@ -1023,10 +1046,12 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                         variable.setLambdaFunc(null);
                     }
                 }
-                else if(expression.getClassReference().getAttributes() != null){
+                else if(!expression.getClassReference().getAttributes().isEmpty() &&
+                expression.getClassReference().getAttributes().get(expression.getSelectedAttribute()) != null){
                     if(variable.getClassReference() != null && 
                     variable.getSelectedAttribute() != null &&
-                    !variable.getClassReference().getAttributes().isEmpty()){
+                    !variable.getClassReference().getAttributes().isEmpty() &&
+                    variable.getClassReference().getAttributes().get(variable.getSelectedAttribute()) != null){
                         String leftAttribute = variable.getSelectedAttribute();
                         String rightAttribute = expression.getSelectedAttribute();
                         variable.getClassReference().getAttributes().get(leftAttribute)
@@ -1056,7 +1081,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             } else{
                 if(variable.getClassReference() != null){
                     if(variable.getSelectedAttribute() != null &&
-                    !variable.getClassReference().getAttributes().isEmpty()){
+                    !variable.getClassReference().getAttributes().isEmpty() &&
+                    variable.getClassReference().getAttributes().get(variable.getSelectedAttribute()) != null){
                         String attribute = variable.getSelectedAttribute();
                         variable.getClassReference().getAttributes().get(attribute).setTrackedValue(null);
                         variable.getClassReference().getAttributes().get(attribute).setClassReference(null);
@@ -1128,12 +1154,14 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
         //Have to check if any of the expressions is an attribute access
         if(expr1.getClassReference() != null && expr1.getSelectedAttribute() != null &&
-        !expr1.getClassReference().getAttributes().isEmpty()){
+        !expr1.getClassReference().getAttributes().isEmpty() && 
+        expr1.getClassReference().getAttributes().get(expr1.getSelectedAttribute()) != null){
             expr1 = (Expression) expr1.getClassReference().getAttributes().get(expr1.getSelectedAttribute());
         }
 
         if(expr2.getClassReference() != null && expr2.getSelectedAttribute() != null &&
-        !expr2.getClassReference().getAttributes().isEmpty()){
+        !expr2.getClassReference().getAttributes().isEmpty() && 
+        expr2.getClassReference().getAttributes().get(expr2.getSelectedAttribute()) != null){
             expr2 = (Expression) expr2.getClassReference().getAttributes().get(expr2.getSelectedAttribute());
         }
         //Test new expressions once again to avoid errors due to null
@@ -1511,6 +1539,60 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             return true;
         }
         return false;
+    }
+
+    public void canPropagateClassReferenceToFunction(Variable variable, String functionName, 
+    MethodCallExpression methodCall){
+        if(variable.getClassReference() != null){
+            if(variable.getSelectedAttribute() != null &&
+            !variable.getClassReference().getAttributes().isEmpty() &&
+            variable.getClassReference().getAttributes().get(variable.getSelectedAttribute()) != null){
+                if(variable.getClassReference().getAttributes().get(variable.getSelectedAttribute()).getClassReference() == null){
+                    /*this.tempThis = null;
+                    //No class reference found. null will be propagated as reference for corresponding function
+                    this.noClassReferencePropagation = true;
+                    this.methodCallReferencePropagation = funcCall.getFunctionName();*/
+                    this.tempThis.add(null);
+                    //No class reference found. null will be propagated as reference for corresponding function
+                    this.noClassReferencePropagation.add(true);
+                    this.methodCallReferencePropagation.add(functionName);
+                } else{
+                    /*this.tempThis = variable.getClassReference().getAttributes().get(variable.getSelectedAttribute());
+                    //Class reference found & will be propagated as reference for corresponding function
+                    this.noClassReferencePropagation = false;
+                    this.methodCallReferencePropagation = funcCall.getFunctionName();*/
+                    this.tempThis.add(variable.getClassReference().getAttributes().get(variable.getSelectedAttribute()));
+                    //Class reference found & will be propagated as reference for corresponding function
+                    this.noClassReferencePropagation.add(false);
+                    this.methodCallReferencePropagation.add(functionName);
+                }
+            } else{
+                /*this.tempThis = variable;
+                //Class reference found & will be propagated as reference for corresponding function
+                this.noClassReferencePropagation = false;
+                this.methodCallReferencePropagation = funcCall.getFunctionName();*/
+                this.tempThis.add(variable);
+                //Class reference found & will be propagated as reference for corresponding function
+                this.noClassReferencePropagation.add(false);
+                this.methodCallReferencePropagation.add(functionName);
+            }
+        } else{
+            /*this.tempThis = null;
+            //No class reference found. null will be propagated as reference for corresponding function
+            this.noClassReferencePropagation = true;
+            this.methodCallReferencePropagation = funcCall.getFunctionName();*/
+            this.tempThis.add(null);
+            //No class reference found. null will be propagated as reference for corresponding function
+            this.noClassReferencePropagation.add(true);
+            this.methodCallReferencePropagation.add(functionName);
+            if(variable.getName().equals("this") && variable.getSelectedAttribute() != null){
+                if(!classes.isEmpty() && 
+                classes.peek().getAttributes().containsKey(variable.getSelectedAttribute())){
+                    //Avoid recursion of same name functions (eg call List isEmpty() inside a method isEmpty())
+                    methodCall.setCurrentType(classes.peek().getAttributes().get(variable.getSelectedAttribute()).getType());
+                }
+            }
+        }
     }
 
     public void resetFunctionVariablesTaintedness(Function function){
