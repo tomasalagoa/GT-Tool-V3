@@ -34,17 +34,14 @@ public class FrameworkEntrypointsFinder {
                         System.out.println("Checking entrypoints of Java file: " + selectedFileName);
                         walker.walk(frameListener, tree);
                         saveEntrypoints(frameListener.getEntrypoints());
-                        return;
-                    } else{
-                        return;
                     }
                 } else {
                     System.out.println("Checking entrypoints of all directory Java files");
                     walker.walk(frameListener, tree);
                     saveEntrypoints(frameListener.getEntrypoints());
-                    return;
                 }
-            
+                return;
+
 
             default:
                 System.out.println("Framework " + frameworkName + " is not supported. Current supported frameworks: Spring for Java, Flask for Python.");
@@ -67,18 +64,15 @@ public class FrameworkEntrypointsFinder {
                         walker.walk(frameListener, tree);
                         saveEntrypoints(frameListener.getEntrypoints());
                         saveGlobalTaintedVariables(frameListener.getGlobalTaintedVariables());
-                        return;
-                    } else{
-                        return;
                     }
                 } else {
                     System.out.println("Checking entrypoints of all directory Python files");
                     walker.walk(frameListener, tree);
                     saveEntrypoints(frameListener.getEntrypoints());
                     saveGlobalTaintedVariables(frameListener.getGlobalTaintedVariables());
-                    return;
                 }
-            
+                return;
+
 
             default:
                 System.out.println("Framework " + frameworkName + " is not supported. Current supported frameworks: Spring for Java, Flask for Python.");

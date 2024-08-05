@@ -125,7 +125,7 @@ public abstract class PhpBaseLexer extends Lexer
 
     private String GetHeredocIdentifier(String text) {
         String trimmedText = text.trim();
-        boolean semi = (trimmedText.length() > 0) ? (trimmedText.charAt(trimmedText.length() - 1) == ';') : false;
+        boolean semi = !trimmedText.isEmpty() && (trimmedText.charAt(trimmedText.length() - 1) == ';');
         return semi ? trimmedText.substring(0, trimmedText.length() - 1) : trimmedText;
     }
 

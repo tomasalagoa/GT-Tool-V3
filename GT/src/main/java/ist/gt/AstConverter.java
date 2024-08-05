@@ -353,25 +353,25 @@ public class AstConverter {
      * where it found one.
      **/
     private static void createUnknownMethodWarningMessage(){
-        String warning = "";
+        StringBuilder warning = new StringBuilder();
         if(unknownMethodsLines.size() == 1){
-            warning += "An unknown method/function (i.e method/function with an unreachable code block) with tainted argument(s) has been found in line " + unknownMethodsLines.get(0) + ".";
+            warning.append("An unknown method/function (i.e method/function with an unreachable code block) with tainted argument(s) has been found in line ").append(unknownMethodsLines.get(0)).append(".");
         } else {
             Collections.sort(unknownMethodsLines);
-            warning += "Unknown methods/functions (i.e method/function with an unreachable code block) with tainted argument(s) have been found in lines ";
+            warning.append("Unknown methods/functions (i.e method/function with an unreachable code block) with tainted argument(s) have been found in lines ");
             for(int i = 0; i < unknownMethodsLines.size(); i++){
                 if(i == unknownMethodsLines.size() - 1){
-                    warning += unknownMethodsLines.get(i) + ".";
+                    warning.append(unknownMethodsLines.get(i)).append(".");
                 } else{
-                    warning += unknownMethodsLines.get(i) + " - ";
+                    warning.append(unknownMethodsLines.get(i)).append(" - ");
                 }
             }
         }
 
-        warning += " As the tool's current unknown method detection is a bit simplified, please check if";
-        warning += " the vulnerabilities that arised from that detection are true vulnerabilities.";
+        warning.append(" As the tool's current unknown method detection is a bit simplified, please check if");
+        warning.append(" the vulnerabilities that arised from that detection are true vulnerabilities.");
 
-        report.setUnknownMethodWarning(warning);
+        report.setUnknownMethodWarning(warning.toString());
     }
 
     /** 

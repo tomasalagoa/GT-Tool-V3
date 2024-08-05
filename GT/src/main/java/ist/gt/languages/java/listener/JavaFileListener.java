@@ -98,12 +98,8 @@ public class JavaFileListener extends Java8ParserBaseListener {
     public void enterUnaryExpression(Java8Parser.UnaryExpressionContext ctx){
         if(ctx.SUB() != null){
             String str = ctx.getText();
-            
-            if(str.matches("\\-\\d+\\.?\\d*")){
-                negativeNumberFound = true;
-            } else{
-                negativeNumberFound = false;
-            }
+
+            negativeNumberFound = str.matches("-\\d+\\.?\\d*");
         }
     }
 
@@ -644,13 +640,8 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void enterSwitchLabel(Java8Parser.SwitchLabelContext ctx){
         if(ctx.CASE() != null){
-            if(this.casesBuilt == 0){
-                gastBuilder.addIfStatement(ctx, ctx.constantExpression().getText(), false);
-                this.casesBuilt++;
-            } else{
-                gastBuilder.addIfStatement(ctx, ctx.constantExpression().getText(), true);
-                this.casesBuilt++;
-            }
+            gastBuilder.addIfStatement(ctx, ctx.constantExpression().getText(), this.casesBuilt != 0);
+            this.casesBuilt++;
         } else if(ctx.DEFAULT() != null){
             gastBuilder.enterElseStatement(ctx);
         }

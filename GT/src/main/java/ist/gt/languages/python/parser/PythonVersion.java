@@ -1,5 +1,8 @@
 package ist.gt.languages.python.parser;
 
+import lombok.Getter;
+
+@Getter
 public enum PythonVersion {
     Autodetect(0),
     Python2(2),
@@ -11,7 +14,4 @@ public enum PythonVersion {
         this.value = value;
     }
 
-    public int getValue() {
-        return value;
-    }
 }

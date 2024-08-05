@@ -217,7 +217,7 @@ public class JsFileListener extends JavaScriptParserBaseListener {
             } else{
                 gastBuilder.addVariable(ctx, ctx.identifier().getText());
             }
-        } else if(variableAttributeAccess && ctx.identifier().getText().equals(variableAccessName)){
+        } else if(ctx.identifier().getText().equals(variableAccessName)){
             variableAccessName = "";
             variableAttributeAccess = false;
         }
@@ -277,7 +277,7 @@ public class JsFileListener extends JavaScriptParserBaseListener {
             } else{
                 gastBuilder.addVariable(ctx, ctx.identifier().getText());
             }
-        } else if(variableAttributeAccess && ctx.identifier().getText().equals(variableAccessName)){
+        } else if(ctx.identifier().getText().equals(variableAccessName)){
             variableAccessName = "";
             variableAttributeAccess = false;
         }
@@ -413,10 +413,10 @@ public class JsFileListener extends JavaScriptParserBaseListener {
     @Override
     public void enterArgumentsExpression(JavaScriptParser.ArgumentsExpressionContext ctx) {
         if(ctx.Dot() != null){
-            if(ctx.functionCall().size() > 0){
+            if(!ctx.functionCall().isEmpty()){
                 gastBuilder.addMethodCall(ctx);
                 gastBuilder.addVariable(ctx,  ctx.singleExpression().getText());
-            } else if(ctx.attributeAccess().size() > 0){
+            } else if(!ctx.attributeAccess().isEmpty()){
                 if(!ctx.singleExpression().getText().equals("this")){
                     if(!(gastBuilder.getStatements().peek() instanceof Expression)){
                         gastBuilder.addExpression(ctx);
@@ -443,9 +443,9 @@ public class JsFileListener extends JavaScriptParserBaseListener {
     @Override
     public void exitArgumentsExpression(JavaScriptParser.ArgumentsExpressionContext ctx) {
         if(ctx.Dot() != null){
-            if(ctx.functionCall().size() > 0){
+            if(!ctx.functionCall().isEmpty()){
                 gastBuilder.exitStatementOrExpression();
-            } else if(ctx.attributeAccess().size() > 0){
+            } else if(!ctx.attributeAccess().isEmpty()){
                 if(!ctx.singleExpression().getText().equals("this")){
                     if(this.attributeAccessExpression){
                         gastBuilder.exitStatementOrExpression();

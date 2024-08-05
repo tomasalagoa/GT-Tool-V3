@@ -468,7 +468,7 @@ public class GastBuilder {
                     originalClass.getSuperClass());
                 
                 //Needed so that attributes do not share same reference between different instances
-                HashMap<String, Attribute> attributes = new HashMap<String, Attribute>();
+                HashMap<String, Attribute> attributes = new HashMap<>();
                 for(Attribute attribute : originalClass.getAttributes().values()){
                     Attribute newAttribute = createNewAttributeReference(attribute);
                     attributes.put(newAttribute.getName(), newAttribute);
@@ -484,12 +484,12 @@ public class GastBuilder {
                     for(Attribute attribute : superclassAttributes.values()){
                         attributes.put(attribute.getName(), attribute);
                     }
-                } else if(superclassAttributes == null && trackedClass.getSuperClass() != null){
+                } else if(trackedClass.getSuperClass() != null){
                     trackedClass.setNeedSuperclassUpdate(true);
                     originalClass.setNeedSuperclassUpdate(true);
                 }
                 trackedClass.setAttributes(attributes);
-                trackedClass.setMethods(new HashMap<String, Function>(originalClass.getMethods()));
+                trackedClass.setMethods(new HashMap<>(originalClass.getMethods()));
 
                 expression.setClassReference(trackedClass);
                 if(functionCall != null){
@@ -531,9 +531,9 @@ public class GastBuilder {
         if(superclassName == null || !this.analyzedClasses.containsKey(superclassName)){
             return null;
         } else{
-            HashMap<String, Attribute> attributes = new HashMap<String, Attribute>();
-            ArrayList<Class> superclasses = new ArrayList<Class>();
-            Boolean noMoreSupers = false;
+            HashMap<String, Attribute> attributes = new HashMap<>();
+            ArrayList<Class> superclasses = new ArrayList<>();
+            boolean noMoreSupers = false;
             
             while(!noMoreSupers){
                 if(this.analyzedClasses.containsKey(superclassName)){
@@ -595,14 +595,12 @@ public class GastBuilder {
         if(statements.peek() instanceof Assignment){
             Assignment assignment = (Assignment) statements.pop();
 
-            if(assignment.getRight() != null && assignment.getRight().getType() != null && 
-            (assignment.getOperator() == null || (assignment.getOperator() != null && assignment.getOperator().equals("=")))){
+            if(assignment.getRight() != null && assignment.getRight().getType() != null && (assignment.getOperator() == null || assignment.getOperator().equals("="))){
                 Variable var = (Variable) assignment.getLeft();
                 //Is the right-side a simple variable?
                 if(assignment.getRight().getTrackedValue() != null){
                     //Check if left has class reference or not
-                    if(var.getClassReference() == null || 
-                        (var.getClassReference() != null && var.getSelectedAttribute() == null)){
+                    if(var.getClassReference() == null || var.getSelectedAttribute() == null){
                         var.setTrackedValue(assignment.getRight().getTrackedValue());
                         var.setClassReference(null);
                         var.setLambdaFunc(null);
@@ -690,7 +688,7 @@ public class GastBuilder {
     public void addExpressionOperator(String operator){
         if(!statements.isEmpty() && statements.peek() instanceof Expression){
             Expression expression = (Expression) statements.pop();
-            if(!expression.getMembers().isEmpty() && expression.getMembers().size() == 2){
+            if(expression.getMembers().size() == 2){
                 Expression expr = new Expression();
                 expr.getMembers().add(expression.getMembers().remove(0));
                 expr.getMembers().add(expression.getMembers().remove(0));
@@ -735,7 +733,7 @@ public class GastBuilder {
                 if(assignment.getOperator().equals("=")){
                     statements.push(assignment);
                     return;
-                } else{
+                } else {
                     Variable variable = (Variable) assignment.getLeft();
                     Expression expression;
                     if(statements.peek() instanceof Expression){
@@ -907,7 +905,7 @@ public class GastBuilder {
             Assignment assignment = (Assignment) statements.pop();
             Variable left = (Variable) assignment.getLeft();
             boolean isInLeft = true;
-            /**
+            /*
              * JavaScript treats attribute accesses (and other expressions) different than Java, not using
              * Expression object in certain cases to contain other objects (variable, attribute access, etc).
              * Because of this, eg, var str = x.y will go here as the right side wont have an Expression object but a
@@ -915,8 +913,7 @@ public class GastBuilder {
              */
             if(left.getName().matches("[a-zA-Z0-9_]+\\.[a-zA-Z0-9_]+")){
                 members = Arrays.asList(left.getName().split("\\."));
-            } else if(assignment.getRight() instanceof Variable){
-                Variable right = (Variable) assignment.getRight();
+            } else if(assignment.getRight() instanceof Variable right){
                 members = Arrays.asList(right.getName().split("\\."));
                 isInLeft = false;
             }
@@ -933,9 +930,9 @@ public class GastBuilder {
             statements.push(assignment);
         //Attribute access is on the right side of expression
         } else if(statements.peek() instanceof Expression){
-            Variable var = null, attribute = null;
+            Variable var = null, attribute;
             int newAttributeAddedIdx = -1;
-            String attributeName = "";
+            String attributeName;
             String fileNameExtension = Arrays.asList(this.file.getName().split("\\.")).get(1);
             Expression expression = (Expression) statements.pop();
 
@@ -954,7 +951,7 @@ public class GastBuilder {
                 var = createNewVariableForAttributes((Variable) expression.getMembers().get(newAttributeAddedIdx));
                 var.setSelectedAttribute(attributeName);
             } else if(fileNameExtension.equals("java") || fileNameExtension.equals("py")){
-                /**
+                /*
                  * For more complex expressions (using +, -, +=, etc), Python/Java adds the Expression object,
                  * however, the accessed attribute is done with one object only: a Variable with source.attribute name.
                  */
@@ -1107,7 +1104,7 @@ public class GastBuilder {
     public boolean addStatementsToLambdaFunc(Statement statement){
         boolean isLambdaFuncExpr = false;
         GenericStatement genStmt = null;
-        /**
+        /*
          * Found this "bug" in lambda functions (works as intended in normal functions) 
          * where if we have, e.g, str = functionCall(something), the Parser will generate 
          * a GenericStatement and the Assignment object that follows will be lost. However,
@@ -1166,9 +1163,8 @@ public class GastBuilder {
     public void checkIfLeftSideIsExpr(){
         if(!statements.isEmpty() && statements.peek() instanceof Assignment){
             Assignment assignment = (Assignment) statements.pop();
-            if(assignment.getLeft() instanceof Expression && !assignment.getLeft().getMembers().isEmpty() &&
-            assignment.getLeft().getMembers().get(0) instanceof Variable){
-                Variable leftVar = (Variable) assignment.getLeft().getMembers().get(0);
+            if(assignment.getLeft() != null && !assignment.getLeft().getMembers().isEmpty() &&
+                    assignment.getLeft().getMembers().get(0) instanceof Variable leftVar){
                 assignment.setLeft(leftVar);
             }
             statements.push(assignment);
@@ -1181,11 +1177,7 @@ public class GastBuilder {
      * so far to see if it is a function or a class instance.
     */
     public boolean nameBelongsToClass(String name){
-        if(this.analyzedClasses.containsKey(name)){
-            return true;
-        }
-
-        return false;
+        return this.analyzedClasses.containsKey(name);
     }
 
     public void collectionInitFound(){
@@ -1341,19 +1333,16 @@ public class GastBuilder {
      * used. Doesn't support other classes due to the complexity involved!
      */
     public void addAttributeTrackedValue(String attributeName, String type, String value){
-        if(type.equals("int") || type.equals("double") || 
-            type.equals("float") || type.equals("char") || 
-            type.equals("boolean")){
-            this.classes.peek().getAttributes().get(attributeName).setTrackedValue(value);
-        } else if(type.equals("String")){
-            //Remove quotes from ctx text due to the appearance of double quotes later on
-            String rmvQuotes = value.substring(1, value.length()-1).replace("\"\"", "\"");
-            this.classes.peek().getAttributes().get(attributeName).setTrackedValue(rmvQuotes);
-        } else if(type.equals("List") || type.equals("ArrayList") ||
-            type.equals("LinkedList") || type.equals("Map") ||
-            type.equals("HashMap") || type.equals("Stack") || 
-            type.equals("HashSet") || type.equals("Set")){
-                this.classes.peek().getAttributes().get(attributeName).setCollection(true);
+        switch (type) {
+            case "int", "double", "float", "char", "boolean" ->
+                    this.classes.peek().getAttributes().get(attributeName).setTrackedValue(value);
+            case "String" -> {
+                //Remove quotes from ctx text due to the appearance of double quotes later on
+                String rmvQuotes = value.substring(1, value.length() - 1).replace("\"\"", "\"");
+                this.classes.peek().getAttributes().get(attributeName).setTrackedValue(rmvQuotes);
+            }
+            case "List", "ArrayList", "LinkedList", "Map", "HashMap", "Stack", "HashSet", "Set" ->
+                    this.classes.peek().getAttributes().get(attributeName).setCollection(true);
         }
     }
 

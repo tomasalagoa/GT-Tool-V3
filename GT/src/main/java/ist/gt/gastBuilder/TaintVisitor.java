@@ -510,11 +510,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         if (spec.getGlobalTaintVariableRegex() != null && !spec.getGlobalTaintVariableRegex().isEmpty()) {
             for (String regex : spec.getGlobalTaintVariableRegex()) {
                 if (Pattern.matches(regex, var.getName())) {
-                    if(currentPathVariables.containsKey(var.getName())){
-                        currentPathVariables.get(var.getName()).setTainted(true);
-                    } else{
-                        var.setTainted(true);
-                    }
+                    currentPathVariables.getOrDefault(var.getName(), var).setTainted(true);
                 }
             }
         }
@@ -759,15 +755,14 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
         methodCall.getSource().accept(this);
         boolean isTainted = false;
-        if (methodCall.getSource() instanceof MethodCallExpression) {
-            var sourceCall = (MethodCallExpression) methodCall.getSource();
+        if (methodCall.getSource() instanceof MethodCallExpression sourceCall) {
             isTainted = processMethodCall(methodCall, sourceCall.getCurrentType(), sourceCall.isTainted());
             sourceCall.setTainted(isTainted);
 
         } else if (methodCall.getSource() instanceof Variable) {
             var source = currentPathVariables.get(((Variable) methodCall.getSource()).getName());
-            String sourceType = null;
-            boolean sourceTaint = false;
+            String sourceType;
+            boolean sourceTaint;
             if(source.getClassReference() != null && source.getSelectedAttribute() != null &&
             !source.getClassReference().getAttributes().isEmpty() && 
             source.getClassReference().getAttributes().get(source.getSelectedAttribute()) != null){
@@ -805,8 +800,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         boolean gotCollection = false;
         boolean checkedClassReferenceForPropagation = false;
         for (Expression member : methodCall.getMembers()) {
-            if (member instanceof FunctionCall) {
-                FunctionCall funcCall = (FunctionCall) member;
+            if (member instanceof FunctionCall funcCall) {
                 if (methodCall.getCurrentType() == null) {
                     System.out.println("Source type is unknown so function call " + funcCall.getFunctionName() + 
                     " will be treated as a simple function " + " file: " + file.getName());
@@ -818,8 +812,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                         continue;
                     }
                     
-                    if(methodCall.getSource() instanceof Variable){
-                        Variable variable = (Variable) methodCall.getSource();
+                    if(methodCall.getSource() instanceof Variable variable){
                         if(variable.getLambdaFunc() != null){
                             processFunction(variable.getLambdaFunc(), funcCall, file, classes.isEmpty() ? null : classes.peek());
                             isTainted = isTainted || funcCall.isTainted() || (isTaintedSource && spec.isReturnTaintedIfTaintedSource());
@@ -834,7 +827,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                                 variable.setTainted(isTainted);
                             } else{
                                 //Independently of the method invoked, if collection is tainted, it will return tainted
-                                isTainted = isTaintedSource ? true : false; 
+                                isTainted = isTaintedSource;
                             }
                         } else{
                             checkedClassReferenceForPropagation = true;
@@ -846,8 +839,9 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                         List<FileAndFunction> functions = getFunctionsForType(methodCall.getCurrentType(), funcCall);
                         if (functions.isEmpty()) {
                             System.out.println("Could not find any function for type " + methodCall.getCurrentType() + " and function: " + funcCall.getFunctionName() + " file: " + file.getName());
-                            /** Avoid recursion if class possesses a method with the same name as the source is not
-                             * an object of that class! */
+                            /* Avoid recursion if class possesses a method with the same name as the source is not
+                             * an object of that class!
+                             */
                             funcCall.setType(methodCall.getCurrentType());
                             funcCall.accept(this);
                             if(checkedClassReferenceForPropagation){
@@ -956,8 +950,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
     private void propagateSetTainted(Expression expression, boolean taint) {
         expression.setTainted(taint);
-        if (expression instanceof Variable) {
-            var variable = (Variable) expression;
+        if (expression instanceof Variable variable) {
             if(variable.getClassReference() != null){
                 if(variable.getClassReference().getAttributes().isEmpty()){
                     currentPathVariables.get(variable.getName()).setTainted(variable.isTainted());
@@ -1003,8 +996,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             Variable variable = (Variable) assignment.getLeft();
 
             if(expression.getTrackedValue() != null){
-                if(variable.getClassReference() == null || 
-                (variable.getClassReference() != null && variable.getSelectedAttribute() == null)){
+                if(variable.getClassReference() == null || variable.getSelectedAttribute() == null){
                     variable.setTrackedValue(expression.getTrackedValue());
                     variable.setClassReference(null);
                     variable.setLambdaFunc(null);
@@ -1156,13 +1148,13 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         if(expr1.getClassReference() != null && expr1.getSelectedAttribute() != null &&
         !expr1.getClassReference().getAttributes().isEmpty() && 
         expr1.getClassReference().getAttributes().get(expr1.getSelectedAttribute()) != null){
-            expr1 = (Expression) expr1.getClassReference().getAttributes().get(expr1.getSelectedAttribute());
+            expr1 = expr1.getClassReference().getAttributes().get(expr1.getSelectedAttribute());
         }
 
         if(expr2.getClassReference() != null && expr2.getSelectedAttribute() != null &&
         !expr2.getClassReference().getAttributes().isEmpty() && 
         expr2.getClassReference().getAttributes().get(expr2.getSelectedAttribute()) != null){
-            expr2 = (Expression) expr2.getClassReference().getAttributes().get(expr2.getSelectedAttribute());
+            expr2 = expr2.getClassReference().getAttributes().get(expr2.getSelectedAttribute());
         }
         //Test new expressions once again to avoid errors due to null
         if(expr1.getTrackedValue() == null || expr2.getTrackedValue() == null || expr1.getType() == null
@@ -1177,10 +1169,10 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         expr2.getType().equals("char"));
 
         if(areNumbers){
-            value = expr1.getType().equals("char") ? (char)expr1.getTrackedValue().toCharArray()[1] 
-            : Double.valueOf(expr1.getTrackedValue());
-            anotherValue = expr2.getType().equals("char") ? (char)expr2.getTrackedValue()
-            .toCharArray()[1] : Double.valueOf(expr2.getTrackedValue());
+            value = expr1.getType().equals("char") ? expr1.getTrackedValue().toCharArray()[1]
+            : Double.parseDouble(expr1.getTrackedValue());
+            anotherValue = expr2.getType().equals("char") ? expr2.getTrackedValue()
+            .toCharArray()[1] : Double.parseDouble(expr2.getTrackedValue());
         }
         switch(expression.getOperator()){
             case ">":
@@ -1294,8 +1286,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
      * previously added to a function call, to the corresponding methodCall (if applicable).
      */
     public void trackReturnValueForMethodCall(MethodCallExpression methodCall){
-        if(methodCall.getMembers().size() == 1 && methodCall.getMembers().get(0) instanceof FunctionCall){
-            FunctionCall functionCall = (FunctionCall) methodCall.getMembers().get(0);
+        if(methodCall.getMembers().size() == 1 && methodCall.getMembers().get(0) instanceof FunctionCall functionCall){
             if(functionCall.getTrackedValue() != null){
                 methodCall.setType(functionCall.getType());
                 methodCall.setTrackedValue(functionCall.getTrackedValue());
@@ -1370,9 +1361,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 Class clazz = file.getClasses().get(constructorCall.getFunctionName());
 
                 if(clazz.getConstructors().size() == 1){
-                    FileAndFunction constructorDetails = new FileAndFunction(file, 
+                    return new FileAndFunction(file,
                     clazz.getConstructors().get(0), clazz);
-                    return constructorDetails;
                 } else if(clazz.getConstructors().size() > 1){
                     for(Function constr : clazz.getConstructors()){
                         foundConstructor = true;
@@ -1396,8 +1386,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                             }
         
                             if(foundConstructor && equalParameters < constr.getParameters().size()){
-                                FileAndFunction constructorDetails = new FileAndFunction(file, constr, clazz);
-                                return constructorDetails;
+                                return new FileAndFunction(file, constr, clazz);
                             }
                         }
                     }
@@ -1413,7 +1402,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
     /**
      * @function cleanVariable
-     * @param Variable
+     * @param variable
      * 
      * Receives a variable that will receive a null value (either it is actually a null or 
      * the value it would received couldn't be tracked) and so it is needed to cleanse all other
@@ -1433,7 +1422,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
      * object was analysed), then all attributes are searched and given to it.
      */
     public void updateClassReferenceAttributes(Variable variable){
-        ArrayList<Attribute> attributes = new ArrayList<>();
+        ArrayList<Attribute> attributes;
         if(!variable.getClassReference().getAttributes().isEmpty()){
             attributes = getAllSuperAttributes(variable.getClassReference().getSuperClass());
         } else{
@@ -1534,11 +1523,8 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
      * example, a buffer reader or any other bad source that can appear in the code.
      */
     public boolean checkIfUntrustedDataSource(Variable variable){
-        if(spec.getUntrustedDataSources() != null && !spec.getUntrustedDataSources().isEmpty() && 
-        variable.getType() != null && spec.getUntrustedDataSources().contains(variable.getType())){
-            return true;
-        }
-        return false;
+        return spec.getUntrustedDataSources() != null && !spec.getUntrustedDataSources().isEmpty() &&
+                variable.getType() != null && spec.getUntrustedDataSources().contains(variable.getType());
     }
 
     public void canPropagateClassReferenceToFunction(Variable variable, String functionName, 
@@ -1624,22 +1610,21 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         if(classType.matches(matchingType)){
             return true;
         } else{
-            while(true){
-                for(File file : files){
-                    if(file.getClasses().containsKey(classType)){
-                        if(file.getClasses().get(classType).getSuperClass() != null){
-                            classType = file.getClasses().get(classType).getSuperClass();
-                            if(classType.matches(matchingType)){
-                                return true;
-                            }
-                        } else{
-                            return false;
+            for(File file : files){
+                if(file.getClasses().containsKey(classType)){
+                    if(file.getClasses().get(classType).getSuperClass() != null){
+                        classType = file.getClasses().get(classType).getSuperClass();
+                        if(classType.matches(matchingType)){
+                            return true;
                         }
+                    } else{
+                        return false;
                     }
                 }
-
-                return false;
             }
+
+            return false;
+
         }
     }
 }

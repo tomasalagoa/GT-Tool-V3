@@ -14,7 +14,7 @@ public abstract class JavaScriptLexerBase extends Lexer
      * Stores values of nested modes. By default mode is strict or
      * defined externally (useStrictDefault)
      */
-    private Stack<Boolean> scopeStrictModes = new Stack<Boolean>();
+    private Stack<Boolean> scopeStrictModes = new Stack<>();
 
     private Token lastToken = null;
     /**
@@ -72,13 +72,13 @@ public abstract class JavaScriptLexerBase extends Lexer
 
     protected void ProcessOpenBrace()
     {
-        useStrictCurrent = scopeStrictModes.size() > 0 && scopeStrictModes.peek() ? true : useStrictDefault;
+        useStrictCurrent = !scopeStrictModes.isEmpty() && scopeStrictModes.peek() || useStrictDefault;
         scopeStrictModes.push(useStrictCurrent);
     }
 
     protected void ProcessCloseBrace()
     {
-        useStrictCurrent = scopeStrictModes.size() > 0 ? scopeStrictModes.pop() : useStrictDefault;
+        useStrictCurrent = !scopeStrictModes.isEmpty() ? scopeStrictModes.pop() : useStrictDefault;
     }
 
     protected void ProcessStringLiteral()
@@ -107,24 +107,16 @@ public abstract class JavaScriptLexerBase extends Lexer
             return true;
         }
 
-        switch (this.lastToken.getType()) {
-            case JavaScriptLexer.Identifier:
-            case JavaScriptLexer.NullLiteral:
-            case JavaScriptLexer.BooleanLiteral:
-            case JavaScriptLexer.This:
-            case JavaScriptLexer.CloseBracket:
-            case JavaScriptLexer.CloseParen:
-            case JavaScriptLexer.OctalIntegerLiteral:
-            case JavaScriptLexer.DecimalLiteral:
-            case JavaScriptLexer.HexIntegerLiteral:
-            case JavaScriptLexer.StringLiteral:
-            case JavaScriptLexer.PlusPlus:
-            case JavaScriptLexer.MinusMinus:
+        return switch (this.lastToken.getType()) {
+            case JavaScriptLexer.Identifier, JavaScriptLexer.NullLiteral, JavaScriptLexer.BooleanLiteral,
+                 JavaScriptLexer.This, JavaScriptLexer.CloseBracket, JavaScriptLexer.CloseParen,
+                 JavaScriptLexer.OctalIntegerLiteral, JavaScriptLexer.DecimalLiteral, JavaScriptLexer.HexIntegerLiteral,
+                 JavaScriptLexer.StringLiteral, JavaScriptLexer.PlusPlus, JavaScriptLexer.MinusMinus ->
                 // After any of the tokens above, no regex literal can follow.
-                return false;
-            default:
+                    false;
+            default ->
                 // In all other cases, a regex literal _is_ possible.
-                return true;
-        }
+                    true;
+        };
     }
 }

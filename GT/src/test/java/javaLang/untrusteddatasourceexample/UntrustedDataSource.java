@@ -3,6 +3,7 @@ package javaLang.untrusteddatasourceexample;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.Socket;
+import java.nio.charset.StandardCharsets;
 
 public class UntrustedDataSource {
 
@@ -12,7 +13,7 @@ public class UntrustedDataSource {
         InputStreamReader readerInputStream = null;
         
         socket = new Socket("something", 777);
-        readerInputStream = new InputStreamReader(socket.getInputStream(), "UTF-8");
+        readerInputStream = new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8);
         readerBuffered = new BufferedReader(readerInputStream);
 
         String data = readerBuffered.readLine();

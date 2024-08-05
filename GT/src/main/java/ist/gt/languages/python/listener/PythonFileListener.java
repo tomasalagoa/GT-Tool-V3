@@ -92,11 +92,7 @@ public class PythonFileListener extends PythonParserBaseListener {
         if(!gastBuilder.nameBelongsToClass(ctx.name().getText())){
             gastBuilder.addFunction(ctx, ctx.name().getText());
             functionName = ctx.name().getText();
-            if(ctx.name().getText().equals("__init__")){
-                initFound = true;
-            } else{
-                initFound = false;
-            }
+            initFound = ctx.name().getText().equals("__init__");
         }
         className = null;
         classDefFound = false;

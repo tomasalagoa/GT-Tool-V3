@@ -53,14 +53,14 @@ public abstract class PythonLexerBase extends Lexer {
     @Override
     public Token nextToken() {
         // Check if the end-of-file is ahead and there are still some DEDENTS expected.
-        if (_input.LA(1) == EOF && _indents.size() > 0) {
+        if (_input.LA(1) == EOF && !_indents.isEmpty()) {
             if (_buffer[_lastTokenInd] == null || _buffer[_lastTokenInd].getType() != PythonLexer.LINE_BREAK) {
                 // First emit an extra line break that serves as the end of the statement.
                 emit(PythonLexer.LINE_BREAK);
             }
 
             // Now emit as much DEDENT tokens as needed.
-            while (_indents.size() != 0) {
+            while (!_indents.isEmpty()) {
                 emit(PythonLexer.DEDENT);
                 _indents.pop();
             }
@@ -136,14 +136,14 @@ public abstract class PythonLexerBase extends Lexer {
     private void ProcessNewLine(int indent) {
         emit(PythonLexer.LINE_BREAK);
 
-        int previous = _indents.size() == 0 ? 0 : _indents.peek();
+        int previous = _indents.isEmpty() ? 0 : _indents.peek();
 
         if (indent > previous) {
             _indents.push(indent);
             emit(PythonLexer.INDENT);
         } else {
             // Possibly emit more than 1 DEDENT token.
-            while (_indents.size() != 0 && _indents.peek() > indent) {
+            while (!_indents.isEmpty() && _indents.peek() > indent) {
                 emit(PythonLexer.DEDENT);
                 _indents.pop();
             }
