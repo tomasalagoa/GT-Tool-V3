@@ -35,7 +35,7 @@ public class Function extends Element {
 
     public Function(ParserRuleContext ctx, @NonNull String name, String returnType) {
         super(ctx);
-        this.name = Objects.requireNonNullElse(name, "lambda");
+        this.name = name;
         this.returnType = returnType;
     }
 

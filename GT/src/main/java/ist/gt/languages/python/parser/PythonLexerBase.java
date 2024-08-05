@@ -8,13 +8,13 @@ import org.antlr.v4.runtime.Token;
 import java.util.Stack;
 
 public abstract class PythonLexerBase extends Lexer {
-    public static int TabSize = 8;
+    public static final int TabSize = 8;
 
     // The amount of opened braces, brackets and parenthesis.
     private int _opened;
 
     // The stack that keeps track of the indentation level.
-    private Stack<Integer> _indents = new Stack<>();
+    private final Stack<Integer> _indents = new Stack<>();
 
     // A circular buffer where extra tokens are pushed on (see the NEWLINE and WS lexer rules).
     private int _firstTokensInd;

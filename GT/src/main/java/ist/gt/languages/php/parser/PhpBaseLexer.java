@@ -25,7 +25,7 @@ import org.antlr.v4.runtime.*;
 
 public abstract class PhpBaseLexer extends Lexer
 {
-    protected boolean AspTags = true;
+    protected final boolean AspTags = true;
     protected boolean _scriptTag;
     protected boolean _styleTag;
     protected String _heredocIdentifier;

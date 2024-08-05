@@ -14,7 +14,7 @@ public abstract class JavaScriptLexerBase extends Lexer
      * Stores values of nested modes. By default mode is strict or
      * defined externally (useStrictDefault)
      */
-    private Stack<Boolean> scopeStrictModes = new Stack<>();
+    private final Stack<Boolean> scopeStrictModes = new Stack<>();
 
     private Token lastToken = null;
     /**
@@ -88,9 +88,10 @@ public abstract class JavaScriptLexerBase extends Lexer
             String text = getText();
             if (text.equals("\"use strict\"") || text.equals("'use strict'"))
             {
-                if (scopeStrictModes.size() > 0)
+                if (!scopeStrictModes.isEmpty())
                     scopeStrictModes.pop();
                 useStrictCurrent = true;
+                //noinspection ConstantValue
                 scopeStrictModes.push(useStrictCurrent);
             }
         }

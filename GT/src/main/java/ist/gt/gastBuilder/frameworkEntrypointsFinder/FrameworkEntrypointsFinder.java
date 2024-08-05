@@ -45,7 +45,6 @@ public class FrameworkEntrypointsFinder {
 
             default:
                 System.out.println("Framework " + frameworkName + " is not supported. Current supported frameworks: Spring for Java, Flask for Python.");
-                return;
         }
     }
 
@@ -76,7 +75,6 @@ public class FrameworkEntrypointsFinder {
 
             default:
                 System.out.println("Framework " + frameworkName + " is not supported. Current supported frameworks: Spring for Java, Flask for Python.");
-                return;
         }
     }
 

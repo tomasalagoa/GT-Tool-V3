@@ -732,7 +732,6 @@ public class GastBuilder {
             if(assignment.getOperator() != null){
                 if(assignment.getOperator().equals("=")){
                     statements.push(assignment);
-                    return;
                 } else {
                     Variable variable = (Variable) assignment.getLeft();
                     Expression expression;
@@ -792,7 +791,6 @@ public class GastBuilder {
         //This is the case where we have, e.g., x = ++id, so it does not belong in this function.
         if(statements.peek() instanceof Expression){
             assignmentIncrementDecrementExpression(ctx, operator, condType);
-            return;
         } else if(statements.peek() instanceof GenericStatement){
             Expression expression = new Expression(ctx);
             Assignment assignment = new Assignment(ctx);

@@ -68,7 +68,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 file = file1;
                 file1.accept(this);
             }
-            return;
         } else{
             file.accept(this);
         }
@@ -145,7 +144,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     AstConverter.addUnknownMethodsLines(functionCall.getLine());
                 }
             }
-            return;
         } else if (!classes.empty() && functionCall.getType() == null && classes.peek().getMethods().containsKey(functionCall.getFunctionName())) {
             processFunction(classes.peek().getMethods().get(functionCall.getFunctionName()), functionCall, file, classes.peek());
 
@@ -780,13 +778,12 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             }
             isTainted = processMethodCall(methodCall, sourceType, sourceTaint);
             source.setTainted(isTainted);
-        } else if(methodCall.getSource() instanceof Expression){
-            isTainted = processMethodCall(methodCall, methodCall.getSource().getType(), 
-                methodCall.getSource().isTainted());
-        } else if(methodCall.getSource() instanceof FunctionCall){
-            FunctionCall source = (FunctionCall) methodCall.getSource();
+        }  else if(methodCall.getSource() instanceof FunctionCall source){
             source.accept(this);
             isTainted = processMethodCall(methodCall, source.getType(), source.isTainted());
+        } else if(methodCall.getSource() != null){
+            isTainted = processMethodCall(methodCall, methodCall.getSource().getType(),
+                        methodCall.getSource().isTainted());
         }
         methodCall.setTainted(isTainted);
         methodCall.getSource().setTainted(isTainted || methodCall.getSource().isTainted());
@@ -1258,7 +1255,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 return;
             default:
             System.out.println("Unknown operator: " + expression.getOperator());
-            return;
         }
     }
 
@@ -1584,11 +1580,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     public void resetFunctionVariablesTaintedness(Function function){
         if (spec.isRootSpecification()) {
             for(Variable variable : file.getRootFunc().getVariables().values()){
-                if(spec.getTaintedVarsOrArgs().contains(variable.getName())){
-                    variable.setTainted(true);
-                } else{
-                    variable.setTainted(false);
-                }
+                variable.setTainted(spec.getTaintedVarsOrArgs().contains(variable.getName()));
             }
             if(!file.getRootFunc().getParameters().isEmpty()){
                 spec.getTaintedVarsOrArgs().forEach(var -> file.getRootFunc().getParameters().get(var).setTainted(true));
