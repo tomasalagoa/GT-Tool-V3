@@ -1,6 +1,7 @@
 package ist.gt;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ist.gt.gastBuilder.TaintVisitor;
@@ -34,9 +35,7 @@ import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.time.StopWatch;
 
 import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
@@ -44,7 +43,9 @@ import java.util.stream.Stream;
 @Data
 public class AstConverter {
 
-    private static final String reportFilePath = "C:\\Users\\diogo\\Desktop\\MEIC-T\\2Ano\\Tese\\MasterDissertation\\GT-Tool-V2\\GT\\src\\main\\resources\\report.json";
+    private static final String REPORT_FIELD_NAME = "reportFilePath";
+    private static final Path ASTCONVERTER_SETTINGS_FILEPATH = Paths.get("src", "main", "resources", "astconverter-settings.json");
+    private static Path reportFilePath;
 
     private static final ObjectMapper jsonMapper = new ObjectMapper();
     public static Report report = new Report();
@@ -222,7 +223,7 @@ public class AstConverter {
     }
 
     private static void addMessage(String message) {
-        try (FileWriter fw = new FileWriter(reportFilePath, true);
+        try (FileWriter fw = new FileWriter(String.valueOf(reportFilePath), true);
              BufferedWriter bw = new BufferedWriter(fw);
              PrintWriter out = new PrintWriter(bw)) {
             out.println(message);
@@ -245,10 +246,10 @@ public class AstConverter {
     }
 
     private static void clearReport() {
-        java.io.File f = new java.io.File(reportFilePath);
+        java.io.File f = new java.io.File(String.valueOf(reportFilePath));
         if (f.exists() && !f.isDirectory()) {
             try {
-                new PrintWriter(reportFilePath).close();
+                new PrintWriter(String.valueOf(reportFilePath)).close();
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             }
@@ -417,6 +418,28 @@ public class AstConverter {
      * which is not intended. This function cleans up the AstConverter every time it is used.
      **/
     public static void setUpAstConverter(){
+        try {
+            JsonNode reportFilePathNode =
+                    jsonMapper.readTree(new BufferedInputStream(new FileInputStream(ASTCONVERTER_SETTINGS_FILEPATH.toString()))).get(REPORT_FIELD_NAME);
+            if (reportFilePathNode != null) {
+                reportFilePath = Paths.get(reportFilePathNode.asText());
+            } else { // User provided a valid JSON with no reportFilePath field
+                try {
+                    reportFilePath = Paths.get(Files.createTempDirectory("reports").toString(), "report.json");
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        } catch (IOException e) {
+            System.err.println(e.getMessage());
+            try {
+                reportFilePath = Paths.get(Files.createTempDirectory("reports").toString(), "report.json");
+            } catch (IOException e2) {
+                throw new RuntimeException(e2);
+            }
+        }
+        System.out.println(ASTCONVERTER_SETTINGS_FILEPATH.toAbsolutePath());
+        System.out.println(reportFilePath.toAbsolutePath());
         isUsingFramework = false;
         frameworkName = null;
         fileName = null;
