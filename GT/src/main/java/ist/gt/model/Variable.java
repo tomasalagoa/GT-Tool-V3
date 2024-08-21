@@ -38,7 +38,7 @@ public class Variable extends Expression {
     }
 
     @Override
-    public void addValue(ValueTrackingInterface tracker){
+    public void addValue(ValueTrackingInterface tracker) {
         tracker.track(this);
     }
 

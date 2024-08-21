@@ -35,7 +35,7 @@ public class ConditionalStatement extends Statement {
         visitor.visit(this);
     }
 
-    public void addValue(ValueTrackingInterface tracker){
+    public void addValue(ValueTrackingInterface tracker) {
         //Nothing to track here
     }
 }

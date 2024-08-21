@@ -8,7 +8,7 @@ import java.util.HashMap;
 import java.util.ArrayList;
 
 @Data
-public class JavaFrameworkEntrypointsFinder extends Java8ParserBaseListener{
+public class JavaFrameworkEntrypointsFinder extends Java8ParserBaseListener {
     private HashMap<String, ArrayList<String>> entrypoints;
     private boolean annotationFound;
     private String functionName;
@@ -25,43 +25,43 @@ public class JavaFrameworkEntrypointsFinder extends Java8ParserBaseListener{
 
     @Override
     public void exitMethodDeclaration(Java8Parser.MethodDeclarationContext ctx) {
-        if(this.annotationFound){
+        if (this.annotationFound) {
             this.annotationFound = false;
         }
     }
 
     @Override
     public void enterFormalParameter(Java8Parser.FormalParameterContext ctx) {
-        if(this.annotationFound && this.entrypoints.containsKey(this.functionName)){
+        if (this.annotationFound && this.entrypoints.containsKey(this.functionName)) {
             this.entrypoints.get(this.functionName).add(ctx.variableDeclaratorId().Identifier().getText());
         }
     }
 
     @Override
-    public void enterNormalAnnotation(Java8Parser.NormalAnnotationContext ctx){
-        if(ctx.AT() != null && this.functionName != null){
+    public void enterNormalAnnotation(Java8Parser.NormalAnnotationContext ctx) {
+        if (ctx.AT() != null && this.functionName != null) {
             isAnnotationValid(ctx.typeName().getText());
         }
     }
 
     @Override
-    public void enterMarkerAnnotation(Java8Parser.MarkerAnnotationContext ctx){
-        if(ctx.AT() != null && this.functionName != null){
+    public void enterMarkerAnnotation(Java8Parser.MarkerAnnotationContext ctx) {
+        if (ctx.AT() != null && this.functionName != null) {
             isAnnotationValid(ctx.typeName().getText());
         }
     }
 
     @Override
-    public void enterSingleElementAnnotation(Java8Parser.SingleElementAnnotationContext ctx){
-        if(ctx.AT() != null && this.functionName != null){
+    public void enterSingleElementAnnotation(Java8Parser.SingleElementAnnotationContext ctx) {
+        if (ctx.AT() != null && this.functionName != null) {
             isAnnotationValid(ctx.typeName().getText());
         }
     }
 
-    public void isAnnotationValid(String annotationName){
-        if(annotationName.equals("RequestMapping") || annotationName.equals("GetMapping")
-        || annotationName.equals("PostMapping") || annotationName.equals("PutMapping")
-        || annotationName.equals("DeleteMapping")){
+    public void isAnnotationValid(String annotationName) {
+        if (annotationName.equals("RequestMapping") || annotationName.equals("GetMapping")
+                || annotationName.equals("PostMapping") || annotationName.equals("PutMapping")
+                || annotationName.equals("DeleteMapping")) {
             this.annotationFound = true;
             this.entrypoints.putIfAbsent(this.functionName, new ArrayList<>());
         }

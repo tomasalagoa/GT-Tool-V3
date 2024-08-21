@@ -6,8 +6,7 @@ import org.antlr.v4.runtime.*;
  * All parser methods that used in grammar (p, prev, notLineTerminator, etc.)
  * should start with lower case char similar to parser rules.
  */
-public abstract class JavaScriptParserBase extends Parser
-{
+public abstract class JavaScriptParserBase extends Parser {
     public JavaScriptParserBase(TokenStream input) {
         super(input);
     }

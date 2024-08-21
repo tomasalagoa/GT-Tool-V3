@@ -1,10 +1,10 @@
 
-**/.idea/
+.idea/
 
-**/target/
+target/
 
-**/GT/src/main/java/ist/gt/resources/report.json
-
-**/gen/
+gen/
 
 *.iml
+
+GT/src/test/resources/Experimental_Evaluation

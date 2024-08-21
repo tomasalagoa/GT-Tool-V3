@@ -3,8 +3,7 @@ package ist.gt.languages.python.parser;
 import org.antlr.v4.runtime.Parser;
 import org.antlr.v4.runtime.TokenStream;
 
-public abstract class PythonParserBase extends Parser
-{
+public abstract class PythonParserBase extends Parser {
     public PythonVersion Version = PythonVersion.Python3;
 
     protected PythonParserBase(TokenStream input) {

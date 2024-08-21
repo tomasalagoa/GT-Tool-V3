@@ -10,23 +10,20 @@ public class ReturnExample {
      * */
 
     public void method(int id){
-        String query = someStringFunction(id);
-        //vulnerability due to else path
-        executeQuery(query);
-        Animal animal = someCatClassRef(id);
+        String query = someStringFunction(id); // query tainted
+        executeQuery(query); //vulnerability due to else path
+        Animal animal = someCatClassRef(id); // animal tainted
         //line 18-19-20 same thing as comment above - only vulnerability due to Cat in else
         executeQuery(animal.age);
         sensitiveSink(animal);
         animal.sound(query);
-        animal.testingNoOverride();
-        query = someStringFunction(11);
+        animal.testingNoOverride(); // TODO: deveria ser vuln?
+        query = someStringFunction(11); // query nao é tainted
         //No vulnerability 24-25
-        sensitiveSink(animal);
+        sensitiveSink(animal); // TODO: deveria ser vuln?
         sensitiveSink(query);
-        animal = someCatClassRef(8);
-        //No vulnerability 28
+        animal = someCatClassRef(8); // animal ja nao e tainted
         executeQuery(animal);
-
         //Tool should report 4 vulnerabilities in report
     }
     

@@ -20,13 +20,13 @@ public class FuncDefinition {
     //For external configuration: allows one to know what are the parameters of the function 
     private List<String> parameters;
 
-    public FuncDefinition(String name, String type){
+    public FuncDefinition(String name, String type) {
         this.name = name;
         this.type = type;
         this.parameters = new ArrayList<>();
     }
 
-    public FuncDefinition(String name, List<String> parameters, String type){
+    public FuncDefinition(String name, List<String> parameters, String type) {
         this.name = name;
         this.type = type;
         this.parameters = parameters;

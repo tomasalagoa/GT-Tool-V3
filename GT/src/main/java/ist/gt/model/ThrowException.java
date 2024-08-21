@@ -20,6 +20,6 @@ public class ThrowException extends Statement {
 
     public void addValue(ValueTrackingInterface tracker) {
         //Nothing to track here
-        
+
     }
 }

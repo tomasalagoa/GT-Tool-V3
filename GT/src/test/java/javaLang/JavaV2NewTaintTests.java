@@ -12,11 +12,11 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class JavaV2NewTaintTests {
-    private static TaintSpecification spec = new TaintSpecification(
-        new FuncDefinition("method"), List.of("id"), List.of(
-            new FuncDefinition("executeQuery"), new FuncDefinition("sensitiveSink")), 
-            List.of(new FuncDefinition("sanitize"))); 
-    private Settings settings;
+    private static final TaintSpecification spec = new TaintSpecification(
+            new FuncDefinition("method"), List.of("id"), List.of(
+            new FuncDefinition("executeQuery"), new FuncDefinition("sensitiveSink")),
+            List.of(new FuncDefinition("sanitize")));
+    private final Settings settings;
     private final String DirectoryPath = "src/test/java/javaLang";
 
     public JavaV2NewTaintTests() {

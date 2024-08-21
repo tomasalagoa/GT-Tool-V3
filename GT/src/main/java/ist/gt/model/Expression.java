@@ -16,13 +16,13 @@ public class Expression extends Statement {
         super(ctx);
     }
 
-    public Expression(ParserRuleContext ctx, String value, String type){
+    public Expression(ParserRuleContext ctx, String value, String type) {
         super(ctx);
         this.trackedValue = value;
         this.type = type;
     }
 
-    public Expression(ParserRuleContext ctx, String type){
+    public Expression(ParserRuleContext ctx, String type) {
         super(ctx);
         this.type = type;
     }

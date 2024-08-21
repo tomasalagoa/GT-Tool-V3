@@ -9,6 +9,7 @@ public class NewExpression extends Expression {
 
     public Class object;
     public String className;
+
     public NewExpression(ParserRuleContext ctx, String className) {
         super(ctx);
         this.className = className;

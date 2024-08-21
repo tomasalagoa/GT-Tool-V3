@@ -17,8 +17,8 @@ public class GenericStatement extends Statement {
     public void accept(AstBuilderVisitorInterface visitor) {
         visitor.visit(this);
     }
-    
-    public void addValue(ValueTrackingInterface tracker){
-            //Nothing to track here
+
+    public void addValue(ValueTrackingInterface tracker) {
+        //Nothing to track here
     }
 }

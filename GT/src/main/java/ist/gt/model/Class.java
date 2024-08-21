@@ -26,7 +26,7 @@ public class Class extends Element {
         this.name = name;
         this.superClass = superClass;
     }
-    
+
     //Value tracking constructor (no need for ctx)
     public Class(String name) {
         this.name = name;
@@ -36,10 +36,10 @@ public class Class extends Element {
      * @function areAttributesTainted
      * If at least one attribute is tainted, then class object is considered tainted
      */
-    public boolean areAttributesTainted(){
+    public boolean areAttributesTainted() {
         boolean tainted = false;
 
-        for(Attribute attribute : attributes.values()){
+        for (Attribute attribute : attributes.values()) {
             tainted = tainted || attribute.isTainted();
         }
 

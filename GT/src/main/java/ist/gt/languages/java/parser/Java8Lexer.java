@@ -1,5 +1,6 @@
 // Generated from C:/Users/mihail/Desktop/Tese/master-thesis/YASAT/src/main/resources/grammars/java\Java8Lexer.g4 by ANTLR 4.8
 package ist.gt.languages.java.parser;
+
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.*;

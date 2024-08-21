@@ -8,9 +8,9 @@ import ist.gt.settings.TaintSpecification;
 
 public class ParserRun {
     private static final TaintSpecification spec = new TaintSpecification(
-        new FuncDefinition("method"), List.of("id"), List.of(
+            new FuncDefinition("method"), List.of("id"), List.of(
             new FuncDefinition("executeQuery")), List.of(
-                new FuncDefinition("sanitize")));
+            new FuncDefinition("sanitize")));
     private final static Settings settings = new Settings();
     private final static String DirectoryPath = "src/test/java/javaLang";
 
