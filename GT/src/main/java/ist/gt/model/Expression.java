@@ -29,7 +29,7 @@ public class Expression extends Statement {
 
     private List<Expression> members = new ArrayList<>();
     private String trackedValue;
-    private String operator;
+    private Operator operator;
     //Mostly used for Constants & Variables, helping in value tracking
     private String type;
     //In case Variable will need to reference a class

@@ -1163,42 +1163,42 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     .toCharArray()[1] : Double.parseDouble(expr2.getTrackedValue());
         }
         switch (expression.getOperator()) {
-            case ">":
+            case Operator.GREATER_THAN:
                 result = value > anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("boolean");
                 return;
-            case ">=":
+            case Operator.GREATER_THAN_EQUAL:
                 result = value >= anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("boolean");
                 return;
-            case "<":
+            case Operator.LESS_THAN:
                 result = value < anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("boolean");
                 return;
-            case "<=":
+            case Operator.LESS_THAN_EQUAL:
                 result = value <= anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("boolean");
                 return;
-            case "*":
+            case Operator.MULTIPLY:
                 result = value * anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("double");
                 return;
-            case "/":
+            case Operator.DIVIDE:
                 result = value / anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("double");
                 return;
-            case "%":
+            case Operator.MODULUS:
                 result = value % anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("double");
                 return;
-            case "+":
+            case Operator.ADD:
                 if (areNumbers) {
                     result = value + anotherValue;
                     expression.setTrackedValue(result.toString());
@@ -1209,12 +1209,12 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     expression.setType("String");
                 }
                 return;
-            case "-":
+            case Operator.SUBTRACT:
                 result = value - anotherValue;
                 expression.setTrackedValue(result.toString());
                 expression.setType("double");
                 return;
-            case "==":
+            case Operator.EQUAL:
                 if (areNumbers) {
                     result = Math.abs(value - anotherValue) < epsilon;
                     expression.setTrackedValue(result.toString());
@@ -1229,7 +1229,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     expression.setType("boolean");
                 }
                 return;
-            case "!=":
+            case Operator.NOT_EQUAL:
                 if (areNumbers) {
                     result = Math.abs(value - anotherValue) >= epsilon;
                     expression.setTrackedValue(result.toString());

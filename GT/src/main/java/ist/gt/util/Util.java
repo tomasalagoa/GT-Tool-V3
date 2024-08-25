@@ -1,5 +1,6 @@
 package ist.gt.util;
 
+import ist.gt.model.Operator;
 import org.apache.commons.lang3.SerializationUtils;
 
 import java.io.Serializable;
@@ -33,6 +34,19 @@ public class Util {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    public static Operator toOperator(String op) {
+        return switch (op) {
+            case "==" -> Operator.EQUAL;
+            case "!=" -> Operator.NOT_EQUAL;
+            case "+" -> Operator.ADD;
+            case "-" -> Operator.SUBTRACT;
+            case "*" -> Operator.MULTIPLY;
+            case "/" -> Operator.DIVIDE;
+            case "%" -> Operator.MODULUS;
+            default -> null;
+        };
     }
 }
 

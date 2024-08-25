@@ -414,7 +414,7 @@ public class GastBuilder {
     /**
      * @function addParametersToLambdaFunction
      * @params ctx, paramName
-     *
+     * <p>
      * Receives a parameter's name as well as its context in order to retrieve 
      * it from the root function and give it to the associated lambda function.
      */
@@ -675,7 +675,7 @@ public class GastBuilder {
     /**
      * @function addExpressionOperator
      * @param operator (String)
-     *
+     * <p>
      * Gives the @param operator to the current Expression. This auxiliary 
      * function's purpose is to give the current Expression the operator related
      * to the operation it is being used: relational (<, <=, >, >=), 
@@ -689,10 +689,10 @@ public class GastBuilder {
                 Expression expr = new Expression();
                 expr.getMembers().add(expression.getMembers().removeFirst());
                 expr.getMembers().add(expression.getMembers().removeFirst());
-                expr.setOperator(operator);
+                expr.setOperator(Util.toOperator(operator));
                 expression.getMembers().add(expr);
             } else {
-                expression.setOperator(operator);
+                expression.setOperator(Util.toOperator(operator));
             }
 
             statements.push(expression);
@@ -702,7 +702,7 @@ public class GastBuilder {
     /**
      * @function addAssigmentOperator
      * @param operator (String)
-     *
+     * <p>
      * Gives the @param operator to the current Assignment. This auxiliary 
      * function's purpose is to simplify the assignments that use the operators:
      * +=, -=, *=, /=, %=, giving it to the current Assignment. More info at
@@ -741,24 +741,15 @@ public class GastBuilder {
                     expression.getMembers().addFirst(variable);
 
                     switch (assignment.getOperator()) {
-                        case "+=":
-                            expression.setOperator("+");
-                            break;
-                        case "-=":
-                            expression.setOperator("-");
-                            break;
-                        case "*=":
-                            expression.setOperator("*");
-                            break;
-                        case "/=":
-                            expression.setOperator("/");
-                            break;
-                        case "%=":
-                            expression.setOperator("%");
-                            break;
-                        default:
+                        case "+=" -> expression.setOperator(Operator.ADD);
+                        case "-=" -> expression.setOperator(Operator.SUBTRACT);
+                        case "*=" -> expression.setOperator(Operator.MULTIPLY);
+                        case "/=" -> expression.setOperator(Operator.DIVIDE);
+                        case "%=" -> expression.setOperator(Operator.MODULUS);
+                        default -> {
                             statements.push(assignment);
                             return;
+                        }
                     }
 
                     assignment.setRight(expression);
@@ -773,7 +764,7 @@ public class GastBuilder {
     /**
      * @function normalIncrementDecrementExpression
      * @params ctx (ParserRuleContext), operator (String), condType (String)
-     *
+     * <p>
      * This function is used to simplify & transform pre(post)-increments(decrements)
      * when they belong only to an expression (and GenericStatement). This means that they
      * are not used in an Assignment, which is covered in @function 
@@ -804,15 +795,12 @@ public class GastBuilder {
             genStmt.setStatement(assignment);
 
             switch (operator) {
-                case "+":
-                    expression.setOperator("+");
-                    break;
-                case "-":
-                    expression.setOperator("-");
-                    break;
-                default:
+                case "+" -> expression.setOperator(Util.toOperator("+"));
+                case "-" -> expression.setOperator(Util.toOperator("-"));
+                default -> {
                     System.out.println("Invalid operator");
                     return;
+                }
             }
 
             statements.push(genStmt);
@@ -822,7 +810,7 @@ public class GastBuilder {
     /**
      * @function assignmentIncrementDecrementExpression
      * @params ctx (ParserRuleContext), operator (String), condType (String)
-     *
+     * <p>
      * This function is used to simplify & transform pre(post)-increments(decrements)
      * when they belong to an Assignment.
      * The @param condType allows the function to identify which type of 
@@ -845,16 +833,13 @@ public class GastBuilder {
             expression.getMembers().add(constant);
 
             switch (operator) {
-                case "+":
-                    expression.setOperator("+");
-                    break;
-                case "-":
-                    expression.setOperator("-");
-                    break;
-                default:
+                case "+" -> expression.setOperator(Util.toOperator("+"));
+                case "-" -> expression.setOperator(Util.toOperator("-"));
+                default -> {
                     //Should never enter here!
                     System.out.println("Invalid operator");
                     return;
+                }
             }
             //x = ++id; -> id = id + 1; x = id;
             if (condType.equals("pre")) {
@@ -1280,11 +1265,11 @@ public class GastBuilder {
      * first, the method call will have as source the function it wants to call and second,
      * that same function will have as first member the class creation expression 
      * we want to have as source!
-     *
+     * <p>
      * (new someClass()).someMethodCall() can also appear in the right side of an assignment and
      * GT will not consider that a method call and will separate them in different statements (also
      * couldn't find a rule in Parser that allowed me to know reliably that it is a methodCall).
-     *
+     * <p>
      * If you want to also extend this to other languages (might be needed), care
      * for these assumptions!
      */
@@ -1353,11 +1338,11 @@ public class GastBuilder {
 
         if (!isElseIf) {
             ifStatement.getExpression().getMembers().add(switchExpression.getMembers().getFirst());
-            ifStatement.getExpression().setOperator("==");
+            ifStatement.getExpression().setOperator(Util.toOperator("=="));
         } else {
             int lastElseIf = ifStatement.getElseIfs().size() - 1;
             ifStatement.getElseIfs().get(lastElseIf).getExpression().getMembers().add(switchExpression.getMembers().getFirst());
-            ifStatement.getElseIfs().get(lastElseIf).getExpression().setOperator("==");
+            ifStatement.getElseIfs().get(lastElseIf).getExpression().setOperator(Util.toOperator("=="));
         }
 
         statements.push(switchExpression);

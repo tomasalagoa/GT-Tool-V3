@@ -1,0 +1,8 @@
+package ist.gt.model;
+
+public enum Operator {
+    ADD, SUBTRACT, MULTIPLY, DIVIDE, MODULUS,
+    LESS_THAN, GREATER_THAN,
+    LESS_THAN_EQUAL, GREATER_THAN_EQUAL,
+    EQUAL, NOT_EQUAL,
+}
