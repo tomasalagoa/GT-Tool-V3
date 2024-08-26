@@ -543,7 +543,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 codeBlocks.clear();
                 resetFunctionVariablesTaintedness(function);
                 function.getCodeBlock().accept(this);
-            } catch (UnsupportedOperationException e) {
+            } catch (Exception e) {
                 if (e.getMessage() != null)
                     System.out.println(e.getMessage());
                 else {

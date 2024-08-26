@@ -417,8 +417,8 @@ public class GastBuilder {
     public void addParametersToLambdaFunction(ParserRuleContext ctx, String paramName) {
         if (currentLambdaFunction != null) {
             String type;
-            if (this.getFile().getRootFunc().getParameters().containsKey(paramName)) {
-                type = this.getFile().getRootFunc().getParameters().get(paramName).getType();
+            if (this.file.getRootFunc().getParameters().containsKey(paramName)) {
+                type = this.file.getRootFunc().getParameters().get(paramName).getType();
             } else {
                 type = null;
             }
@@ -1031,11 +1031,11 @@ public class GastBuilder {
             statements.push(assignment);
             statements.push(expression);
 
-            int idx = this.getCodeBlocks().peek().getStatements().size();
-            genStmt = (GenericStatement) this.getCodeBlocks().peek().getStatements().remove(idx - 1);
-            assignment = (Assignment) this.getCodeBlocks().peek().getStatements().remove(idx - 2);
-            this.getCodeBlocks().peek().getStatements().add(genStmt);
-            this.getCodeBlocks().peek().getStatements().add(assignment);
+            int idx = this.codeBlocks.peek().getStatements().size();
+            genStmt = (GenericStatement) this.codeBlocks.peek().getStatements().remove(idx - 1);
+            assignment = (Assignment) this.codeBlocks.peek().getStatements().remove(idx - 2);
+            this.codeBlocks.peek().getStatements().add(genStmt);
+            this.codeBlocks.peek().getStatements().add(assignment);
         } else {
             statements.push(expression);
             statements.push(genStmt);
