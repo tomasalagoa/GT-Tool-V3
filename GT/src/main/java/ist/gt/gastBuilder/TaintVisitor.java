@@ -543,7 +543,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                 codeBlocks.clear();
                 resetFunctionVariablesTaintedness(function);
                 function.getCodeBlock().accept(this);
-            } catch (Exception e) {
+            } catch (UnsupportedOperationException e) {
                 if (e.getMessage() != null)
                     System.out.println(e.getMessage());
                 else {
@@ -1009,7 +1009,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                  * Have to watch out for the following cases: left-side is a simple variable so it becomes
                  * a class instance if right-side does not access any attribute OR
                  * left-side still is a simple variable but right-side accesses an attribute OR
-                 * left-side accesses an attribute but right-side doesnt so that attribute is a class instance OR
+                 * left-side accesses an attribute but right-side doesn't so that attribute is a class instance OR
                  * left-side & right-side both access an attribute
                  */
                 if (expression.getSelectedAttribute() == null) {
@@ -1088,7 +1088,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     currentPathVariables.replace(variable.getName(), variable);
                 } else if (variable.getClassReference() != null) {
                     /* If class reference is the same, there is no problem.
-                     * But if class reference changes to another class (eg subclass to superclass),
+                     * But if class reference changes to another class (e.g. subclass to superclass),
                      * then it needs to change in currentPathVariables to reflect! */
                     currentPathVariables.get(variable.getName()).setClassReference(variable.getClassReference());
                     currentPathVariables.get(variable.getName()).setType(variable.getType());
@@ -1309,7 +1309,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     }
 
     /**
-     * @param attribute
+     * @param attribute desc
      * @return Attribute
      * <p>
      * Represents the creation of a new reference for the @param attribute.
@@ -1332,7 +1332,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     }
 
     /**
-     * @param constructorCall
+     * @param constructorCall desc
      * @return FileAndFunction
      * <p>
      * Receives a constructor call and analyses all the constructors its class might have.
@@ -1389,7 +1389,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
     /**
      * @param variable Receives a variable that will receive a null value (either it is actually a null or
-     *                 the value it would received couldn't be tracked) and so it is needed to cleanse all other
+     *                 the value it would have received couldn't be tracked) and so it is needed to cleanse all other
      *                 tracking fields.
      * @function cleanVariable
      */

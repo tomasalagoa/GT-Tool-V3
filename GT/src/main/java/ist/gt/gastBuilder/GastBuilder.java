@@ -7,11 +7,7 @@ import lombok.Data;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Stack;
+import java.util.*;
 
 @Data
 public class GastBuilder {
@@ -586,8 +582,8 @@ public class GastBuilder {
     /**
      * @function trackLeftVariableValue
      *
-     * Passes the value in the right side of an assignment to the left side,
-     * if the right side exists (i.e could just be an empty variable declaration)
+     * Passes the value on the right side of an assignment to the left side,
+     * if the right side exists (i.e. could just be an empty variable declaration)
      * or if it has a type meaning its value could be tracked earlier (will be
      * tracked later if not). Also supports class reference and lambda function tracking.
      */
@@ -638,7 +634,7 @@ public class GastBuilder {
      *
      * Updates the value of current Expression. Can only be made if the current
      * Expression does not possess a tracked value (or class reference) yet and if it only has one 
-     * element (Variable, Parameter, etc), making it able to immediately get its
+     * element (Variable, Parameter, etc.), making it able to immediately get its
      * value in this stage.
      */
     public void trackExpressionValue() {
@@ -867,9 +863,9 @@ public class GastBuilder {
      * @function accessedAttribute
      *
      * Represents the 3 cases where an attribute will be accessed here: 
-     * 1. In the left side of an assignment, and it can be known because the last
+     * 1. On the left side of an assignment, and it can be known because the last
      * statement in the statements Stack will be the Assignment object.
-     * 2. In the right side of an assignment, and it can be known because the right side
+     * 2. On the right side of an assignment, and it can be known because the right side
      * is always represented with an Expression so it is enough to check if the statement before
      * is an Assignment or not. May also be used when it is an argument in a function call.
      * 3. In a pre/post-increment/decrement expression, known by the use of GenericStatement in these
@@ -886,9 +882,9 @@ public class GastBuilder {
             Variable left = (Variable) assignment.getLeft();
             boolean isInLeft = true;
             /*
-             * JavaScript treats attribute accesses (and other expressions) different than Java, not using
+             * JavaScript treats attribute accesses (and other expressions) different from Java, not using
              * Expression object in certain cases to contain other objects (variable, attribute access, etc).
-             * Because of this, eg, var str = x.y will go here as the right side wont have an Expression object but a
+             * Because of this, eg, var str = x.y will go here as the right side won't have an Expression object but a
              * Variable object instead...
              */
             if (left.getName().matches("[a-zA-Z0-9_]+\\.[a-zA-Z0-9_]+")) {
@@ -994,7 +990,7 @@ public class GastBuilder {
      *
      * This function is used, primarily for now, for attribute accesses in Generic Statements.
      * The issue being solved here was found regarding pre/post-increment/decrement expressions with
-     * attribute acesses. With a Generic Statement, the information regarding attribute accesses is lost
+     * attribute accesses. With a Generic Statement, the information regarding attribute accesses is lost
      * and to be able to get that information, this function will instead insert an Expression in the Stack
      * (and in the Generic Statement) to store that information so it can be processed in another function.
      *

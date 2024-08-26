@@ -63,7 +63,7 @@ public class PythonFileListener extends PythonParserBaseListener {
             gastBuilder.addLambdaFunction(ctx);
             lambdaFunctionDetected = true;
         } else if (ctx.logical_test() != null && !ctx.logical_test().isEmpty()) {
-            /* The second expression analyses cases where the last statement (eg. FunctionCall)
+            /* The second expression analyses cases where the last statement (e.g. FunctionCall)
              * extends Expression, so instanceof returns true in 1st expression, but
              * it is not an Expression.
              */

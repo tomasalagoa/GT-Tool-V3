@@ -90,7 +90,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     /**
      * This rule is mainly used to catch negative numbers as literals. The reason for this is
-     * because if, e.g, we do int num = -1, what reaches the LiteralContext above is only 1, the
+     * that if, e.g, we do int num = -1, what reaches the LiteralContext above is only 1, the
      * - is used in this rule and -1 never reaches LiteralContext. So with this, we are advising
      * a "counter" to know when the number should've been negative.
      */
@@ -614,7 +614,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
     }
 
     /**
-     * Switch case statement here will function like a If-ElseIf-Else statement.
+     * Switch case statement here will function like an If-ElseIf-Else statement.
      * This allows the tool to reuse the model (as a switch case isn't that different
      * from an if-else) and to also reuse code of a similar logic already implemented!
      */
@@ -891,7 +891,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     /**
      * @function enterExplicitConstructorInvocation
-     * Distiguishes between the super() function and the this() function used in constructors.
+     * Distinguishes between the super() function and the this() function used in constructors.
      **/
     @Override
     public void enterExplicitConstructorInvocation(Java8Parser.ExplicitConstructorInvocationContext ctx) {

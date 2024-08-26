@@ -28,7 +28,7 @@ public class FrameworkEntrypointsFinder {
     public void useJavaFrameworkEntrypointsFinder(String frameworkName, String selectedFileName, String currentFile, ParseTreeWalker walker, CompilationUnitContext tree) {
         JavaFrameworkEntrypointsFinder frameListener = new JavaFrameworkEntrypointsFinder();
         switch (frameworkName) {
-            case "Spring":
+            case "Spring" -> {
                 if (selectedFileName != null) {
                     if (selectedFileName.equals(currentFile)) {
                         System.out.println("Checking entrypoints of Java file: " + selectedFileName);
@@ -41,10 +41,9 @@ public class FrameworkEntrypointsFinder {
                     saveEntrypoints(frameListener.getEntrypoints());
                 }
                 return;
-
-
-            default:
-                System.out.println("Framework " + frameworkName + " is not supported. Current supported frameworks: Spring for Java, Flask for Python.");
+            }
+            default ->
+                    System.out.println("Framework " + frameworkName + " is not supported. Current supported frameworks: Spring for Java, Flask for Python.");
         }
     }
 

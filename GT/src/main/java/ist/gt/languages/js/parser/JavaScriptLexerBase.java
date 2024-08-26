@@ -10,7 +10,7 @@ import java.util.Stack;
  */
 public abstract class JavaScriptLexerBase extends Lexer {
     /**
-     * Stores values of nested modes. By default mode is strict or
+     * Stores values of nested modes. By default, mode is strict or
      * defined externally (useStrictDefault)
      */
     private final Stack<Boolean> scopeStrictModes = new Stack<>();

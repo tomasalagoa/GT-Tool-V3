@@ -67,7 +67,7 @@ public class AstConverter {
      * Converts a given file's code into an AST which will then be converted into a GAST
      * in order for GT to analyse it and find vulnerabilities.
      **/
-    private static File convertFile(String filePath) throws Exception {
+    private static File convertFile(String filePath) throws IOException {
         Path path = Path.of(filePath);
         var fileExtension = FilenameUtils.getExtension(filePath);
 
@@ -137,7 +137,7 @@ public class AstConverter {
                 analyzedClasses = listener.getGastBuilder().getAnalyzedClasses();
                 return listener.getGastBuilder().getFile();
             }
-            default -> throw new Exception("File extension not supported");
+            default -> throw new RuntimeException("File extension not supported");
         }
     }
 
@@ -155,8 +155,9 @@ public class AstConverter {
                             File file = convertFile(path.toString());
                             file.setPath(path);
                             files.add(file);
-                        } catch (Exception e) {
-                            e.printStackTrace();
+                        } catch (IOException e) {
+                            // e.printStackTrace();
+                            System.err.println("There was an issue opening the provided file: " + path);
                         }
                     });
         }
@@ -251,7 +252,10 @@ public class AstConverter {
             try {
                 new PrintWriter(String.valueOf(reportFilePath)).close();
             } catch (FileNotFoundException e) {
-                e.printStackTrace();
+                // e.printStackTrace();
+                System.err.println("Could not find file: " + reportFilePath);
+            } catch (SecurityException se) {
+                System.err.println("Cannot write to file: " + reportFilePath);
             }
         }
     }
@@ -369,7 +373,7 @@ public class AstConverter {
         }
 
         warning.append(" As the tool's current unknown method detection is a bit simplified, please check if");
-        warning.append(" the vulnerabilities that arised from that detection are true vulnerabilities.");
+        warning.append(" the vulnerabilities that arose from that detection are true vulnerabilities.");
 
         report.setUnknownMethodWarning(warning.toString());
     }
@@ -402,7 +406,7 @@ public class AstConverter {
     public static void showEntrypoints() {
         System.out.println("================================================");
         for (String file : filesEntrypoints.keySet()) {
-            HashMap<String, ArrayList<String>> entrypoints = filesEntrypoints.get(file);
+            Map<String, ArrayList<String>> entrypoints = filesEntrypoints.get(file);
             System.out.println("Entrypoints found in file " + file);
             for (String functionName : entrypoints.keySet()) {
                 System.out.println("Function: " + functionName);
@@ -413,7 +417,7 @@ public class AstConverter {
 
     /**
      * @function setUpAstConverter
-     * Auxiliary function. In multiple unit tests, AstConverter's information could be reutilized
+     * Auxiliary function. In multiple unit tests, AstConverter's information could be reused
      * which is not intended. This function cleans up the AstConverter every time it is used.
      **/
     public static void setUpAstConverter() {

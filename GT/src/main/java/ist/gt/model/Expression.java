@@ -37,7 +37,7 @@ public class Expression extends Statement {
     private String selectedAttribute;
     //In case it will need to store a lambda function
     private Function lambdaFunc;
-    //In case a Collection (List, Set, Map, etc) is used (going for List support for now)
+    //In case a Collection (List, Set, Map, etc.) is used (going for List support for now)
     private boolean isCollection = false;
 
     public void setType(String type) {
