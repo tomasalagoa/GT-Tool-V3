@@ -113,7 +113,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             functionCall.setTainted(false);
             return true;
         }
-        IsVulnerability(functionCall, isTaintedSource, sourceType);
+        isVulnerability(functionCall, isTaintedSource, sourceType);
         return false;
     }
 
@@ -294,10 +294,26 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     }
 
 
-    private void IsVulnerability(FunctionCall functionCall, boolean isTaintedSource, String sourceType) {
-        if (spec.getSensitiveFunctions().stream().anyMatch(func -> functionCall.getFunctionName().equals(func.getName())
-                && (sourceType == null || func.getType() == null || func.getType().equals(sourceType)))
-                && ((isTaintedSource && spec.isReturnTaintedIfTaintedSource()) || propagateTaintInExpressionList(functionCall.getMembers()))) {
+    private void isVulnerability(FunctionCall functionCall, boolean isTaintedSource, String sourceType) {
+        /*
+        This function checks whether a function call is a vulnerability.
+        This can occur in one of two situations:
+            1 - the function call being analyzed is a method call, which means that it is only a vulnerability in one
+             of two conditions:
+                a) the method is not in the analyzed code and the source is tainted
+                b) the method is in the source code and returns a tainted value
+            2 - the function call being analyzed is a 'normal' function call, which means that it is only a
+            vulnerability in one of two conditions:
+                a) the called function is in the source code, and it returns a tainted value
+                b) the called function is in a library and any of its arguments is tainted
+         */
+        if (spec.getSensitiveFunctions().stream().anyMatch(
+                func -> functionCall.getFunctionName().equals(func.getName())
+                        && (sourceType == null || func.getType() == null || func.getType().equals(sourceType))
+                )
+                && ((isTaintedSource && spec.isReturnTaintedIfTaintedSource())
+                    || propagateTaintInExpressionList(functionCall.getMembers()))
+        ) {
 
             Vulnerability vulnerability = new Vulnerability(functionCall.getLine(), functionCall.getFunctionName());
 
@@ -308,7 +324,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             vulnerability.setFunctionCallStack(new ArrayList<>(functionNames));
             AstConverter.addVulnerability(vulnerability);
 //            CommonTools.throwAny(new Exception("Found vulnerability " + functionCall.getLine()));
-            System.out.println("Found vulnerability " + functionCall.getLine() + " " + functionCall.getText());
+            System.out.println("Found vulnerability on line " + functionCall.getLine() + " from function call " + functionCall.getText());
         }
     }
 
