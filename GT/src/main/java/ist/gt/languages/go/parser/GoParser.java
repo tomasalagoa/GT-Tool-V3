@@ -1,3 +1,5 @@
+package ist.gt.languages.go.parser;
+
 // Generated from GoParser.g4 by ANTLR 4.13.2
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
