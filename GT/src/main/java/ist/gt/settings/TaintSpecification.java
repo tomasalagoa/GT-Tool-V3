@@ -34,7 +34,7 @@ public class TaintSpecification {
     private List<FuncDefinition> sanitizationFunctions = new ArrayList<>();
     /* For external configuration: provided taint attributes from class in file */
     private List<String> taintedAttributes = new ArrayList<>();
-    /* For external configuration: return tainted from a method if it's source is tainted */
+    /* For external configuration: return tainted from a method if its source is tainted */
     private boolean returnTaintedIfTaintedSource;
     /* For external configuration: simply runs through files (from top of file to bottom) (?)*/
     private boolean allFiles;
