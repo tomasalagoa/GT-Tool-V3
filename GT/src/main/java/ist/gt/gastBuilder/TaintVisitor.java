@@ -82,7 +82,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         file = files.stream().filter(file1 -> file1.getName().equals(specification.getFileName())).findFirst().orElseThrow();
 
         if (spec.isRootSpecification()) {
-            spec.getTaintedVarsOrArgs().forEach(var -> file.getRootFunc().getVariables().get(var).setTainted(true));
+            spec.getTaintedVarsOrArgs().forEach(var -> {
+                        if (file.getRootFunc().getVariables().get(var) != null)
+                            file.getRootFunc().getVariables().get(var).setTainted(true);
+                    }
+            );
             if (!file.getRootFunc().getParameters().isEmpty()) {
                 spec.getTaintedVarsOrArgs().forEach(var -> file.getRootFunc().getParameters().get(var).setTainted(true));
             }
@@ -997,7 +1001,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
      */
     @Override
     public void track(Assignment assignment) {
-        //Rare cases can appear when dealing with more complex (Python) code. 
+        //Rare cases can appear when dealing with more complex (Python) code.
         if (!(assignment.getLeft() instanceof Variable)) {
             return;
         }
@@ -1116,11 +1120,11 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     }
 
     /**
+     * @function track(Expression)
      * @param expression Represents the logic for complex expressions between numbers and strings, ie,
      *                   additive, multiplicative, equality, relational expressions. Various distinctions
      *                   had to be made to assure the values are correct and legal. This function is invoked
      *                   if a given expression possesses an operator (+, -, *, /, %, ==, !=, <, <=, >, >=).
-     * @function track(Expression)
      */
     @Override
     public void track(Expression expression) {
@@ -1305,13 +1309,13 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     }
 
     /**
+     * @function createNewVariableForAttributes
      * @return Variable
      * <p>
      * Receives a variable and returns another reference to that variable with the same
      * information regarding name, type, if it's tainted or not, etc. Used mainly because
      * of class instances to know what attribute was used for that instance in a given statement,
      * without having that information be overwritten to all other references of that variable
-     * @function createNewVariableForAttributes
      */
     public Variable createNewVariableForAttributes(Variable variable) {
         Variable var = new Variable(variable.getName());
@@ -1325,6 +1329,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     }
 
     /**
+     * @function createNewAttributeReference
      * @param attribute desc
      * @return Attribute
      * <p>
@@ -1332,7 +1337,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
      * The goal here is to create a new reference for a given attribute (whenever
      * a new class instance is created) so that it is not the same as the one stored
      * in the classes field of GastBuilder.
-     * @function createNewAttributeReference
      */
     public Attribute createNewAttributeReference(Attribute attribute) {
         Attribute newAttribute = new Attribute();
@@ -1348,13 +1352,13 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     }
 
     /**
+     * @function tryToGetConstructor
      * @param constructorCall desc
      * @return FileAndFunction
      * <p>
      * Receives a constructor call and analyses all the constructors its class might have.
      * It is done by analysing the parameters' type between the constructor and the invocation,
      * which might be a simplified way of achieving this. Will return null if using an "empty" constructor.
-     * @function tryToGetConstructor
      */
     public FileAndFunction tryToGetConstructor(FunctionCall constructorCall) {
         int equalParameters;
@@ -1404,10 +1408,10 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
     }
 
     /**
+     * @function cleanVariable
      * @param variable Receives a variable that will receive a null value (either it is actually a null or
      *                 the value it would have received couldn't be tracked) and so it is needed to cleanse all other
      *                 tracking fields.
-     * @function cleanVariable
      */
     public void cleanVariable(Variable variable) {
         variable.setClassReference(null);
