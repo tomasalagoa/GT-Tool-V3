@@ -40,7 +40,6 @@ public class FrameworkEntrypointsFinder {
                     walker.walk(frameListener, tree);
                     saveEntrypoints(frameListener.getEntrypoints());
                 }
-                return;
             }
             default ->
                     System.out.println("Framework " + frameworkName + " is not supported. Current supported frameworks: Spring for Java, Flask for Python.");
