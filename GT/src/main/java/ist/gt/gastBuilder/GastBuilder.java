@@ -103,7 +103,7 @@ public class GastBuilder {
 
 
     public FunctionCall addFunctionCall(ParserRuleContext ctx, String name) {
-        var functionCall = new FunctionCall(ctx, name);
+        FunctionCall functionCall = new FunctionCall(ctx, name);
         if (currentLambdaFunction == null) {
             processExpression(functionCall);
         } else {
@@ -164,7 +164,7 @@ public class GastBuilder {
         if (currentFunction.getVariables().containsKey(var.getName())) {
             var = currentFunction.getVariables().get(var.getName());
         }
-        /* In case a parameter's value is overwriten (with an assignment), we will
+        /* In case a parameter's value is overwritten (with an assignment), we will
          * not know its type unless we retrieve it. */
         else if (!currentFunction.getVariables().containsKey(var.getName()) &&
                 currentFunction.getParameters().containsKey(var.getName())) {
@@ -179,12 +179,18 @@ public class GastBuilder {
             isParameter = true;
         }
         /* If the variable is not in the current function (not a local variable),
-         * not a parameter neither is it a parameter of a lambda function, then it could be
+         * not a parameter of the local function and not a parameter of a lambda function, then it could be
          * an attribute that is being used without the keyword "this". */
         else if (!classes.isEmpty() && classes.peek().getAttributes().containsKey(var.getName())) {
+            // maybe "this" is already a variable in the current function, meaning we have encountered an attribute
+            // before
             String attribute = var.getName();
-            var.setName("this");
-            var.setSelectedAttribute(attribute);
+            if (currentFunction.getVariables().containsKey("this")) {
+                currentFunction.getVariables().get("this").setSelectedAttribute(attribute);
+            } else {
+                var.setName("this");
+                var.setSelectedAttribute(attribute);
+            }
         }
 
         if (!var.getName().equals("this")) {
@@ -381,7 +387,7 @@ public class GastBuilder {
 
     /**
      * @function addLambdaFunction
-     * @params ctx
+     * @param ctx
      *
      * Creates a new Function to represent a lambda function and gives it to the
      * Expression that will store it.
@@ -409,7 +415,8 @@ public class GastBuilder {
 
     /**
      * @function addParametersToLambdaFunction
-     * @params ctx, paramName
+     * @param ctx desc
+     * @param paramName desc
      * <p>
      * Receives a parameter's name as well as its context in order to retrieve 
      * it from the root function and give it to the associated lambda function.
@@ -609,7 +616,6 @@ public class GastBuilder {
                         var.setType(assignment.getRight().getType());
                         var.setTrackedValue(null);
                         var.setLambdaFunc(null);
-
                     }
                 } else if (assignment.getRight().getLambdaFunc() != null) {
                     var.setLambdaFunc(assignment.getRight().getLambdaFunc());
@@ -759,7 +765,9 @@ public class GastBuilder {
 
     /**
      * @function normalIncrementDecrementExpression
-     * @params ctx (ParserRuleContext), operator (String), condType (String)
+     * @param ctx desc
+     * @param operator desc
+     * @param condType desc
      * <p>
      * This function is used to simplify & transform pre(post)-increments(decrements)
      * when they belong only to an expression (and GenericStatement). This means that they
@@ -805,7 +813,9 @@ public class GastBuilder {
 
     /**
      * @function assignmentIncrementDecrementExpression
-     * @params ctx (ParserRuleContext), operator (String), condType (String)
+     * @param ctx desc
+     * @param operator desc
+     * @param condType desc
      * <p>
      * This function is used to simplify & transform pre(post)-increments(decrements)
      * when they belong to an Assignment.
@@ -1072,7 +1082,7 @@ public class GastBuilder {
 
     /**
      * @function addStatementsToLambdaFunc
-     * @param statement
+     * @param statement desc
      * @return boolean
      * Adds a given statement to the codeblock of the current lambda function.
      * Returns true if it is dealing with a lambda function, and false otherwise.  
@@ -1214,8 +1224,9 @@ public class GastBuilder {
      */
     public void addSuperMethodCall(ParserRuleContext ctx, String functionName, boolean isConstructorSuper) {
         FunctionCall superFunction;
-        addFunctionCall(ctx, functionName);
-        superFunction = (FunctionCall) statements.pop();
+        // addFunctionCall(ctx, functionName);
+        // superFunction = (FunctionCall) statements.pop();
+        superFunction = addFunctionCall(ctx, functionName);
         if (isConstructorSuper) {
             superFunction.setConstructor(true);
         } else {
