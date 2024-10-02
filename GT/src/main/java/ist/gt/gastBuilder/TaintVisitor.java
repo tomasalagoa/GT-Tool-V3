@@ -1223,10 +1223,10 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     result = value + anotherValue;
                     expression.setTrackedValue(result.toString());
                     expression.setType("double");
-                } else if (expr1.getType().equals("String") || expr2.getType().equals("String")) {
+                } else if (expr1.getType().equals("string") || expr2.getType().equals("string")) {
                     result = expr1.getTrackedValue() + expr2.getTrackedValue();
                     expression.setTrackedValue(result.toString());
-                    expression.setType("String");
+                    expression.setType("string");
                 }
                 return;
             case Operator.SUBTRACT:
@@ -1243,7 +1243,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     result = Boolean.valueOf(expr1.getTrackedValue()) == Boolean.valueOf(expr2.getTrackedValue());
                     expression.setTrackedValue(result.toString());
                     expression.setType("boolean");
-                } else if (expr1.getType().equals("String") && expr2.getType().equals("String")) {
+                } else if (expr1.getType().equals("string") && expr2.getType().equals("string")) {
                     result = expr1.getTrackedValue().equals(expr2.getTrackedValue());
                     expression.setTrackedValue(result.toString());
                     expression.setType("boolean");
@@ -1258,7 +1258,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
                     result = Boolean.valueOf(expr1.getTrackedValue()) != Boolean.valueOf(expr2.getTrackedValue());
                     expression.setTrackedValue(result.toString());
                     expression.setType("boolean");
-                } else if (expr1.getType().equals("String") && expr2.getType().equals("String")) {
+                } else if (expr1.getType().equals("string") && expr2.getType().equals("string")) {
                     result = !expr1.getTrackedValue().equals(expr2.getTrackedValue());
                     expression.setTrackedValue(result.toString());
                     expression.setType("boolean");

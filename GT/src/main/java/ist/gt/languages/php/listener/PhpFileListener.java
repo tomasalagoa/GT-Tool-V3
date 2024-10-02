@@ -23,7 +23,7 @@ public class PhpFileListener extends PhpParserBaseListener {
 
     @Override
     public void enterConstant(PhpParser.ConstantContext ctx) {
-        gastBuilder.addConstant(ctx, ctx.getText(), "String");
+        gastBuilder.addConstant(ctx, ctx.getText(), "string");
     }
 
     @Override
@@ -38,12 +38,12 @@ public class PhpFileListener extends PhpParserBaseListener {
 
     @Override
     public void enterStringConstant(PhpParser.StringConstantContext ctx) {
-        gastBuilder.addConstant(ctx, ctx.getText(), "String");
+        gastBuilder.addConstant(ctx, ctx.getText(), "string");
     }
 
     @Override
     public void enterString(PhpParser.StringContext ctx) {
-        gastBuilder.addConstant(ctx, ctx.getText(), "String");
+        gastBuilder.addConstant(ctx, ctx.getText(), "string");
     }
 
     @Override
@@ -91,12 +91,12 @@ public class PhpFileListener extends PhpParserBaseListener {
 
     @Override
     public void enterInterpolatedStringPart(PhpParser.InterpolatedStringPartContext ctx) {
-        gastBuilder.addConstant(ctx, ctx.getText(), "String");
+        gastBuilder.addConstant(ctx, ctx.getText(), "string");
     }
 
     @Override
     public void enterLiteralConstant(PhpParser.LiteralConstantContext ctx) {
-        gastBuilder.addConstant(ctx, ctx.getText(), "String");
+        gastBuilder.addConstant(ctx, ctx.getText(), "string");
     }
 
     @Override

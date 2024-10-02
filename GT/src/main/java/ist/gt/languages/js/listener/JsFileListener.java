@@ -42,7 +42,7 @@ public class JsFileListener extends JavaScriptParserBaseListener {
         } else if (ctx.StringLiteral() != null) {
             //Remove quotes from ctx text due to the appearance of double quotes later on
             String rmvQuotes = ctx.getText().substring(1, ctx.getText().length() - 1).replace("\"\"", "\"");
-            gastBuilder.addConstant(ctx, rmvQuotes, "String");
+            gastBuilder.addConstant(ctx, rmvQuotes, "string");
         } else if (ctx.NullLiteral() != null) {
             gastBuilder.addConstant(ctx, ctx.getText(), "null");
         } else if (ctx.numericLiteral() != null) {
@@ -54,7 +54,7 @@ public class JsFileListener extends JavaScriptParserBaseListener {
             }
         } else if (ctx.TemplateStringLiteral() != null || ctx.RegularExpressionLiteral() != null) {
             String rmvQuotes = ctx.getText().substring(1, ctx.getText().length() - 1).replace("\"\"", "\"");
-            gastBuilder.addConstant(ctx, rmvQuotes, "String");
+            gastBuilder.addConstant(ctx, rmvQuotes, "string");
         }
     }
 

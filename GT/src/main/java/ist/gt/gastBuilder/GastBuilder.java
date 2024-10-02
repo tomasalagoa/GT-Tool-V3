@@ -1323,7 +1323,7 @@ public class GastBuilder {
         switch (type) {
             case "int", "double", "float", "char", "boolean" ->
                     this.classes.peek().getAttributes().get(attributeName).setTrackedValue(value);
-            case "String" -> {
+            case "string" -> {
                 //Remove quotes from ctx text due to the appearance of double quotes later on
                 String rmvQuotes = value.substring(1, value.length() - 1).replace("\"\"", "\"");
                 this.classes.peek().getAttributes().get(attributeName).setTrackedValue(rmvQuotes);

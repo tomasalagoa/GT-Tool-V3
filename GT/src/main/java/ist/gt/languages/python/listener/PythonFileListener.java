@@ -226,7 +226,7 @@ public class PythonFileListener extends PythonParserBaseListener {
     @Override
     public void enterString_literal(PythonParser.String_literalContext ctx) {
         String rmvQuotes = ctx.getText().substring(1, ctx.getText().length() - 1).replace("\"\"", "\"");
-        gastBuilder.addConstant(ctx, rmvQuotes, "String");
+        gastBuilder.addConstant(ctx, rmvQuotes, "string");
     }
 
     @Override
