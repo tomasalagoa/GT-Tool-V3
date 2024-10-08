@@ -6,6 +6,7 @@ import ist.gt.util.Util;
 import lombok.Data;
 
 import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.tree.TerminalNode;
 
 import java.util.*;
 
@@ -232,7 +233,36 @@ public class GastBuilder {
         return parameter;
     }
 
-    public Constant addConstant(ParserRuleContext ctx, String value, String type) {
+    public Constant addConstant(ParserRuleContext ctx, LiteralOptions opts) {
+        String type = null;
+        String value = ctx.getText();
+        if ((TerminalNode)Util.callMethodIfExists(ctx, "BooleanLiteral") != null) {
+            type = "boolean";
+        }
+        if ((TerminalNode)Util.callMethodIfExists(ctx,"IntegerLiteral") != null) {
+            type = "int";
+            if (opts.isNegativeNumber()) {
+                value = "-" + value;
+            }
+        }
+        if ((TerminalNode)Util.callMethodIfExists(ctx,"FloatingPointLiteral") != null) {
+            type = "double";
+            if (opts.isNegativeNumber()) {
+                value = "-" + value;
+            }
+        }
+        if ((TerminalNode)Util.callMethodIfExists(ctx,"CharacterLiteral") != null) {
+            type = "char";
+        }
+        if ((TerminalNode)Util.callMethodIfExists(ctx,"StringLiteral") != null) {
+            type = "string";
+            if (opts.isRemoveQuotes())
+                value = ctx.getText().substring(1, ctx.getText().length() - 1).replace("\"\"", "\"");
+
+        }
+        if ((TerminalNode)Util.callMethodIfExists(ctx,"NullLiteral") != null) {
+            // Do nothing
+        }
         var constant = new Constant(ctx, value, type);
         processExpression(constant);
         return constant;

@@ -1,12 +1,14 @@
 package ist.gt.languages.java.listener;
 
 import ist.gt.gastBuilder.GastBuilder;
+import ist.gt.gastBuilder.LiteralOptions;
 import ist.gt.languages.java.parser.Java8Parser;
 import ist.gt.languages.java.parser.Java8ParserBaseListener;
 import lombok.Data;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 @Data
 public class JavaFileListener extends Java8ParserBaseListener {
@@ -60,31 +62,34 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterLiteral(Java8Parser.LiteralContext ctx) {
+        /*
         if (ctx.BooleanLiteral() != null) {
-            gastBuilder.addConstant(ctx, ctx.getText(), "boolean");
+            gastBuilder.addConstant(ctx, LiteralOptions.NULL);
         } else if (ctx.IntegerLiteral() != null) {
             if (this.negativeNumberFound) {
-                gastBuilder.addConstant(ctx, "-" + ctx.getText(), "int");
+                gastBuilder.addConstant(ctx, LiteralOptions.NEGATIVE_NUMBER);
                 this.negativeNumberFound = false;
             } else {
-                gastBuilder.addConstant(ctx, ctx.getText(), "int");
+                gastBuilder.addConstant(ctx, LiteralOptions.NULL);
             }
         } else if (ctx.FloatingPointLiteral() != null) {
             if (this.negativeNumberFound) {
-                gastBuilder.addConstant(ctx, "-" + ctx.getText(), "double");
+                gastBuilder.addConstant(ctx, LiteralOptions.NEGATIVE_NUMBER);
                 this.negativeNumberFound = false;
             } else {
-                gastBuilder.addConstant(ctx, ctx.getText(), "double");
+                gastBuilder.addConstant(ctx, LiteralOptions.NULL);
             }
         } else if (ctx.CharacterLiteral() != null) {
-            gastBuilder.addConstant(ctx, ctx.getText(), "char");
+            gastBuilder.addConstant(ctx, LiteralOptions.NULL);
         } else if (ctx.StringLiteral() != null) {
             //Remove quotes from ctx text due to the appearance of double quotes later on
             String rmvQuotes = ctx.getText().substring(1, ctx.getText().length() - 1).replace("\"\"", "\"");
-            gastBuilder.addConstant(ctx, rmvQuotes, "string");
+            gastBuilder.addConstant(ctx, LiteralOptions.REMOVE_QUOTES);
         } else if (ctx.NullLiteral() != null) {
             gastBuilder.addConstant(ctx, ctx.getText(), null);
         }
+         */
+        gastBuilder.addConstant(ctx, new LiteralOptions(this.negativeNumberFound, true));
 
     }
 
