@@ -4,6 +4,7 @@ import ist.gt.model.Operator;
 import org.apache.commons.lang3.SerializationUtils;
 
 import java.io.Serializable;
+import java.lang.reflect.Method;
 
 public class Util {
 
@@ -48,6 +49,20 @@ public class Util {
             default -> null;
         };
     }
+
+    public static Object callMethodIfExists(Object obj, String methodName) {
+        try {
+            // Get the method by name and parameter types
+            Method method = obj.getClass().getDeclaredMethod(methodName);
+            // Invoke the method
+            return method.invoke(obj);
+        } catch (NoSuchMethodException e) {
+            System.out.println("Method '" + methodName + "' not found.");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
 }
 
 
