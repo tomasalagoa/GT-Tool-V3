@@ -14,7 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class VulnadoFrameworkTest {
     private TaintSpecification spec = new TaintSpecification();
     private final Settings settings = new Settings();
-    private final String DirectoryPath = "src/test/resources/javaLang/vulnado";
+    private final String DirectoryPath = "src/test/resources/javalang/vulnado";
 
     public VulnadoFrameworkTest(){
         settings.setFileExtension("java");
