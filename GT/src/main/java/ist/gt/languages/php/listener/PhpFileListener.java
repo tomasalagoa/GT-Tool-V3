@@ -1,6 +1,7 @@
 package ist.gt.languages.php.listener;
 
 import ist.gt.gastBuilder.GastBuilder;
+import ist.gt.gastBuilder.LiteralOptions;
 import ist.gt.languages.php.parser.PhpParser;
 import ist.gt.languages.php.parser.PhpParserBaseListener;
 import ist.gt.util.Util;
@@ -23,7 +24,7 @@ public class PhpFileListener extends PhpParserBaseListener {
 
     @Override
     public void enterConstant(PhpParser.ConstantContext ctx) {
-        gastBuilder.addConstant(ctx, ctx.getText(), "string");
+        gastBuilder.addConstant(ctx, new LiteralOptions(false, false));
     }
 
     @Override
@@ -38,12 +39,12 @@ public class PhpFileListener extends PhpParserBaseListener {
 
     @Override
     public void enterStringConstant(PhpParser.StringConstantContext ctx) {
-        gastBuilder.addConstant(ctx, ctx.getText(), "string");
+        gastBuilder.addConstant(ctx, new LiteralOptions(false, false));
     }
 
     @Override
     public void enterString(PhpParser.StringContext ctx) {
-        gastBuilder.addConstant(ctx, ctx.getText(), "string");
+        gastBuilder.addConstant(ctx, new LiteralOptions(false, false));
     }
 
     @Override
@@ -91,12 +92,12 @@ public class PhpFileListener extends PhpParserBaseListener {
 
     @Override
     public void enterInterpolatedStringPart(PhpParser.InterpolatedStringPartContext ctx) {
-        gastBuilder.addConstant(ctx, ctx.getText(), "string");
+        gastBuilder.addConstant(ctx, new LiteralOptions(false, false));
     }
 
     @Override
     public void enterLiteralConstant(PhpParser.LiteralConstantContext ctx) {
-        gastBuilder.addConstant(ctx, ctx.getText(), "string");
+        gastBuilder.addConstant(ctx, new LiteralOptions(false, false));
     }
 
     @Override

@@ -3,6 +3,7 @@ package ist.gt.languages.python.listener;
 import java.util.ArrayList;
 
 import ist.gt.gastBuilder.GastBuilder;
+import ist.gt.gastBuilder.LiteralOptions;
 import ist.gt.languages.python.parser.PythonParser;
 import ist.gt.languages.python.parser.PythonParserBaseListener;
 import ist.gt.model.Expression;
@@ -220,23 +221,25 @@ public class PythonFileListener extends PythonParserBaseListener {
 
     @Override
     public void enterTrue_false(PythonParser.True_falseContext ctx) {
-        gastBuilder.addConstant(ctx, ctx.getText(), "boolean");
+        gastBuilder.addConstant(ctx, new LiteralOptions(false, false));
     }
 
     @Override
     public void enterString_literal(PythonParser.String_literalContext ctx) {
-        String rmvQuotes = ctx.getText().substring(1, ctx.getText().length() - 1).replace("\"\"", "\"");
-        gastBuilder.addConstant(ctx, rmvQuotes, "string");
+        gastBuilder.addConstant(ctx, new LiteralOptions(false, true));
     }
 
     @Override
     public void enterNumber(PythonParser.NumberContext ctx) {
+        /*
         if (negativeNumberFound) {
             gastBuilder.addConstant(ctx, "-" + ctx.getText(), "double");
             negativeNumberFound = false;
         } else {
             gastBuilder.addConstant(ctx, ctx.getText(), "double");
         }
+         */
+        gastBuilder.addConstant(ctx, new LiteralOptions(this.negativeNumberFound, false));
     }
 
     @Override

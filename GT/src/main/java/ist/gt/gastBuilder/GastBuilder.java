@@ -1,5 +1,6 @@
 package ist.gt.gastBuilder;
 
+import ist.gt.languages.js.parser.JavaScriptParser;
 import ist.gt.model.Class;
 import ist.gt.model.*;
 import ist.gt.util.Util;
@@ -234,35 +235,55 @@ public class GastBuilder {
     }
 
     public Constant addConstant(ParserRuleContext ctx, LiteralOptions opts) {
-        String type = null;
+        String type = "null";
         String value = ctx.getText();
+
+        // Java / Generic Literals
+
         if ((TerminalNode)Util.callMethodIfExists(ctx, "BooleanLiteral") != null) {
             type = "boolean";
         }
-        if ((TerminalNode)Util.callMethodIfExists(ctx,"IntegerLiteral") != null) {
+        else if ((TerminalNode)Util.callMethodIfExists(ctx,"IntegerLiteral") != null) {
             type = "int";
             if (opts.isNegativeNumber()) {
                 value = "-" + value;
             }
         }
-        if ((TerminalNode)Util.callMethodIfExists(ctx,"FloatingPointLiteral") != null) {
+        else if ((TerminalNode)Util.callMethodIfExists(ctx,"FloatingPointLiteral") != null) {
             type = "double";
             if (opts.isNegativeNumber()) {
                 value = "-" + value;
             }
         }
-        if ((TerminalNode)Util.callMethodIfExists(ctx,"CharacterLiteral") != null) {
+        else if ((TerminalNode)Util.callMethodIfExists(ctx,"CharacterLiteral") != null) {
             type = "char";
         }
-        if ((TerminalNode)Util.callMethodIfExists(ctx,"StringLiteral") != null) {
+        else if ((TerminalNode)Util.callMethodIfExists(ctx,"StringLiteral") != null) {
             type = "string";
             if (opts.isRemoveQuotes())
                 value = ctx.getText().substring(1, ctx.getText().length() - 1).replace("\"\"", "\"");
 
         }
-        if ((TerminalNode)Util.callMethodIfExists(ctx,"NullLiteral") != null) {
+        else if ((TerminalNode)Util.callMethodIfExists(ctx,"NullLiteral") != null) {
             // Do nothing
         }
+
+        // JS Literals
+
+        else if ((JavaScriptParser.NumericLiteralContext)Util.callMethodIfExists(ctx, "numericLiteral") != null) {
+            // Repeat of FloatingPointLiteral, could be refactored to the same case but for clarity will be separated
+            type = "double";
+            if (opts.isNegativeNumber()) {
+                value = "-" + value;
+            }
+        }
+        else if ((TerminalNode)Util.callMethodIfExists(ctx, "TemplateStringLiteral") != null || (TerminalNode)Util.callMethodIfExists(ctx, "RegularExpressionLiteral") != null) {
+            type = "string";
+            if (opts.isRemoveQuotes()) {
+                value = ctx.getText().substring(1, ctx.getText().length() - 1).replace("\"\"", "\"");
+            }
+        }
+
         var constant = new Constant(ctx, value, type);
         processExpression(constant);
         return constant;

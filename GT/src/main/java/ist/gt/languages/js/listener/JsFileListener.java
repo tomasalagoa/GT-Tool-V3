@@ -1,6 +1,7 @@
 package ist.gt.languages.js.listener;
 
 import ist.gt.gastBuilder.GastBuilder;
+import ist.gt.gastBuilder.LiteralOptions;
 import ist.gt.languages.js.parser.JavaScriptParser;
 import ist.gt.languages.js.parser.JavaScriptParserBaseListener;
 import ist.gt.model.Assignment;
@@ -37,6 +38,7 @@ public class JsFileListener extends JavaScriptParserBaseListener {
 
     @Override
     public void enterLiteral(JavaScriptParser.LiteralContext ctx) {
+        /*
         if (ctx.BooleanLiteral() != null) {
             gastBuilder.addConstant(ctx, ctx.getText(), "boolean");
         } else if (ctx.StringLiteral() != null) {
@@ -56,6 +58,8 @@ public class JsFileListener extends JavaScriptParserBaseListener {
             String rmvQuotes = ctx.getText().substring(1, ctx.getText().length() - 1).replace("\"\"", "\"");
             gastBuilder.addConstant(ctx, rmvQuotes, "string");
         }
+         */
+        gastBuilder.addConstant(ctx, new LiteralOptions(this.negativeNumberFound, true));
     }
 
     @Override
