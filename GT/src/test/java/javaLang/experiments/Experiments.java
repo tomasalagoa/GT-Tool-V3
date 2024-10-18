@@ -33,15 +33,17 @@ public class Experiments {
         numb = ++exp.num;
         numb = --exp.num;
 
+        // exp.num == numb == 10
+
         if(numb < 1){
             numb = 0;
         } else{
-            x.run(exp.str + id, exp.str);
-            conn1.createStatement().executeQuery(id);
+            x.run(exp.str + id, exp.str); // vuln
+            conn1.createStatement().executeQuery(id); // vuln
         }
 
         if(exp.num >= 10){
-            sensitiveSink(exp); 
+            sensitiveSink(exp); // vuln
         }
 
         if(exp.num != 10){
@@ -55,14 +57,14 @@ public class Experiments {
         }
 
         if(exp.num < 100){
-            sensitiveSink(exp);
+            sensitiveSink(exp); // vuln
             id = sanitize(id);
             x.run(id, "Hello");
         }
 
-        x.run(exp.str, "World");
+        x.run(exp.str, "World"); // vuln
 
-        methodV2(exp.str, exp.num);
+        methodV2(exp.str, exp.num); // vuln
     }
 
     public void methodV2(String str, double num){
