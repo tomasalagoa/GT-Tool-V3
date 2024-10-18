@@ -62,35 +62,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterLiteral(Java8Parser.LiteralContext ctx) {
-        /*
-        if (ctx.BooleanLiteral() != null) {
-            gastBuilder.addConstant(ctx, LiteralOptions.NULL);
-        } else if (ctx.IntegerLiteral() != null) {
-            if (this.negativeNumberFound) {
-                gastBuilder.addConstant(ctx, LiteralOptions.NEGATIVE_NUMBER);
-                this.negativeNumberFound = false;
-            } else {
-                gastBuilder.addConstant(ctx, LiteralOptions.NULL);
-            }
-        } else if (ctx.FloatingPointLiteral() != null) {
-            if (this.negativeNumberFound) {
-                gastBuilder.addConstant(ctx, LiteralOptions.NEGATIVE_NUMBER);
-                this.negativeNumberFound = false;
-            } else {
-                gastBuilder.addConstant(ctx, LiteralOptions.NULL);
-            }
-        } else if (ctx.CharacterLiteral() != null) {
-            gastBuilder.addConstant(ctx, LiteralOptions.NULL);
-        } else if (ctx.StringLiteral() != null) {
-            //Remove quotes from ctx text due to the appearance of double quotes later on
-            String rmvQuotes = ctx.getText().substring(1, ctx.getText().length() - 1).replace("\"\"", "\"");
-            gastBuilder.addConstant(ctx, LiteralOptions.REMOVE_QUOTES);
-        } else if (ctx.NullLiteral() != null) {
-            gastBuilder.addConstant(ctx, ctx.getText(), null);
-        }
-         */
         gastBuilder.addConstant(ctx, new LiteralOptions(this.negativeNumberFound, true));
-
     }
 
     /**
@@ -242,7 +214,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
         }
         if (ctx.typeName() != null) {
             gastBuilder.addMethodCall(ctx);
-            if (ctx.typeName() != null)
+            if (ctx.typeName() != null) // FIXME ????
                 gastBuilder.addVariable(ctx, ctx.typeName().getText());
             gastBuilder.addFunctionCall(ctx, ctx.Identifier().getText());
         } else {

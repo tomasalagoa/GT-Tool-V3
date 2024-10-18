@@ -414,7 +414,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             saveFirstTaintedReturnValueFound(stmt.getExpression().getTrackedValue(),
                     stmt.getExpression().getClassReference(), stmt.getExpression().getType(), stmt.getExpression().getText());
         }
-        Util.throwAny(new ReturnFoundException("Found return statement at line " + stmt.getLine()));
+        // Util.throwAny(new ReturnFoundException("Found return statement at line " + stmt.getLine()));
     }
 
 
