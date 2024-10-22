@@ -265,75 +265,32 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterClassInstanceCreationExpression(Java8Parser.ClassInstanceCreationExpressionContext ctx) {
-        if (ctx.Identifier(0).getText().equals("ArrayList") ||
-                ctx.Identifier(0).getText().equals("LinkedList") ||
-                ctx.Identifier(0).getText().equals("HashMap") ||
-                ctx.Identifier(0).getText().equals("Stack") ||
-                ctx.Identifier(0).getText().equals("HashSet")) {
-            collectionFound = true;
-        } else {
-            gastBuilder.addFunctionCall(ctx, ctx.Identifier(0).getText());
-            gastBuilder.trackClassReference(ctx.Identifier(0).getText());
-        }
+       gastBuilder.addClassCreation(ctx, ctx.Identifier(0).getText());
     }
 
     @Override
     public void exitClassInstanceCreationExpression(Java8Parser.ClassInstanceCreationExpressionContext ctx) {
-        if (collectionFound) {
-            gastBuilder.collectionInitFound();
-            collectionFound = false;
-        } else {
-            gastBuilder.exitStatementOrExpression();
-        }
+        gastBuilder.finishClassCreation();
     }
 
     @Override
     public void enterClassInstanceCreationExpression_lf_primary(Java8Parser.ClassInstanceCreationExpression_lf_primaryContext ctx) {
-        if (ctx.Identifier().getText().equals("ArrayList") ||
-                ctx.Identifier().getText().equals("LinkedList") ||
-                ctx.Identifier().getText().equals("HashMap") ||
-                ctx.Identifier().getText().equals("Stack") ||
-                ctx.Identifier().getText().equals("HashSet")) {
-            collectionFound = true;
-        } else {
-            gastBuilder.addFunctionCall(ctx, ctx.Identifier().getText());
-            gastBuilder.trackClassReference(ctx.Identifier().getText());
-        }
+       gastBuilder.addClassCreation(ctx, ctx.Identifier().getText());
     }
 
     @Override
     public void exitClassInstanceCreationExpression_lf_primary(Java8Parser.ClassInstanceCreationExpression_lf_primaryContext ctx) {
-        if (collectionFound) {
-            gastBuilder.collectionInitFound();
-            collectionFound = false;
-        } else {
-            gastBuilder.exitStatementOrExpression();
-        }
-
+        gastBuilder.finishClassCreation();
     }
 
     @Override
     public void enterClassInstanceCreationExpression_lfno_primary(Java8Parser.ClassInstanceCreationExpression_lfno_primaryContext ctx) {
-        if (ctx.Identifier(0).getText().equals("ArrayList") ||
-                ctx.Identifier(0).getText().equals("LinkedList") ||
-                ctx.Identifier(0).getText().equals("HashMap") ||
-                ctx.Identifier(0).getText().equals("Stack") ||
-                ctx.Identifier(0).getText().equals("HashSet")) {
-            collectionFound = true;
-        } else {
-            gastBuilder.addFunctionCall(ctx, ctx.Identifier(0).getText());
-            gastBuilder.trackClassReference(ctx.Identifier(0).getText());
-        }
+        gastBuilder.addClassCreation(ctx, ctx.Identifier(0).getText());
     }
 
     @Override
     public void exitClassInstanceCreationExpression_lfno_primary(Java8Parser.ClassInstanceCreationExpression_lfno_primaryContext ctx) {
-        if (collectionFound) {
-            gastBuilder.collectionInitFound();
-            collectionFound = false;
-        } else {
-            gastBuilder.exitStatementOrExpression();
-        }
+        gastBuilder.finishClassCreation();
     }
 
     @Override

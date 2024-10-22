@@ -50,6 +50,14 @@ public class Util {
         };
     }
 
+    /**
+     *
+     * @param obj the object from which we want to call the method from
+     * @param methodName the name of the method to be called
+     * @return the result of the call, if successfull
+     * This function checks whether an object implements a specific method which accepts no arguments, and if so, it
+     * calls the method and returns the result
+     */
     public static Object callMethodIfExists(Object obj, String methodName) {
         try {
             // Get the method by name and parameter types
@@ -57,12 +65,69 @@ public class Util {
             // Invoke the method
             return method.invoke(obj);
         } catch (NoSuchMethodException e) {
-            System.out.println("Method '" + methodName + "' not found.");
+            //System.out.println("Method '" + methodName + "' not found.");
+            return null;
         } catch (Exception e) {
             e.printStackTrace();
         }
         return null;
     }
+
+
+    /**
+     *
+     * @param obj the object from which we want to call the method from
+     * @param methodName the name of the method to be called
+     * @param parameterTypes the types of each argument
+     * @param args the arguments to be passed on to the method
+     * @return the result of the call, if successfull
+     * This function checks whether an object implements a specific method which accepts a number of arguments, and if
+     * so, it calls the method and returns the result
+     */
+    public static Object callMethodIfExists(Object obj, String methodName, Class<?>[] parameterTypes,
+                                            Object... args) {
+        try {
+            // Get the method by name and parameter types
+            Method method = obj.getClass().getDeclaredMethod(methodName, parameterTypes);
+            // Invoke the method
+            return method.invoke(obj, args);
+        } catch (NoSuchMethodException e) {
+            // System.out.println("Method '" + methodName + "' not found.");
+            return null;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     *
+     * @param obj the object from which we want to call the method from
+     * @param methodNames the names of the methods to be called
+     * @param parameterTypes the types of each argument
+     * @param args the arguments to be passed on to the method
+     * @return the result of the chained calls, or null if one of the methods does not exist
+     * This function calls a chain of methods, which may or may not receive any arguments
+     */
+    public static Object callMethodChain(Object obj, String[] methodNames, Class<?>[][] parameterTypes,
+                                        Object[][] args) {
+        Object currentObj = obj; // Start with the initial object
+        try {
+            for (int i = 0; i < methodNames.length; i++) {
+                // Get the method
+                Method method = currentObj.getClass().getMethod(methodNames[i], parameterTypes[i]);
+                // Invoke the method and update the current object if the method returns something
+                currentObj = method.invoke(currentObj, args[i]);
+                if (currentObj == null) {
+                    return null;
+                }
+            }
+        } catch (NoSuchMethodException e) {
+            System.out.println("Method not found.");
+            return null;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return currentObj;
+    }
 }
-
-
