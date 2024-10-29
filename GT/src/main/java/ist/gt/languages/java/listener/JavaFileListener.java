@@ -2,9 +2,12 @@ package ist.gt.languages.java.listener;
 
 import ist.gt.gastBuilder.GastBuilder;
 import ist.gt.gastBuilder.LiteralOptions;
+import ist.gt.gastBuilder.MethodOptions;
 import ist.gt.languages.java.parser.Java8Parser;
 import ist.gt.languages.java.parser.Java8ParserBaseListener;
 import lombok.Data;
+import org.antlr.v4.runtime.RuleContext;
+import org.antlr.v4.runtime.tree.ParseTree;
 
 import java.util.Arrays;
 import java.util.List;
@@ -203,54 +206,18 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterMethodInvocation(Java8Parser.MethodInvocationContext ctx) {
-        if (ctx.SUPER() != null) {
-            gastBuilder.addSuperMethodCall(ctx, ctx.Identifier().getText(), false);
-            return;
-        }
-
-        if (ctx.methodName() != null) {
-            gastBuilder.addFunctionCall(ctx, ctx.methodName().getText());
-            return;
-        }
-        if (ctx.typeName() != null) {
-            gastBuilder.addMethodCall(ctx);
-            if (ctx.typeName() != null) // FIXME ????
-                gastBuilder.addVariable(ctx, ctx.typeName().getText());
-            gastBuilder.addFunctionCall(ctx, ctx.Identifier().getText());
-        } else {
-            gastBuilder.addMethodCall(ctx);
-            // "this" is stored in primary
-            if (ctx.primary() != null) {
-                if (ctx.primary().getText().equals("this")) {
-                    gastBuilder.addVariable(ctx, ctx.primary().getText());
-                } else {
-                    // This most certaintly could be a case of (new SomeClass()).someMethod()
-                    this.classInMethodCallSource = true;
-                }
-            }
-            gastBuilder.addFunctionCall(ctx, ctx.Identifier().getText());
-        }
+        gastBuilder.addMethodInvocation(ctx, new MethodOptions(
+                Optional.ofNullable(ctx.methodName()).map(RuleContext::getText).orElse(""),
+                Optional.ofNullable(ctx.Identifier()).map(ParseTree::getText).orElse(""),
+                Optional.ofNullable(ctx.typeName()).map(RuleContext::getText).orElse(""),
+                Optional.ofNullable(ctx.primary()).map(RuleContext::getText).orElse("")
+                )
+        );
     }
 
     @Override
     public void exitMethodInvocation(Java8Parser.MethodInvocationContext ctx) {
-        if (ctx.SUPER() != null) {
-            gastBuilder.exitStatementOrExpression();
-        }
-
-        if (ctx.methodName() != null) {
-            gastBuilder.exitStatementOrExpression();
-        } else if (ctx.typeName() != null) {
-            gastBuilder.exitStatementOrExpression();
-            gastBuilder.exitStatementOrExpression();
-        } else {
-            if (this.classInMethodCallSource) {
-                gastBuilder.rearrangeMethodClassWithClassSource();
-                this.classInMethodCallSource = false;
-            }
-            gastBuilder.exitStatementOrExpression();
-            gastBuilder.exitStatementOrExpression();
-        }
+        gastBuilder.exitMethodInvocation(ctx);
     }
 
     @Override

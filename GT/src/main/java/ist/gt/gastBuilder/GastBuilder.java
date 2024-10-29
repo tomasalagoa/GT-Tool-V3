@@ -1,13 +1,11 @@
 package ist.gt.gastBuilder;
 
-import ist.gt.languages.js.parser.JavaScriptParser;
 import ist.gt.model.Class;
 import ist.gt.model.*;
 import ist.gt.util.Util;
 import lombok.Data;
 
 import org.antlr.v4.runtime.ParserRuleContext;
-import org.antlr.v4.runtime.tree.TerminalNode;
 import org.apache.commons.lang3.NotImplementedException;
 
 import java.util.*;
@@ -28,6 +26,7 @@ public class GastBuilder {
     private List<String> taintedAttributes = null;
     private boolean isParameter = false;
     private boolean inCollection = false;
+    private boolean classInMethodCallSource = false;
 
     private <E> void popIfNotEmpty(Stack<E> stack) {
         if (!stack.empty())
@@ -325,7 +324,7 @@ public class GastBuilder {
         switch (ruleType) {
             case "string" -> {
                 type = "string";
-                if (opts.isRemoveQuotes()) {
+                if (opts.removeQuotes()) {
                     value = ctx.getText().substring(1, ctx.getText().length() - 1).replace("\"\"", "\"");
                 }
             }
@@ -465,6 +464,52 @@ public class GastBuilder {
         return attributeAccess;
     }
 
+
+    public void addMethodInvocation(ParserRuleContext ctx, MethodOptions opts) {
+        if (Util.callMethodIfExists(ctx, "SUPER") != null) {
+            addSuperMethodCall(ctx, opts.identName(), false);
+        }
+
+        if (Util.callMethodIfExists(ctx, "methodName") != null) {
+            addFunctionCall(ctx, opts.methodName());
+        }
+
+        if (Util.callMethodIfExists(ctx, "typeName") != null) {
+            addMethodCall(ctx);
+            addVariable(ctx, opts.typeName());
+            addFunctionCall(ctx, opts.identName());
+        } else {
+            addMethodCall(ctx);
+            if (Util.callMethodIfExists(ctx, "primary") != null) {
+                if (opts.primaryName().equals("this")) {
+                    addVariable(ctx, opts.primaryName());
+                } else {
+                    classInMethodCallSource = true;
+                }
+            }
+            addFunctionCall(ctx, opts.identName());
+        }
+    }
+
+    public void exitMethodInvocation(ParserRuleContext ctx) {
+        if (Util.callMethodIfExists(ctx, "SUPER") != null) {
+            exitStatementOrExpression();
+        }
+
+        if (Util.callMethodIfExists(ctx, "methodName") != null) {
+            exitStatementOrExpression();
+        } else if (Util.callMethodIfExists(ctx, "typeName") != null) {
+            exitStatementOrExpression();
+            exitStatementOrExpression();
+        } else {
+            if (classInMethodCallSource) {
+                rearrangeMethodClassWithClassSource();
+                classInMethodCallSource = false;
+            }
+            exitStatementOrExpression();
+            exitStatementOrExpression();
+        }
+    }
 
     public MethodCallExpression addMethodCall(ParserRuleContext ctx) {
         var methodCall = new MethodCallExpression(ctx);
