@@ -1,13 +1,11 @@
 package ist.gt.gastBuilder;
 
-import ist.gt.languages.js.parser.JavaScriptParser;
 import ist.gt.model.Class;
 import ist.gt.model.*;
 import ist.gt.util.Util;
 import lombok.Data;
 
 import org.antlr.v4.runtime.ParserRuleContext;
-import org.antlr.v4.runtime.tree.TerminalNode;
 import org.apache.commons.lang3.NotImplementedException;
 
 import java.util.*;

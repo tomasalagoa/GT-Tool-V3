@@ -1,5 +1,6 @@
 package ist.gt;
 
+import java.nio.file.Path;
 import java.util.List;
 
 import ist.gt.settings.FuncDefinition;
@@ -12,14 +13,14 @@ public class ParserRun {
             new FuncDefinition("executeQuery")), List.of(
             new FuncDefinition("sanitize")));
     private final static Settings settings = new Settings();
-    private final static String DirectoryPath = "src/test/java/javaLang";
+    private final static Path DirectoryPath = Path.of("src", "test", "java", "javaLang");
 
     public static void main(String[] args) throws Exception {
         settings.setFileExtension("java");
         spec.setFileName("Experiments.java");
         spec.getFunction().setType(spec.getFileName().replace(".java", ""));
         settings.setSpecification(spec);
-        AstConverter.analyse(DirectoryPath + "/experiments", settings);
+        AstConverter.analyse(DirectoryPath.resolve("experiments"), settings);
         System.out.println("Success");
     }
 }

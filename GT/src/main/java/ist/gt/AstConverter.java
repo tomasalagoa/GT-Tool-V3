@@ -146,9 +146,9 @@ public class AstConverter {
      * Based on the path to the directory, as well as the extension of the files to analyse,
      * GT will pass each file to the converter so their code can be analysed.
      **/
-    public static List<File> getFilesFromDirectory(String directoryPath, String extension) throws IOException {
+    public static List<File> getFilesFromDirectory(Path directoryPath, String extension) throws IOException {
         var files = new ArrayList<File>();
-        try (Stream<Path> paths = Files.walk(Paths.get(directoryPath))) {
+        try (Stream<Path> paths = Files.walk(directoryPath)) {
             paths.filter(path -> Files.isRegularFile(path) && FilenameUtils.getExtension(path.toString()).equals(extension))
                     .forEach(path -> {
                         try {
@@ -180,7 +180,7 @@ public class AstConverter {
      * ASTConverter's main function. Connects a given language parser (and GastBuilder)
      * with the TaintVisitor.
      **/
-    public static void analyse(String directoryPath, Settings settings) throws IOException {
+    public static void analyse(Path directoryPath, Settings settings) throws IOException {
         report = new Report();
         StopWatch sw = new StopWatch();
         setUpAstConverter();
