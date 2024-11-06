@@ -1,7 +1,6 @@
 package ist.gt.gastBuilder;
 
 import ist.gt.AstConverter;
-import ist.gt.exceptions.ReturnFoundException;
 import ist.gt.model.Class;
 import ist.gt.model.*;
 import ist.gt.settings.Settings;

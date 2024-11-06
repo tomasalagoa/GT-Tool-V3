@@ -112,4 +112,14 @@ public class ExpressionVisitor implements AstBuilderVisitorInterface {
 
     }
 
+    @Override
+    public void visit(Switch switch_stmt) {
+
+    }
+
+    @Override
+    public void visit(ForLoop forLoop) {
+
+    }
+
 }
