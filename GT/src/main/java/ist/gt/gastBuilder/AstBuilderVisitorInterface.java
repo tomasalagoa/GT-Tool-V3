@@ -44,4 +44,8 @@ public interface AstBuilderVisitorInterface {
     void visit(ThrowException throwException);
 
     void visit(TryCatch tryCatch);
+
+    void visit(Switch switch_stmt);
+
+    void visit(ForLoop forLoop);
 }

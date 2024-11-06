@@ -1628,4 +1628,21 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
         }
     }
+
+    public void visit(Switch switch_stmt) {
+        // TODO
+        // 1. Check which case we're getting into
+        // 2. Get the relevant code block
+        // 3. Analyse the code block
+    }
+
+    public void visit(ForLoop forLoop) {
+        // TODO
+        // 1. Check if the initialization affects any variables that already exist
+        // 1.1 Update value accordingly
+        // 1.2 Create local variable and update value
+        // 2. Check if we should enter the loop
+        // 3. Evaluate the codeblock
+        // 4. Evaluate advancement - repeat 2.
+    }
 }

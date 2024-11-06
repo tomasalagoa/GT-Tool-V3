@@ -23,7 +23,6 @@ public class JavaFileListener extends Java8ParserBaseListener {
     private boolean wasVarDecl = false;
     private boolean genStmtInserted = false;
     private boolean collectionFound = false;
-    private boolean classInMethodCallSource = false;
     private String switchExpression = "";
     private int totalSwitchCases;
     private int casesBuilt = 0;
