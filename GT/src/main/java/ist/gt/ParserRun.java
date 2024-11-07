@@ -9,15 +9,16 @@ import ist.gt.settings.TaintSpecification;
 
 public class ParserRun {
     private static final TaintSpecification spec = new TaintSpecification(
-            new FuncDefinition("method"), List.of("id"), List.of(
-            new FuncDefinition("executeQuery")), List.of(
-            new FuncDefinition("sanitize")));
+            new FuncDefinition("method"),
+            List.of("id"),
+            List.of(new FuncDefinition("executeQuery")),
+            List.of(new FuncDefinition("sanitize")));
     private final static Settings settings = new Settings();
     private final static Path DirectoryPath = Path.of("src", "test", "java", "javaLang");
 
     public static void main(String[] args) throws Exception {
         settings.setFileExtension("java");
-        spec.setFileName("Experiments.java");
+        spec.setFileName("Experiment2.java");
         spec.getFunction().setType(spec.getFileName().replace(".java", ""));
         settings.setSpecification(spec);
         AstConverter.analyse(DirectoryPath.resolve("experiments"), settings);

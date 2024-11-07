@@ -23,6 +23,7 @@ import ist.gt.model.Class;
 import ist.gt.settings.FuncDefinition;
 import ist.gt.settings.Settings;
 import ist.gt.util.Report;
+import ist.gt.util.Util;
 import ist.gt.util.Vulnerability;
 
 import lombok.Data;
@@ -235,6 +236,9 @@ public class AstConverter {
     }
 
     public static void addVulnerability(Vulnerability vulnerability) {
+        // FIXME
+        System.err.println(report.getVulnerabilities());
+        System.err.println(vulnerability);
         report.getVulnerabilities().add(vulnerability);
     }
 
@@ -429,6 +433,7 @@ public class AstConverter {
                     ).get(REPORT_FIELD_NAME);
             if (reportFilePathNode != null) {
                 reportFilePath = Paths.get(reportFilePathNode.asText());
+                Util.clearFile(reportFilePath);
             } else { // User provided a valid JSON with no reportFilePath field
                 try {
                     reportFilePath = Paths.get(Files.createTempDirectory("reports").toString(), "report.json");

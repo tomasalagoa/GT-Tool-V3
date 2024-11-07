@@ -3,8 +3,12 @@ package ist.gt.util;
 import ist.gt.model.Operator;
 import org.apache.commons.lang3.SerializationUtils;
 
+import java.io.BufferedWriter;
+import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Method;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 public class Util {
 
@@ -129,5 +133,14 @@ public class Util {
             e.printStackTrace();
         }
         return currentObj;
+    }
+
+    public static void clearFile(Path filepath) {
+        try (BufferedWriter writer = Files.newBufferedWriter(filepath)) {
+            writer.write("");
+            writer.flush();
+        } catch (IOException e) {
+            System.err.println("Could not write to file " + filepath);
+        }
     }
 }

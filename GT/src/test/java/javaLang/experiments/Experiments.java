@@ -1,7 +1,6 @@
 package javaLang.experiments;
 
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
 
 interface StringFunction{
