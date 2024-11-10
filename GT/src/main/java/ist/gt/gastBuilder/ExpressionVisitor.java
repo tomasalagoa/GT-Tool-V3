@@ -112,4 +112,8 @@ public class ExpressionVisitor implements AstBuilderVisitorInterface {
 
     }
 
+    public void visit(ForLoop forLoop) {}
+
+    public void visit(Switch stmt) {}
+
 }

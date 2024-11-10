@@ -1606,6 +1606,14 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
     }
 
+    public void visit(ForLoop forLoop) {
+
+    }
+
+    public void visit(Switch stmt) {
+
+    }
+
     // Not used currently. Could be handy in the future
     public boolean getSuperclassTypeHierarchy(String classType, String matchingType) {
         if (classType.matches(matchingType)) {

@@ -4,6 +4,7 @@ import ist.gt.gastBuilder.GastBuilder;
 import ist.gt.gastBuilder.LiteralOptions;
 import ist.gt.languages.java.parser.Java8Parser;
 import ist.gt.languages.java.parser.Java8ParserBaseListener;
+import ist.gt.model.ForLoop;
 import lombok.Data;
 
 import java.util.Arrays;
@@ -429,6 +430,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterBasicForStatement(Java8Parser.BasicForStatementContext ctx) {
+        ForLoop forLoop = new ForLoop(ctx);
         gastBuilder.addConditionalStatement(ctx);
     }
 
