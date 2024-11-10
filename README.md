@@ -12,7 +12,7 @@
 
 **Requires Java 21 or newer!**
 
-Tested and ran on Linux, probably does not work on Windows.
+Tested and ran on Linux and Windows.
 
 ## Install ANTLR4
 
