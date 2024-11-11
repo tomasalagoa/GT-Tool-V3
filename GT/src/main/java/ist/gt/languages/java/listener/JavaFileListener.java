@@ -430,13 +430,22 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterBasicForStatement(Java8Parser.BasicForStatementContext ctx) {
-        ForLoop forLoop = new ForLoop(ctx);
-        gastBuilder.addConditionalStatement(ctx);
+        gastBuilder.addForLoopStmt(ctx);
     }
 
     @Override
     public void exitBasicForStatement(Java8Parser.BasicForStatementContext ctx) {
-        gastBuilder.exitConditionalStatement();
+        gastBuilder.exitForLoop();
+    }
+
+    @Override
+    public void enterForUpdate(Java8Parser.ForUpdateContext ctx) {
+
+    }
+
+    @Override
+    public void exitForUpdate(Java8Parser.ForUpdateContext ctx) {
+
     }
 
     @Override

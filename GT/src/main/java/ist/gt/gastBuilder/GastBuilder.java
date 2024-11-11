@@ -17,6 +17,7 @@ public class GastBuilder {
     private Function currentFunction;
     private Stack<CodeBlock> codeBlocks = new Stack<>();
     private Stack<IfStatement> ifStatements = new Stack<>();
+    private Stack<ForLoop> forLoops = new Stack<>();
     private final File file;
     private final Stack<Class> classes = new Stack<>();
     private HashMap<String, Class> analyzedClasses = new HashMap<>();
@@ -339,18 +340,12 @@ public class GastBuilder {
                     value = "-" + value;
                 }
             }
-            case "boolean" -> {
-               type = "boolean";
-            }
+            case "boolean" -> type = "boolean";
             case "null" -> {
                 // Do nothing
             }
-            case "char" -> {
-                type = "char";
-            }
-            default -> {
-                throw new NotImplementedException("Unrecognized data type " + ctx.getText());
-            }
+            case "char" -> type = "char";
+            default -> throw new NotImplementedException("Unrecognized data type " + ctx.getText());
         }
 
         var constant = new Constant(ctx, value, type);
@@ -428,6 +423,14 @@ public class GastBuilder {
         setConditionalStmt(conditionalStatement);
     }
 
+    public void addForLoopStmt(ParserRuleContext ctx) {
+       // TODO
+        forLoops.add(new ForLoop(ctx));
+    }
+
+    public void exitForLoop() {
+        forLoops.pop();
+    }
 
     public GenericStatement addGenericStatement(ParserRuleContext ctx) {
         var statement = new GenericStatement(ctx);
@@ -641,7 +644,7 @@ public class GastBuilder {
     }
 
     /**
-     * @param superclassName
+     * @param superclassName name of superclass
      * @return HashMap<String, Attribute>
      * <p>
      * Receives the name of a given superclass and returns its attributes + the ones of its
@@ -682,7 +685,7 @@ public class GastBuilder {
     }
 
     /**
-     * @param attribute
+     * @param attribute attribute to be copied
      * @return Attribute
      * <p>
      * Represents the creation of a new reference for the @param attribute.
@@ -851,11 +854,12 @@ public class GastBuilder {
                     statements.push(assignment);
                 } else {
                     Variable variable = (Variable) assignment.getLeft();
-                    Expression expression;
-                    if (statements.peek() instanceof Expression) {
+                    Expression expression = new Expression();
+                    if (statements.empty()) {
+                      expression = assignment.getRight();
+                    } else if (statements.peek() instanceof Expression) {
                         expression = assignment.getRight();
                     } else {
-                        expression = new Expression();
                         expression.getMembers().add(assignment.getRight());
                     }
                     expression.getMembers().addFirst(variable);
@@ -1235,7 +1239,7 @@ public class GastBuilder {
     }
 
     /**
-     * @param ctx
+     * @param ctx rule context
      * @param attributeName In JavaScripParser's case, an Attribute is not immediately recognized as it is only analyzed when
      *                      in the constructor. So, for that, once we verify that we are indeed in the constructor we create
      *                      the attribute so that it can be added to its class.
@@ -1327,12 +1331,13 @@ public class GastBuilder {
     }
 
     /**
-     * @param ctx
-     * @param functionName
-     * @param isConstructorSuper Receives the context (so that, for example, line number is known), name of the funtion
-     *                           and if it is a super() or a "super.". The objective of this function is to transform super calls
-     *                           into their respective function calls for analysis, distinguishing from super() (used in constructors)
-     *                           and "super." (used to call super of a given method).
+     * @param ctx rule context
+     * @param functionName name of the function to add
+     * @param isConstructorSuper
+     * Receives the context (so that, for example, line number is known), name of the funtion
+     * and if it is a super() or a "super.". The objective of this function is to transform super calls
+     * into their respective function calls for analysis, distinguishing from super() (used in constructors)
+     * and "super." (used to call super of a given method).
      * @function addSuperMethodCall
      */
     public void addSuperMethodCall(ParserRuleContext ctx, String functionName, boolean isConstructorSuper) {
@@ -1359,7 +1364,7 @@ public class GastBuilder {
     }
 
     /**
-     * @param ctx
+     * @param ctx rule context
      * @param isSuperStatement Auxiliary function. Receives the context and a boolean to determine if it is analysing a
      *                         super() or this() (used in constructors), so that the appropriate name is provided to the
      *                         addSuperMethodCall function.
@@ -1422,11 +1427,12 @@ public class GastBuilder {
     }
 
     /**
-     * @param attributeName
-     * @param type
-     * @param value         Auxiliary function used in Java context (for now) to initialize a class's
-     *                      fields/attributes in case primitive data types (or Lists/Maps/Sets/Stacks) are
-     *                      used. Doesn't support other classes due to the complexity involved!
+     * @param attributeName name of the attribute to add the value to
+     * @param type type of the value to track
+     * @param value value to be tracked
+     * Auxiliary function used in Java context (for now) to initialize a class's
+     * fields/attributes in case primitive data types (or Lists/Maps/Sets/Stacks) are
+     * used. Doesn't support other classes due to the complexity involved!
      * @function addAttributeTrackedValue
      */
     public void addAttributeTrackedValue(String attributeName, String type, String value) {

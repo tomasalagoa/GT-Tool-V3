@@ -8,8 +8,11 @@ public class Experiment2 {
         // executeQuery(sanitize(id));
 
         int x = 2;
+        int i = 0;
+        int j = 0;
+        j += 3;
 
-        for (int i = 0, j = 0; i < 10; i++) {
+        for (j = 0, x += 3; i < 10; i++) {
             if (i == -1) {
                 executeQuery(id); // safe
             }
@@ -18,6 +21,7 @@ public class Experiment2 {
                 executeQuery(id); // vuln
             }
         }
+
         // Should report two vulns
     }
 

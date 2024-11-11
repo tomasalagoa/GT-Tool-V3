@@ -12,22 +12,12 @@ import java.util.ArrayList;
 public class ForLoop extends Element{
 
     private Expression condition;
-    private ArrayList<Assignment> initializations;
     private Expression update;
-    private ArrayList<Variable> localVariables;
+
     private CodeBlock block;
 
     public ForLoop(ParserRuleContext ctx) {
        super(ctx);
-       initializations = new ArrayList<>();
-       localVariables = new ArrayList<>();
-       // Java
-       if (Util.callMethodIfExists(ctx, "forInit") != null) {
-          for (var a :
-                  ((Java8Parser.BasicForStatementContext)ctx).forInit().localVariableDeclaration().variableDeclaratorList().variableDeclarator()) {
-              initializations.add(new Assignment(a));
-          }
-       }
     }
 
     public void accept(AstBuilderVisitorInterface visitor) {
