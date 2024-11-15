@@ -4,26 +4,22 @@ import ist.gt.gastBuilder.AstBuilderVisitorInterface;
 import ist.gt.gastBuilder.ValueTrackingInterface;
 import lombok.Data;
 
-import java.util.Stack;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
-public class Switch extends Statement{
+public class SwitchCase extends Statement{
 
-    private Expression condition;
-    private Stack<SwitchCase> cases = new Stack<>();
-    private int numCases = 0;
+    List<Expression> conditions = new ArrayList<>();
+    CodeBlock block;
 
-    public void addCase(SwitchCase c){
-        cases.push(c);
-        numCases++;
-    }
-
+    @Override
     public void accept(AstBuilderVisitorInterface visitor) {
         visitor.visit(this);
     }
 
     @Override
     public void addValue(ValueTrackingInterface tracker) {
-        // Nothing to track
+    // Nothing to track
     }
 }

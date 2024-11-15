@@ -18,10 +18,10 @@ public class ParserRun {
 
     public static void main(String[] args) throws Exception {
         settings.setFileExtension("java");
-        spec.setFileName("Experiment2.java");
+        spec.setFileName("Experiment.java");
         spec.getFunction().setType(spec.getFileName().replace(".java", ""));
         settings.setSpecification(spec);
-        AstConverter.analyse(DirectoryPath.resolve("experiments"), settings);
+        AstConverter.analyse(DirectoryPath.resolve("switchCase"), settings);
         System.out.println("Success");
     }
 }

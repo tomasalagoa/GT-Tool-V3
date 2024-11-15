@@ -17,7 +17,7 @@ public class GastBuilder {
     private Function currentFunction;
     private Stack<CodeBlock> codeBlocks = new Stack<>();
     private Stack<IfStatement> ifStatements = new Stack<>();
-    private Stack<ForLoop> forLoops = new Stack<>();
+    private Stack<Loop> forLoops = new Stack<>();
     private final File file;
     private final Stack<Class> classes = new Stack<>();
     private HashMap<String, Class> analyzedClasses = new HashMap<>();
@@ -27,6 +27,7 @@ public class GastBuilder {
     private List<String> taintedAttributes = null;
     private boolean isParameter = false;
     private boolean inCollection = false;
+    private Stack<Switch> switches = new Stack<>();
 
     private <E> void popIfNotEmpty(Stack<E> stack) {
         if (!stack.empty())
@@ -425,7 +426,7 @@ public class GastBuilder {
 
     public void addForLoopStmt(ParserRuleContext ctx) {
        // TODO
-        forLoops.add(new ForLoop(ctx));
+        forLoops.add(new Loop(ctx));
     }
 
     public void exitForLoop() {
@@ -506,6 +507,39 @@ public class GastBuilder {
         var attribute = addAttribute(ctx, name);
         attribute.setType(type);
         return attribute;
+    }
+
+    public Switch addSwitch(ParserRuleContext ctx) {
+        Switch newSwitch = new Switch();
+        statements.add(newSwitch);
+        switches.add(newSwitch);
+        codeBlocks.peek().getStatements().add(newSwitch);
+        return newSwitch;
+    }
+
+    public void addSwitchCase(ParserRuleContext ctx, String condition) {
+        if (switches.empty()) {
+            throw new RuntimeException("There shouldn't be a case with no switch declared");
+        }
+
+        Switch innerSwitch = switches.peek();
+
+        if (innerSwitch.getNumCases() == 0) {
+            SwitchCase switchCase = new SwitchCase();
+            innerSwitch.addCase(switchCase);
+            statements.push(switchCase);
+        }
+    }
+
+    public void addDefaultCase(ParserRuleContext ctx) {
+        if (switches.empty()) {
+            throw new RuntimeException("There shouldn't be a default case if no switch was declared");
+        }
+
+        Switch innerSwitch = switches.peek();
+
+        SwitchCase switchCase = new SwitchCase();
+        innerSwitch.addCase(switchCase);
     }
 
     /**
@@ -1450,21 +1484,29 @@ public class GastBuilder {
     }
 
     /**
-     * @param isElseIf Auxiliary function used in Java context (for now) to give a case
-     *                 (from a switch statement) the following expression: switchExpression == caseExpression.
+     * @param ctx the context created by the parser
+     * Auxiliary function used in Java context (for now) to give a case
+     * (from a switch statement) the following expression: switchExpression == caseExpression.
      * @function finishExpressionForCase
      */
-    public void finishExpressionForCase(boolean isElseIf) {
+    public void finishExpressionForCase(ParserRuleContext ctx) {
+        if (switches.empty()) {
+            throw new RuntimeException("Should not reach this without a switch statement previously declared");
+        }
+
+        Switch innerSwitch = switches.peek();
+        String condition =
+                innerSwitch.getCondition().getText()+"=="+innerSwitch.getCases().peek().getConditions().getLast().getText();
+
         IfStatement ifStatement = (IfStatement) statements.pop();
         Expression switchExpression = (Expression) statements.pop();
 
-        if (!isElseIf) {
+        if (!true) {
             ifStatement.getExpression().getMembers().add(switchExpression.getMembers().getFirst());
             ifStatement.getExpression().setOperator(Util.toOperator("=="));
         } else {
-            int lastElseIf = ifStatement.getElseIfs().size() - 1;
-            ifStatement.getElseIfs().get(lastElseIf).getExpression().getMembers().add(switchExpression.getMembers().getFirst());
-            ifStatement.getElseIfs().get(lastElseIf).getExpression().setOperator(Util.toOperator("=="));
+            ifStatement.getElseIfs().getLast().getExpression().getMembers().add(switchExpression.getMembers().getFirst());
+            ifStatement.getElseIfs().getLast().getExpression().setOperator(Util.toOperator("=="));
         }
 
         statements.push(switchExpression);

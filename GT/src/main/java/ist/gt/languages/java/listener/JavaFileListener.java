@@ -4,12 +4,10 @@ import ist.gt.gastBuilder.GastBuilder;
 import ist.gt.gastBuilder.LiteralOptions;
 import ist.gt.languages.java.parser.Java8Parser;
 import ist.gt.languages.java.parser.Java8ParserBaseListener;
-import ist.gt.model.ForLoop;
 import lombok.Data;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
 @Data
 public class JavaFileListener extends Java8ParserBaseListener {
@@ -22,7 +20,6 @@ public class JavaFileListener extends Java8ParserBaseListener {
     private boolean genStmtInserted = false;
     private boolean collectionFound = false;
     private boolean classInMethodCallSource = false;
-    private String switchExpression = "";
     private int totalSwitchCases;
     private int casesBuilt = 0;
     private final GastBuilder gastBuilder;
@@ -430,12 +427,12 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterBasicForStatement(Java8Parser.BasicForStatementContext ctx) {
-        gastBuilder.addForLoopStmt(ctx);
+        gastBuilder.addConditionalStatement(ctx);
     }
 
     @Override
     public void exitBasicForStatement(Java8Parser.BasicForStatementContext ctx) {
-        gastBuilder.exitForLoop();
+        gastBuilder.exitConditionalStatement();
     }
 
     @Override
@@ -565,8 +562,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
      */
     @Override
     public void enterSwitchStatement(Java8Parser.SwitchStatementContext ctx) {
-        this.switchExpression = ctx.expression().getText();
-        gastBuilder.addExpression(ctx);
+        gastBuilder.addSwitch(ctx);
     }
 
     @Override
@@ -585,22 +581,22 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void enterSwitchLabel(Java8Parser.SwitchLabelContext ctx) {
         if (ctx.CASE() != null) {
-            gastBuilder.addIfStatement(ctx, ctx.constantExpression().getText(), this.casesBuilt != 0);
-            this.casesBuilt++;
+            gastBuilder.addSwitchCase(ctx, ctx.constantExpression().getText());
         } else if (ctx.DEFAULT() != null) {
-            gastBuilder.enterElseStatement(ctx);
+            gastBuilder.addDefaultCase(ctx);
         }
     }
 
     @Override
     public void exitSwitchLabel(Java8Parser.SwitchLabelContext ctx) {
         if (ctx.CASE() != null) {
+
             if (this.casesBuilt == 1) {
                 //if statement for first case
-                gastBuilder.finishExpressionForCase(false);
+                gastBuilder.finishExpressionForCase(ctx);
             } else {
                 //else if statement for subsequent cases
-                gastBuilder.finishExpressionForCase(true);
+                gastBuilder.finishExpressionForCase(ctx);
             }
         }
     }
