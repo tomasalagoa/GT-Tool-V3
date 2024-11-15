@@ -8,3 +8,5 @@ gen/
 *.iml
 
 GT/src/test/resources/Experimental_Evaluation
+
+GT/src/main/resources/astconverter-settings.json
