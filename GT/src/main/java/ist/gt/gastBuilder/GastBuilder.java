@@ -17,7 +17,7 @@ public class GastBuilder {
     private Function currentFunction;
     private Stack<CodeBlock> codeBlocks = new Stack<>();
     private Stack<IfStatement> ifStatements = new Stack<>();
-    private Stack<Loop> forLoops = new Stack<>();
+    private Stack<Loop> loops = new Stack<>();
     private final File file;
     private final Stack<Class> classes = new Stack<>();
     private HashMap<String, Class> analyzedClasses = new HashMap<>();
@@ -28,6 +28,17 @@ public class GastBuilder {
     private boolean isParameter = false;
     private boolean inCollection = false;
     private Stack<Switch> switches = new Stack<>();
+    private boolean inSwitchCase = false;
+
+    public enum language {
+        JAVA,
+        PYTHON,
+        JS,
+        PHP
+    }
+
+    ;
+    private language currentLanguage = language.JAVA;
 
     private <E> void popIfNotEmpty(Stack<E> stack) {
         if (!stack.empty())
@@ -39,7 +50,9 @@ public class GastBuilder {
     }
 
     private void processExpression(Expression expression) {
-        if (!statements.empty())
+        if (inSwitchCase) {
+            switches.peek().accept(new ExpressionVisitor(expression));
+        } else if (!statements.empty())
             statements.peek().accept(new ExpressionVisitor(expression));
     }
 
@@ -75,10 +88,11 @@ public class GastBuilder {
         classes.pop();
     }
 
-    public GastBuilder(String filename) {
+    public GastBuilder(String filename, language lang) {
         file = new File(filename);
         currentFunction = file.getRootFunc();
         codeBlocks.push(file.getRootFunc().getCodeBlock());
+        this.currentLanguage = lang;
     }
 
     public void enterCatchBlock() {
@@ -250,73 +264,82 @@ public class GastBuilder {
     public Constant addConstant(ParserRuleContext ctx, LiteralOptions opts) {
         // Java / Generic Literals
 
-        if (Util.callMethodIfExists(ctx, "BooleanLiteral") != null) {
-            return addConstant(ctx, opts, "boolean");
-        } else if (Util.callMethodIfExists(ctx, "IntegerLiteral") != null) {
-            return addConstant(ctx, opts, "int");
-        } else if (Util.callMethodIfExists(ctx, "FloatingPointLiteral") != null) {
-            return addConstant(ctx, opts, "double");
-        } else if (Util.callMethodIfExists(ctx, "CharacterLiteral") != null) {
-            return addConstant(ctx, opts, "char");
-        } else if (Util.callMethodIfExists(ctx, "StringLiteral") != null) {
-            return addConstant(ctx, opts, "string");
-        } else if (Util.callMethodIfExists(ctx, "NullLiteral") != null) {
-            return addConstant(ctx, opts, "null");
+        switch (currentLanguage) {
+            case JAVA:
+                if (Util.callMethodIfExists(ctx, "BooleanLiteral") != null) {
+                    return addConstant(ctx, opts, "boolean");
+                }
+                if (Util.callMethodIfExists(ctx, "IntegerLiteral") != null) {
+                    return addConstant(ctx, opts, "int");
+                }
+                if (Util.callMethodIfExists(ctx, "FloatingPointLiteral") != null) {
+                    return addConstant(ctx, opts, "double");
+                }
+                if (Util.callMethodIfExists(ctx, "CharacterLiteral") != null) {
+                    return addConstant(ctx, opts, "char");
+                } else if (Util.callMethodIfExists(ctx, "StringLiteral") != null) {
+                    return addConstant(ctx, opts, "string");
+                }
+                if (Util.callMethodIfExists(ctx, "NullLiteral") != null) {
+                    return addConstant(ctx, opts, "null");
+                }
+            case JS:
+                if (Util.callMethodIfExists(ctx, "numericLiteral") != null) {
+                    // Repeat of FloatingPointLiteral, could be refactored to the same case but for clarity will be separated
+                    return addConstant(ctx, opts, "double");
+                }
+                if (Util.callMethodIfExists(ctx, "TemplateStringLiteral") != null || Util.callMethodIfExists(ctx, "RegularExpressionLiteral") != null) {
+                    return addConstant(ctx, opts, "string");
+                }
+            case PHP:
+                if (Util.callMethodIfExists(ctx, "literalConstant") != null) {
+                    if (Util.callMethodIfExists(ctx, "Real") != null) {
+                        return addConstant(ctx, opts, "double");
+                    }
+                    if (Util.callMethodIfExists(ctx, "BooleanConstant") != null) {
+                        return addConstant(ctx, opts, "boolean");
+                    }
+                    if (Util.callMethodIfExists(ctx, "numericConstant") != null) {
+                        return addConstant(ctx, opts, "double");
+                    } else if (Util.callMethodIfExists(ctx, "stringConstant") != null) {
+                        return addConstant(ctx, opts, "string");
+                    }
+                    // Should not happen
+                    return null;
+                }
+                if (Util.callMethodIfExists(ctx, "magicConstant") != null || Util.callMethodIfExists(ctx,
+                        "classConstant") != null || Util.callMethodIfExists(ctx, "qualifiedNamespaceName") != null) {
+                    // TODO not implemented yet
+                    return addConstant(ctx, opts, "string");
+                }
+                if (Util.callMethodIfExists(ctx, "Real") != null) {
+                    return addConstant(ctx, opts, "double");
+                }
+                if (Util.callMethodIfExists(ctx, "BooleanConstant") != null) {
+                    return addConstant(ctx, opts, "boolean");
+                }
+                if (Util.callMethodIfExists(ctx, "numericConstant") != null) {
+                    return addConstant(ctx, opts, "double");
+                }
+                if (Util.callMethodIfExists(ctx, "stringConstant") != null) {
+                    return addConstant(ctx, opts, "string");
+                }
+                if (Util.callMethodIfExists(ctx, "Null") != null) {
+                    return addConstant(ctx, opts, "null");
+                }
         }
-
-        // JS Literals
-
-        else if (Util.callMethodIfExists(ctx, "numericLiteral") != null) {
-            // Repeat of FloatingPointLiteral, could be refactored to the same case but for clarity will be separated
-            return addConstant(ctx, opts, "double");
-        } else if (Util.callMethodIfExists(ctx, "TemplateStringLiteral") != null || Util.callMethodIfExists(ctx, "RegularExpressionLiteral") != null) {
-            return addConstant(ctx, opts, "string");
-        }
-
-        // PHP
-
-        else if (Util.callMethodIfExists(ctx, "literalConstant") != null) {
-            if (Util.callMethodIfExists(ctx, "Real") != null) {
-                return addConstant(ctx, opts, "double");
-            } else if (Util.callMethodIfExists(ctx, "BooleanConstant") != null) {
-                return addConstant(ctx, opts, "boolean");
-            } else if (Util.callMethodIfExists(ctx, "numericConstant") != null) {
-                return addConstant(ctx, opts, "double");
-            } else if (Util.callMethodIfExists(ctx, "stringConstant") != null) {
-                return addConstant(ctx, opts, "string");
-            } else {
-                // Should not happen
-                return null;
-            }
-        } else if (Util.callMethodIfExists(ctx, "magicConstant") != null || Util.callMethodIfExists(ctx,
-                "classConstant") != null || Util.callMethodIfExists(ctx, "qualifiedNamespaceName") != null) {
-            // TODO not implemented yet
-            return addConstant(ctx, opts, "string");
-        }else if (Util.callMethodIfExists(ctx, "Real") != null) {
-            return addConstant(ctx, opts, "double");
-        } else if (Util.callMethodIfExists(ctx, "BooleanConstant") != null) {
-            return addConstant(ctx, opts, "boolean");
-        } else if (Util.callMethodIfExists(ctx, "numericConstant") != null) {
-            return addConstant(ctx, opts, "double");
-        } else if (Util.callMethodIfExists(ctx, "stringConstant") != null) {
-            return addConstant(ctx, opts, "string");
-        } else if (Util.callMethodIfExists(ctx, "Null") != null) {
-            return addConstant(ctx, opts, "null");
-        }
-
-        else {
-            throw new NotImplementedException("Unrecognized data type " + ctx.getText());
-        }
+        throw new NotImplementedException("Unrecognized data type " + ctx.getText());
     }
 
     /**
      * This function creates a new constant based on the context generated by the parser of a specific-language.
      * FileListeners should call the more generic version and add conditionals for their specific cases but some
      * parsers generate specific rules for each data type which would necessitate the calling of this function
-     * @param ctx the context from the FileListener
+     *
+     * @param ctx      the context from the FileListener
      * @param ruleType the type of the constant to be added
-     * @param opts this is an object that contains information on if a number is negative or if a string needs its
-     *             quotes removed
+     * @param opts     this is an object that contains information on if a number is negative or if a string needs its
+     *                 quotes removed
      * @return the constant created
      */
     public Constant addConstant(ParserRuleContext ctx, LiteralOptions opts, String ruleType) {
@@ -425,12 +448,12 @@ public class GastBuilder {
     }
 
     public void addForLoopStmt(ParserRuleContext ctx) {
-       // TODO
-        forLoops.add(new Loop(ctx));
+        // TODO
+        loops.add(new Loop(ctx));
     }
 
     public void exitForLoop() {
-        forLoops.pop();
+        loops.pop();
     }
 
     public GenericStatement addGenericStatement(ParserRuleContext ctx) {
@@ -513,33 +536,27 @@ public class GastBuilder {
         Switch newSwitch = new Switch();
         statements.add(newSwitch);
         switches.add(newSwitch);
-        codeBlocks.peek().getStatements().add(newSwitch);
+        codeBlocks.peek().getStatements().add(newSwitch); // TODO needed?
         return newSwitch;
     }
 
-    public void addSwitchCase(ParserRuleContext ctx, String condition) {
+    public void addSwitchCase(ParserRuleContext ctx) {
         if (switches.empty()) {
             throw new RuntimeException("There shouldn't be a case with no switch declared");
         }
-
-        Switch innerSwitch = switches.peek();
-
-        if (innerSwitch.getNumCases() == 0) {
-            SwitchCase switchCase = new SwitchCase();
-            innerSwitch.addCase(switchCase);
-            statements.push(switchCase);
-        }
+        inSwitchCase = true;
     }
 
     public void addDefaultCase(ParserRuleContext ctx) {
         if (switches.empty()) {
             throw new RuntimeException("There shouldn't be a default case if no switch was declared");
         }
+        // do nothing
+    }
 
-        Switch innerSwitch = switches.peek();
-
-        SwitchCase switchCase = new SwitchCase();
-        innerSwitch.addCase(switchCase);
+    public void addBreak() {
+        statements.add(new Break());
+        codeBlocks.peek().getStatements().add(new Break());
     }
 
     /**
@@ -890,7 +907,7 @@ public class GastBuilder {
                     Variable variable = (Variable) assignment.getLeft();
                     Expression expression = new Expression();
                     if (statements.empty()) {
-                      expression = assignment.getRight();
+                        expression = assignment.getRight();
                     } else if (statements.peek() instanceof Expression) {
                         expression = assignment.getRight();
                     } else {
@@ -1273,7 +1290,7 @@ public class GastBuilder {
     }
 
     /**
-     * @param ctx rule context
+     * @param ctx           rule context
      * @param attributeName In JavaScripParser's case, an Attribute is not immediately recognized as it is only analyzed when
      *                      in the constructor. So, for that, once we verify that we are indeed in the constructor we create
      *                      the attribute so that it can be added to its class.
@@ -1365,13 +1382,12 @@ public class GastBuilder {
     }
 
     /**
-     * @param ctx rule context
-     * @param functionName name of the function to add
-     * @param isConstructorSuper
-     * Receives the context (so that, for example, line number is known), name of the funtion
-     * and if it is a super() or a "super.". The objective of this function is to transform super calls
-     * into their respective function calls for analysis, distinguishing from super() (used in constructors)
-     * and "super." (used to call super of a given method).
+     * @param ctx                rule context
+     * @param functionName       name of the function to add
+     * @param isConstructorSuper Receives the context (so that, for example, line number is known), name of the funtion
+     *                           and if it is a super() or a "super.". The objective of this function is to transform super calls
+     *                           into their respective function calls for analysis, distinguishing from super() (used in constructors)
+     *                           and "super." (used to call super of a given method).
      * @function addSuperMethodCall
      */
     public void addSuperMethodCall(ParserRuleContext ctx, String functionName, boolean isConstructorSuper) {
@@ -1398,7 +1414,7 @@ public class GastBuilder {
     }
 
     /**
-     * @param ctx rule context
+     * @param ctx              rule context
      * @param isSuperStatement Auxiliary function. Receives the context and a boolean to determine if it is analysing a
      *                         super() or this() (used in constructors), so that the appropriate name is provided to the
      *                         addSuperMethodCall function.
@@ -1462,11 +1478,11 @@ public class GastBuilder {
 
     /**
      * @param attributeName name of the attribute to add the value to
-     * @param type type of the value to track
-     * @param value value to be tracked
-     * Auxiliary function used in Java context (for now) to initialize a class's
-     * fields/attributes in case primitive data types (or Lists/Maps/Sets/Stacks) are
-     * used. Doesn't support other classes due to the complexity involved!
+     * @param type          type of the value to track
+     * @param value         value to be tracked
+     *                      Auxiliary function used in Java context (for now) to initialize a class's
+     *                      fields/attributes in case primitive data types (or Lists/Maps/Sets/Stacks) are
+     *                      used. Doesn't support other classes due to the complexity involved!
      * @function addAttributeTrackedValue
      */
     public void addAttributeTrackedValue(String attributeName, String type, String value) {
@@ -1485,8 +1501,8 @@ public class GastBuilder {
 
     /**
      * @param ctx the context created by the parser
-     * Auxiliary function used in Java context (for now) to give a case
-     * (from a switch statement) the following expression: switchExpression == caseExpression.
+     *            Auxiliary function used in Java context (for now) to give a case
+     *            the condition
      * @function finishExpressionForCase
      */
     public void finishExpressionForCase(ParserRuleContext ctx) {
@@ -1494,23 +1510,13 @@ public class GastBuilder {
             throw new RuntimeException("Should not reach this without a switch statement previously declared");
         }
 
-        Switch innerSwitch = switches.peek();
-        String condition =
-                innerSwitch.getCondition().getText()+"=="+innerSwitch.getCases().peek().getConditions().getLast().getText();
-
-        IfStatement ifStatement = (IfStatement) statements.pop();
-        Expression switchExpression = (Expression) statements.pop();
-
-        if (!true) {
-            ifStatement.getExpression().getMembers().add(switchExpression.getMembers().getFirst());
-            ifStatement.getExpression().setOperator(Util.toOperator("=="));
-        } else {
-            ifStatement.getElseIfs().getLast().getExpression().getMembers().add(switchExpression.getMembers().getFirst());
-            ifStatement.getElseIfs().getLast().getExpression().setOperator(Util.toOperator("=="));
+        if (Util.callMethodIfExists(ctx, "CASE") != null) {
+            // Expression has already been added in processExpression
+            inSwitchCase = false;
+        } else if (Util.callMethodIfExists(ctx, "DEFAULT") != null) {
+            Expression defaultExpr = new Expression(ctx, "true", "boolean");
+            processExpression(defaultExpr);
         }
-
-        statements.push(switchExpression);
-        statements.push(ifStatement);
     }
 
     /**
@@ -1569,7 +1575,7 @@ public class GastBuilder {
 
     public void addClassCreation(ParserRuleContext ctx, String identifier) {
         if (identifier.equals("ArrayList") || identifier.equals("HashSet") || identifier.equals("LinkedList") ||
-            identifier.equals("HashMap") || identifier.equals("Stack")) {
+                identifier.equals("HashMap") || identifier.equals("Stack")) {
             inCollection = true;
         } else {
             addFunctionCall(ctx, identifier);

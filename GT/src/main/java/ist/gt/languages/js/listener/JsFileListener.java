@@ -33,7 +33,7 @@ public class JsFileListener extends JavaScriptParserBaseListener {
     private String variableAccessName = "";
 
     public JsFileListener(String filename) {
-        gastBuilder = new GastBuilder(filename);
+        gastBuilder = new GastBuilder(filename, GastBuilder.language.JS);
     }
 
     @Override

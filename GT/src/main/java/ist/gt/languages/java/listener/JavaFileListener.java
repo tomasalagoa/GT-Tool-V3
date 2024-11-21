@@ -25,7 +25,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
     private final GastBuilder gastBuilder;
 
     public JavaFileListener(String filename) {
-        gastBuilder = new GastBuilder(filename);
+        gastBuilder = new GastBuilder(filename, GastBuilder.language.JAVA);
     }
 
     @Override
@@ -556,9 +556,8 @@ public class JavaFileListener extends Java8ParserBaseListener {
     }
 
     /**
-     * Switch case statement here will function like an If-ElseIf-Else statement.
-     * This allows the tool to reuse the model (as a switch case isn't that different
-     * from an if-else) and to also reuse code of a similar logic already implemented!
+     * While switch statements can be very similar to if-statements, the fallthrough cases and breaks require a more
+     * specialized implementation
      */
     @Override
     public void enterSwitchStatement(Java8Parser.SwitchStatementContext ctx) {
@@ -581,7 +580,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
     @Override
     public void enterSwitchLabel(Java8Parser.SwitchLabelContext ctx) {
         if (ctx.CASE() != null) {
-            gastBuilder.addSwitchCase(ctx, ctx.constantExpression().getText());
+            gastBuilder.addSwitchCase(ctx);
         } else if (ctx.DEFAULT() != null) {
             gastBuilder.addDefaultCase(ctx);
         }
@@ -589,16 +588,17 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void exitSwitchLabel(Java8Parser.SwitchLabelContext ctx) {
-        if (ctx.CASE() != null) {
+        gastBuilder.finishExpressionForCase(ctx);
+    }
 
-            if (this.casesBuilt == 1) {
-                //if statement for first case
-                gastBuilder.finishExpressionForCase(ctx);
-            } else {
-                //else if statement for subsequent cases
-                gastBuilder.finishExpressionForCase(ctx);
-            }
-        }
+    @Override
+    public void enterBreakStatement(Java8Parser.BreakStatementContext ctx) {
+        gastBuilder.addBreak();
+    }
+
+    @Override
+    public void exitBreakStatement(Java8Parser.BreakStatementContext ctx) {
+        gastBuilder.exitStatementOrExpression();
     }
 
     /*==================================================================*

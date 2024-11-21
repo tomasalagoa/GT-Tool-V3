@@ -47,7 +47,5 @@ public interface AstBuilderVisitorInterface {
 
     void visit(Switch stmt);
 
-    void visit(SwitchCase switchCase);
-
     void visit(Loop forLoop);
 }

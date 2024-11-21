@@ -7,11 +7,15 @@ public class Experiment {
         }
 
         switch (id) {
+            case "0":
+                executeQuery(id);
             case "1":
                 executeQuery(id);
-                break;
             case "2":
                 executeQuery(sanitize(id));
+                break;
+            case "3":
+                sanitize(id);
                 break;
             default:
                 break;

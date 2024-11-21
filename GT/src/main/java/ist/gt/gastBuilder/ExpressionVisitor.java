@@ -115,11 +115,11 @@ public class ExpressionVisitor implements AstBuilderVisitorInterface {
     public void visit(Loop forLoop) {}
 
     public void visit(Switch stmt) {
-        stmt.setCondition(expr);
+        if (stmt.getCondition() == null)
+            stmt.setCondition(expr);
+        else
+            stmt.addCase(expr);
     }
 
-    public void visit(SwitchCase switchCase) {
-        switchCase.getConditions().add(expr);
-    }
-
+    public void visit(Break breakStatement) {}
 }

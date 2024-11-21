@@ -14,7 +14,7 @@ public class PhpFileListener extends PhpParserBaseListener {
     private final GastBuilder gastBuilder;
 
     public PhpFileListener(String filename) {
-        gastBuilder = new GastBuilder(filename);
+        gastBuilder = new GastBuilder(filename, GastBuilder.language.PHP);
     }
 
     @Override

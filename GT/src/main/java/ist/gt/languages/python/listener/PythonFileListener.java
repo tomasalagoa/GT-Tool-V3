@@ -25,7 +25,7 @@ public class PythonFileListener extends PythonParserBaseListener {
     private boolean lambdaFunctionDetected = false;
 
     public PythonFileListener(String filename) {
-        gastBuilder = new GastBuilder(filename);
+        gastBuilder = new GastBuilder(filename, GastBuilder.language.PYTHON);
     }
 
     @Override

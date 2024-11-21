@@ -143,4 +143,9 @@ public class Util {
             System.err.println("Could not write to file " + filepath);
         }
     }
+
+    // From https://stackoverflow.com/a/67716814
+    public record Pair<K, V>(K key, V value) {
+        // intentionally empty
+    }
 }

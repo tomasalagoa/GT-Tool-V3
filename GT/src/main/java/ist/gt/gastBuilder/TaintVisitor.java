@@ -1615,11 +1615,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
     }
 
-    @Override
-    public void visit(SwitchCase switchCase) {
-
-    }
-
     // Not used currently. Could be handy in the future
     public boolean getSuperclassTypeHierarchy(String classType, String matchingType) {
         if (classType.matches(matchingType)) {
