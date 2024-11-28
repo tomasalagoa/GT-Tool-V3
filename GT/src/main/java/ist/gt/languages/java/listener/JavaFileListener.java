@@ -566,15 +566,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void exitSwitchStatement(Java8Parser.SwitchStatementContext ctx) {
-        gastBuilder.exitElseIfOrElseStatement();
-        while (this.casesBuilt > 1) {
-            gastBuilder.exitElseIfOrElseStatement();
-            this.casesBuilt--;
-        }
-        this.casesBuilt = 0;
-        gastBuilder.exitIfStatement();
-
-        gastBuilder.exitStatementOrExpression();
+        gastBuilder.exitSwitch();
     }
 
     @Override

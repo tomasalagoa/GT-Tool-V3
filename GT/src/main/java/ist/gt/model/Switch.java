@@ -12,6 +12,7 @@ import java.util.Stack;
 public class Switch extends Statement{
 
     private Expression condition;
+    private boolean hadBreak = false;
 
     /**
      * This variable holds a collection of mappings, from expressions to codeBlocks
@@ -19,13 +20,18 @@ public class Switch extends Statement{
      */
     private Stack<Util.Pair<ArrayList<Expression>, CodeBlock>> cases = new Stack<>();
 
+    /**
+     * @param cond the condition for a new case
+     * This function adds a new case to the stack, the logic for fallthrough and breaks is also added here
+     */
     public void addCase(Expression cond){
-        // First case
-        if (cases.isEmpty()){
+        // First case or had a break in the previous case
+        if (cases.isEmpty() || hadBreak) {
             ArrayList<Expression> conds = new ArrayList<>();
             conds.add(cond);
-            Util.Pair<ArrayList<Expression>, CodeBlock> pair = new Util.Pair<>(conds, null);
+            Util.Pair<ArrayList<Expression>, CodeBlock> pair = new Util.Pair<>(conds, new CodeBlock());
             cases.push(pair);
+            hadBreak = false;
         } else if (cases.peek().value() == null) {
             // The previous case(s) had no code, so we just add the new condition to the existing list
             cases.peek().key().add(cond);
@@ -34,8 +40,17 @@ public class Switch extends Statement{
             // to the list.
             ArrayList<Expression> conds = new ArrayList<>(cases.peek().key());
             conds.add(cond);
-            Util.Pair<ArrayList<Expression>, CodeBlock> pair = new Util.Pair<>(conds, null);
+            Util.Pair<ArrayList<Expression>, CodeBlock> pair = new Util.Pair<>(conds, new CodeBlock());
+            cases.push(pair);
         }
+    }
+
+    public void addStatement(Statement stmt) {
+        cases.peek().value().getStatements().add(stmt);
+    }
+
+    public void breakInCase() {
+        hadBreak = true;
     }
 
     public void accept(AstBuilderVisitorInterface visitor) {

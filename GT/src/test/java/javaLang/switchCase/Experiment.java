@@ -6,7 +6,7 @@ public class Experiment {
             // nothing
         }
 
-        switch (id) {
+        switch ("1") {
             case "0":
                 executeQuery(id);
             case "1":

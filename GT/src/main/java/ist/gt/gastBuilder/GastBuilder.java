@@ -28,7 +28,15 @@ public class GastBuilder {
     private boolean isParameter = false;
     private boolean inCollection = false;
     private Stack<Switch> switches = new Stack<>();
+
+    /**
+     * This is used to process expressions that represent a case
+     * case 0:
+     *      ^ this constant for example
+     */
     private boolean inSwitchCase = false;
+    private boolean inSwitch = false;
+    private boolean inFor = false;
 
     public enum language {
         JAVA,
@@ -38,11 +46,14 @@ public class GastBuilder {
     }
 
     ;
-    private language currentLanguage = language.JAVA;
+    private language currentLanguage;
 
-    private <E> void popIfNotEmpty(Stack<E> stack) {
+    private <E> E popIfNotEmpty(Stack<E> stack) {
         if (!stack.empty())
-            stack.pop();
+            return stack.pop();
+        else {
+            return null;
+        }
     }
 
     public void addImportedFile(String fileName) {
@@ -52,6 +63,7 @@ public class GastBuilder {
     private void processExpression(Expression expression) {
         if (inSwitchCase) {
             switches.peek().accept(new ExpressionVisitor(expression));
+            inSwitchCase = false;
         } else if (!statements.empty())
             statements.peek().accept(new ExpressionVisitor(expression));
     }
@@ -63,7 +75,12 @@ public class GastBuilder {
 
     public void exitConditionalStatement() {
         popIfNotEmpty(codeBlocks);
-        popIfNotEmpty(statements);
+        Statement stmt = popIfNotEmpty(statements);
+        if (stmt != null) {
+            if (inSwitch) {
+                switches.peek().addStatement(stmt);
+            }
+        }
     }
 
     public void enterElseStatement(ParserRuleContext ctx) {
@@ -534,10 +551,16 @@ public class GastBuilder {
 
     public Switch addSwitch(ParserRuleContext ctx) {
         Switch newSwitch = new Switch();
+        inSwitch = true;
         statements.add(newSwitch);
         switches.add(newSwitch);
         codeBlocks.peek().getStatements().add(newSwitch); // TODO needed?
         return newSwitch;
+    }
+
+    public void exitSwitch() {
+        exitStatementOrExpression();
+        inSwitch = false;
     }
 
     public void addSwitchCase(ParserRuleContext ctx) {
@@ -557,6 +580,9 @@ public class GastBuilder {
     public void addBreak() {
         statements.add(new Break());
         codeBlocks.peek().getStatements().add(new Break());
+        if (inSwitch) {
+            switches.peek().breakInCase();
+        }
     }
 
     /**
