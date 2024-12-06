@@ -20,6 +20,8 @@ public class Switch extends Statement{
      */
     private Stack<Util.Pair<ArrayList<Expression>, CodeBlock>> cases = new Stack<>();
 
+    private boolean caseExpr = false;
+
     /**
      * @param cond the condition for a new case
      * This function adds a new case to the stack, the logic for fallthrough and breaks is also added here
@@ -43,10 +45,17 @@ public class Switch extends Statement{
             Util.Pair<ArrayList<Expression>, CodeBlock> pair = new Util.Pair<>(conds, new CodeBlock());
             cases.push(pair);
         }
+        caseExpr = true;
     }
 
     public void addStatement(Statement stmt) {
-        cases.peek().value().getStatements().add(stmt);
+        // Edge case: adding the main condition expression or the case condition expression
+        if (!cases.empty() && !caseExpr)
+            cases.peek().value().getStatements().add(stmt);
+
+        if (caseExpr) {
+            caseExpr = false;
+        }
     }
 
     public void breakInCase() {

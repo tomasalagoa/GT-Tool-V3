@@ -98,7 +98,14 @@ public class GastBuilder {
     }
 
     public void exitStatementOrExpression() {
-        popIfNotEmpty(statements);
+        Statement stmt = popIfNotEmpty(statements);
+        if (stmt instanceof Switch) {
+            // nothing
+        } else {
+            if (inSwitch && !switches.empty()) {
+               switches.peek().addStatement(stmt);
+            }
+        }
     }
 
     public void exitClass() {
@@ -578,10 +585,12 @@ public class GastBuilder {
     }
 
     public void addBreak() {
-        statements.add(new Break());
-        codeBlocks.peek().getStatements().add(new Break());
+        Break break_stmt = new Break();
+        statements.add(break_stmt);
+        codeBlocks.peek().getStatements().add(break_stmt);
         if (inSwitch) {
             switches.peek().breakInCase();
+            switches.peek().addStatement(break_stmt);
         }
     }
 

@@ -1612,7 +1612,12 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
     @Override
     public void visit(Switch stmt) {
+        // visit main condition
+        visit(stmt.getCondition());
+        // visit all relevant cases
+        for (var pair: stmt.getCases()) {
 
+        }
     }
 
     // Not used currently. Could be handy in the future
