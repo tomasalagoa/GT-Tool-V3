@@ -236,8 +236,6 @@ public class AstConverter {
     }
 
     public static void addVulnerability(Vulnerability vulnerability) {
-        // FIXME
-        System.err.println(report.getVulnerabilities());
         report.getVulnerabilities().add(vulnerability);
     }
 

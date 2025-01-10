@@ -624,11 +624,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             return;
         }
         if (spec.isMethod()) {
-            for (var stmt:
-                    file.getClasses().get(spec.getFunction().getType()).getMethods().get("method").getCodeBlock().getStatements()) {
-                System.out.println(stmt);
-                System.out.println();
-            }
             file.getClasses().get(spec.getFunction().getType()).accept(this);
         }else {
             file.getFunctions().get(spec.getFunction().getName()).accept(this);
@@ -1629,7 +1624,6 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             // visit all expressions and check if value is equal to main condition
            for (var expr: pair.key()) {
                visit(expr);
-               System.out.println(expr);
                if (stmt.getCondition().getTrackedValue().equals(expr.getTrackedValue())) {
                    // evaluate statements in corresponding code block
                    visit(pair.value());

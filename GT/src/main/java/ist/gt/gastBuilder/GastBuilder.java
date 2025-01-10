@@ -32,7 +32,7 @@ public class GastBuilder {
     /**
      * This is used to process expressions that represent a case
      * case 0:
-     *      ^ this constant for example
+     * ^ this constant for example
      */
     private boolean inSwitchCase = false;
     private boolean inSwitch = false;
@@ -45,7 +45,7 @@ public class GastBuilder {
         PHP
     }
 
-    ;
+
     private language currentLanguage;
 
     private <E> E popIfNotEmpty(Stack<E> stack) {
@@ -100,13 +100,16 @@ public class GastBuilder {
     public void exitStatementOrExpression() {
         Statement stmt = popIfNotEmpty(statements);
         if (stmt instanceof Switch) {
-//            System.out.println("====================");
-//            System.out.println(statements);
-//            System.out.println("====================");
             pushStatement(stmt);
         } else {
             if (inSwitch && !switches.empty()) {
-               switches.peek().addStatement(stmt);
+                switches.peek().addStatement(stmt);
+
+                // Check and remove stmt from codeBlocks
+                for (CodeBlock block : codeBlocks) {
+                    block.getStatements().removeIf(statement ->
+                            System.identityHashCode(statement) == System.identityHashCode(stmt));
+                }
             }
         }
     }
@@ -177,10 +180,10 @@ public class GastBuilder {
     public Assignment addAssignment(ParserRuleContext ctx) {
         Assignment assignment = new Assignment(ctx);
         if (currentLambdaFunction == null) {
-            codeBlocks.peek().getStatements().add(assignment);
+            pushStatementToCodeBlock(assignment);
         } else {
             if (!addStatementsToLambdaFunc(assignment)) {
-                codeBlocks.peek().getStatements().add(assignment);
+                pushStatementToCodeBlock(assignment);
             }
         }
         pushStatement(assignment);
@@ -191,10 +194,10 @@ public class GastBuilder {
     public ReturnStatement addReturnStatement(ParserRuleContext ctx) {
         ReturnStatement stmt = new ReturnStatement(ctx);
         if (currentLambdaFunction == null) {
-            codeBlocks.peek().getStatements().add(stmt);
+            pushStatementToCodeBlock(stmt);
         } else {
             if (!addStatementsToLambdaFunc(stmt)) {
-                codeBlocks.peek().getStatements().add(stmt);
+                pushStatementToCodeBlock(stmt);
             }
         }
         pushStatement(stmt);
@@ -450,10 +453,10 @@ public class GastBuilder {
         } else {
             ifStatements.push(ifStatement);
             if (currentLambdaFunction == null) {
-                codeBlocks.peek().getStatements().add(ifStatement);
+                pushStatementToCodeBlock(ifStatement);
             } else {
                 if (!addStatementsToLambdaFunc(ifStatement)) {
-                    codeBlocks.peek().getStatements().add(ifStatement);
+                    pushStatementToCodeBlock(ifStatement);
                 }
             }
         }
@@ -465,10 +468,10 @@ public class GastBuilder {
     public void addConditionalStatement(ParserRuleContext ctx) {
         var conditionalStatement = new ConditionalStatement(ctx);
         if (currentLambdaFunction == null) {
-            codeBlocks.peek().getStatements().add(conditionalStatement);
+            pushStatementToCodeBlock(conditionalStatement);
         } else {
             if (!addStatementsToLambdaFunc(conditionalStatement)) {
-                codeBlocks.peek().getStatements().add(conditionalStatement);
+                pushStatementToCodeBlock(conditionalStatement);
             }
         }
         setConditionalStmt(conditionalStatement);
@@ -485,22 +488,14 @@ public class GastBuilder {
 
     public GenericStatement addGenericStatement(ParserRuleContext ctx) {
         var statement = new GenericStatement(ctx);
-        System.out.println("-----------------");
-        System.out.println(ctx.getText());
-        System.out.println();
-        System.out.println(statements);
-        System.out.println("##################");
         if (currentLambdaFunction == null) {
-            codeBlocks.peek().getStatements().add(statement);
+            pushStatementToCodeBlock(statement);
         } else {
             if (!addStatementsToLambdaFunc(statement)) {
-                codeBlocks.peek().getStatements().add(statement);
+                pushStatementToCodeBlock(statement);
             }
         }
-        // Check if generic statement has not been added already: probable underlying bug, should fix underlying issue
-        if (!statements.contains(statement)) {
-            pushStatement(statement);
-        }
+        pushStatement(statement);
         return statement;
     }
 
@@ -536,7 +531,7 @@ public class GastBuilder {
 
     public ThrowException addThrowException(ParserRuleContext ctx) {
         ThrowException throwException = new ThrowException(ctx);
-        codeBlocks.peek().getStatements().add(throwException);
+        pushStatementToCodeBlock(throwException);
         pushStatement(throwException);
         return throwException;
     }
@@ -544,7 +539,7 @@ public class GastBuilder {
 
     public TryCatch addTryCatch(ParserRuleContext ctx) {
         var tryCatch = new TryCatch(ctx);
-        codeBlocks.peek().getStatements().add(tryCatch);
+        pushStatementToCodeBlock(tryCatch);
         codeBlocks.push(tryCatch.getTryBlock());
         tryCatches.push(tryCatch);
         return tryCatch;
@@ -572,13 +567,21 @@ public class GastBuilder {
         inSwitch = true;
         statements.add(newSwitch);
         switches.add(newSwitch);
-        codeBlocks.peek().getStatements().add(newSwitch); // TODO needed?
+        pushStatementToCodeBlock(newSwitch); // TODO needed?
         return newSwitch;
     }
 
     public void exitSwitch() {
-        exitStatementOrExpression();
+        if (switches.isEmpty() || !inSwitch) {
+            throw new RuntimeException("No switch to exit from.");
+        }
+        // Finalize the switch statement
+        Switch completedSwitch = switches.pop();
         inSwitch = false;
+        inSwitchCase = false; // Reset case flag as well
+
+        // Add the completed switch as a statement
+        pushStatement(completedSwitch);
     }
 
     public void addSwitchCase(ParserRuleContext ctx) {
@@ -598,7 +601,7 @@ public class GastBuilder {
     public void addBreak() {
         Break break_stmt = new Break();
         statements.add(break_stmt);
-        codeBlocks.peek().getStatements().add(break_stmt);
+        pushStatementToCodeBlock(break_stmt);
         if (inSwitch) {
             switches.peek().breakInCase();
             switches.peek().addStatement(break_stmt);
@@ -1262,8 +1265,8 @@ public class GastBuilder {
             int idx = this.codeBlocks.peek().getStatements().size();
             genStmt = (GenericStatement) this.codeBlocks.peek().getStatements().remove(idx - 1);
             assignment = (Assignment) this.codeBlocks.peek().getStatements().remove(idx - 2);
-            this.codeBlocks.peek().getStatements().add(genStmt);
-            this.codeBlocks.peek().getStatements().add(assignment);
+            pushStatementToCodeBlock(genStmt);
+            pushStatementToCodeBlock(assignment);
         } else {
             pushStatement(expression);
             pushStatement(genStmt);
@@ -1562,6 +1565,7 @@ public class GastBuilder {
         } else if (Util.callMethodIfExists(ctx, "DEFAULT") != null) {
             Expression defaultExpr = new Expression(ctx, "true", "boolean");
             processExpression(defaultExpr);
+            inSwitchCase = false;
         }
     }
 
@@ -1641,14 +1645,33 @@ public class GastBuilder {
     private void pushStatement(Statement stmt) {
         // Check if statement is not already in some switch
         for (Switch s : switches) {
-            if (s.getStatements().contains(stmt)) {
-                // Do nothing
+            for (Statement statement : s.getStatements()) {
+                // We have to explicitly check the object's ID/hash code because .equals() might return
+                // false positives
+                if (System.identityHashCode(statement) == System.identityHashCode(stmt)) {
+                    return;
+                }
             }
         }
 
-
-
         statements.push(stmt);
+
+        // TODO: Later check if the statement is not already in a for-loop
+    }
+
+    private void pushStatementToCodeBlock(Statement stmt) {
+        // Check if statement is not already in some switch
+        for (Switch s : switches) {
+            for (Statement statement : s.getStatements()) {
+                // We have to explicitly check the object's ID/hash code because .equals() might return
+                // false positives
+                if (System.identityHashCode(statement) == System.identityHashCode(stmt)) {
+                    return;
+                }
+            }
+        }
+
+        codeBlocks.peek().getStatements().add(stmt);
 
         // TODO: Later check if the statement is not already in a for-loop
     }
