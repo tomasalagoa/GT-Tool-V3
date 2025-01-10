@@ -565,7 +565,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
     }
 
     @Override
-    public void exitSwitchStatement(Java8Parser.SwitchStatementContext ctx) {
+    public void exitSwitchBlock(Java8Parser.SwitchBlockContext ctx) {
         gastBuilder.exitSwitch();
     }
 

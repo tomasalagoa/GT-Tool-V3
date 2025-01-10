@@ -623,9 +623,14 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             file.getRootFunc().accept(this);
             return;
         }
-        if (spec.isMethod())
+        if (spec.isMethod()) {
+            for (var stmt:
+                    file.getClasses().get(spec.getFunction().getType()).getMethods().get("method").getCodeBlock().getStatements()) {
+                System.out.println(stmt);
+                System.out.println();
+            }
             file.getClasses().get(spec.getFunction().getType()).accept(this);
-        else {
+        }else {
             file.getFunctions().get(spec.getFunction().getName()).accept(this);
         }
     }
@@ -1612,11 +1617,32 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
     @Override
     public void visit(Switch stmt) {
+
         // visit main condition
         visit(stmt.getCondition());
-        // visit all relevant cases
-        for (var pair: stmt.getCases()) {
 
+        boolean visit_default = true;
+
+        // visit all relevant cases
+        for (int i = 0; i < stmt.getCases().size() - 1; i++) {
+            var pair = stmt.getCases().get(i);
+            // visit all expressions and check if value is equal to main condition
+           for (var expr: pair.key()) {
+               visit(expr);
+               System.out.println(expr);
+               if (stmt.getCondition().getTrackedValue().equals(expr.getTrackedValue())) {
+                   // evaluate statements in corresponding code block
+                   visit(pair.value());
+                   visit_default = false;
+                   break;
+               }
+           }
+        }
+
+        if (visit_default) {
+            var def_pair = stmt.getCases().getLast();
+            // Visit the code block in the default case
+            visit(def_pair.value());
         }
     }
 

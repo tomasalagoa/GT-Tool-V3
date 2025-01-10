@@ -2,10 +2,6 @@ package javaLang.switchCase;
 
 public class Experiment {
     public void method(String id) {
-        if (id == null) {
-            // nothing
-        }
-
         switch ("1") {
             case "0":
                 executeQuery(id);

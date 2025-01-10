@@ -100,7 +100,10 @@ public class GastBuilder {
     public void exitStatementOrExpression() {
         Statement stmt = popIfNotEmpty(statements);
         if (stmt instanceof Switch) {
-            // nothing
+//            System.out.println("====================");
+//            System.out.println(statements);
+//            System.out.println("====================");
+            pushStatement(stmt);
         } else {
             if (inSwitch && !switches.empty()) {
                switches.peek().addStatement(stmt);
@@ -153,7 +156,7 @@ public class GastBuilder {
                 processExpression(functionCall);
             }
         }
-        statements.push(functionCall);
+        pushStatement(functionCall);
         return functionCall;
     }
 
@@ -167,7 +170,7 @@ public class GastBuilder {
                 processExpression(expression);
             }
         }
-        statements.push(expression);
+        pushStatement(expression);
     }
 
 
@@ -180,7 +183,7 @@ public class GastBuilder {
                 codeBlocks.peek().getStatements().add(assignment);
             }
         }
-        statements.push(assignment);
+        pushStatement(assignment);
         return assignment;
     }
 
@@ -194,7 +197,7 @@ public class GastBuilder {
                 codeBlocks.peek().getStatements().add(stmt);
             }
         }
-        statements.push(stmt);
+        pushStatement(stmt);
         return stmt;
     }
 
@@ -482,6 +485,11 @@ public class GastBuilder {
 
     public GenericStatement addGenericStatement(ParserRuleContext ctx) {
         var statement = new GenericStatement(ctx);
+        System.out.println("-----------------");
+        System.out.println(ctx.getText());
+        System.out.println();
+        System.out.println(statements);
+        System.out.println("##################");
         if (currentLambdaFunction == null) {
             codeBlocks.peek().getStatements().add(statement);
         } else {
@@ -489,20 +497,23 @@ public class GastBuilder {
                 codeBlocks.peek().getStatements().add(statement);
             }
         }
-        statements.push(statement);
+        // Check if generic statement has not been added already: probable underlying bug, should fix underlying issue
+        if (!statements.contains(statement)) {
+            pushStatement(statement);
+        }
         return statement;
     }
 
     private void setConditionalStmt(ConditionalStatement stmt) {
         codeBlocks.push(stmt.getCodeBlock());
-        statements.push(stmt);
+        pushStatement(stmt);
     }
 
 
     public NewExpression addNewExpression(ParserRuleContext ctx, String className) {
         NewExpression newExpression = new NewExpression(ctx, className);
         processExpression(newExpression);
-        statements.push(newExpression);
+        pushStatement(newExpression);
         return newExpression;
     }
 
@@ -510,7 +521,7 @@ public class GastBuilder {
     public AttributeAccess addAttributeAccess(ParserRuleContext ctx, String identifier) {
         AttributeAccess attributeAccess = new AttributeAccess(ctx, identifier);
         processExpression(attributeAccess);
-        statements.push(attributeAccess);
+        pushStatement(attributeAccess);
         return attributeAccess;
     }
 
@@ -518,7 +529,7 @@ public class GastBuilder {
     public MethodCallExpression addMethodCall(ParserRuleContext ctx) {
         var methodCall = new MethodCallExpression(ctx);
         processExpression(methodCall);
-        statements.push(methodCall);
+        pushStatement(methodCall);
         return methodCall;
     }
 
@@ -526,7 +537,7 @@ public class GastBuilder {
     public ThrowException addThrowException(ParserRuleContext ctx) {
         ThrowException throwException = new ThrowException(ctx);
         codeBlocks.peek().getStatements().add(throwException);
-        statements.push(throwException);
+        pushStatement(throwException);
         return throwException;
     }
 
@@ -606,7 +617,7 @@ public class GastBuilder {
             expression.setLambdaFunc(lambdaFunc);
             expression.setType("Lambda");
             currentLambdaFunction = lambdaFunc;
-            statements.push(expression);
+            pushStatement(expression);
         }
     }
 
@@ -717,15 +728,15 @@ public class GastBuilder {
         }
 
         if (newExpression != null) {
-            statements.push(newExpression);
+            pushStatement(newExpression);
         }
 
         if (expression != null) {
-            statements.push(expression);
+            pushStatement(expression);
         }
 
         if (functionCall != null) {
-            statements.push(functionCall);
+            pushStatement(functionCall);
         }
     }
 
@@ -838,7 +849,7 @@ public class GastBuilder {
                     assignment.setLeft(var);
                 }
             }
-            statements.push(assignment);
+            pushStatement(assignment);
         }
     }
 
@@ -877,7 +888,7 @@ public class GastBuilder {
                 }
             }
 
-            statements.push(expression);
+            pushStatement(expression);
         }
     }
 
@@ -904,7 +915,7 @@ public class GastBuilder {
                 expression.setOperator(Util.toOperator(operator));
             }
 
-            statements.push(expression);
+            pushStatement(expression);
         }
     }
 
@@ -921,7 +932,7 @@ public class GastBuilder {
         if (statements.peek() instanceof Assignment) {
             Assignment assignment = (Assignment) statements.pop();
             assignment.setOperator(operator);
-            statements.push(assignment);
+            pushStatement(assignment);
         }
     }
 
@@ -937,7 +948,7 @@ public class GastBuilder {
             Assignment assignment = (Assignment) statements.pop();
             if (assignment.getOperator() != null) {
                 if (assignment.getOperator().equals("=")) {
-                    statements.push(assignment);
+                    pushStatement(assignment);
                 } else {
                     Variable variable = (Variable) assignment.getLeft();
                     Expression expression = new Expression();
@@ -957,16 +968,16 @@ public class GastBuilder {
                         case "/=" -> expression.setOperator(Operator.DIVIDE);
                         case "%=" -> expression.setOperator(Operator.MODULUS);
                         default -> {
-                            statements.push(assignment);
+                            pushStatement(assignment);
                             return;
                         }
                     }
 
                     assignment.setRight(expression);
-                    statements.push(assignment);
+                    pushStatement(assignment);
                 }
             } else {
-                statements.push(assignment);
+                pushStatement(assignment);
             }
         }
     }
@@ -1015,7 +1026,7 @@ public class GastBuilder {
                 }
             }
 
-            statements.push(genStmt);
+            pushStatement(genStmt);
         }
     }
 
@@ -1071,9 +1082,9 @@ public class GastBuilder {
                 assignmentStack.setRight(expression);
             }
 
-            statements.push(genStmt);
-            statements.push(assignmentStack);
-            statements.push(assignExp);
+            pushStatement(genStmt);
+            pushStatement(assignmentStack);
+            pushStatement(assignExp);
         }
     }
 
@@ -1121,7 +1132,7 @@ public class GastBuilder {
                     assignment.setRight(var);
                 }
             }
-            statements.push(assignment);
+            pushStatement(assignment);
             //Attribute access is on the right side of expression
         } else if (statements.peek() instanceof Expression) {
             Variable var = null, attribute;
@@ -1169,7 +1180,7 @@ public class GastBuilder {
                 expression.getMembers().add(newAttributeAddedIdx, var);
             }
 
-            statements.push(expression);
+            pushStatement(expression);
         } else if (statements.peek() instanceof GenericStatement) {
             GenericStatement genStmt = (GenericStatement) statements.pop();
             Expression expression = (Expression) genStmt.getStatement();
@@ -1178,7 +1189,7 @@ public class GastBuilder {
             var.setSelectedAttribute(attribute.getName());
 
             genStmt.setStatement(var);
-            statements.push(genStmt);
+            pushStatement(genStmt);
         }
     }
 
@@ -1220,8 +1231,8 @@ public class GastBuilder {
             Expression expression = new Expression();
             genStmt.setStatement(expression);
 
-            statements.push(genStmt);
-            statements.push(expression);
+            pushStatement(genStmt);
+            pushStatement(expression);
             return true;
         } else {
             return false;
@@ -1244,9 +1255,9 @@ public class GastBuilder {
         if (statements.peek() instanceof Assignment) {
             Assignment assignment = (Assignment) statements.pop();
 
-            statements.push(genStmt);
-            statements.push(assignment);
-            statements.push(expression);
+            pushStatement(genStmt);
+            pushStatement(assignment);
+            pushStatement(expression);
 
             int idx = this.codeBlocks.peek().getStatements().size();
             genStmt = (GenericStatement) this.codeBlocks.peek().getStatements().remove(idx - 1);
@@ -1254,8 +1265,8 @@ public class GastBuilder {
             this.codeBlocks.peek().getStatements().add(genStmt);
             this.codeBlocks.peek().getStatements().add(assignment);
         } else {
-            statements.push(expression);
-            statements.push(genStmt);
+            pushStatement(expression);
+            pushStatement(genStmt);
         }
     }
 
@@ -1272,8 +1283,8 @@ public class GastBuilder {
             genStmt = (GenericStatement) statements.pop();
             expression = (Expression) statements.pop();
 
-            statements.push(genStmt);
-            statements.push(expression);
+            pushStatement(genStmt);
+            pushStatement(expression);
 
         } else {
             expression = (Expression) statements.pop();
@@ -1281,8 +1292,8 @@ public class GastBuilder {
             Variable variable = (Variable) expression.getMembers().getFirst();
             genStmt.setStatement(variable);
 
-            statements.push(expression);
-            statements.push(genStmt);
+            pushStatement(expression);
+            pushStatement(genStmt);
         }
     }
 
@@ -1314,11 +1325,11 @@ public class GastBuilder {
                 expression.getLambdaFunc().getCodeBlock().getStatements().add(statement);
                 isLambdaFuncExpr = true;
             }
-            statements.push(expression);
+            pushStatement(expression);
         }
 
         if (genStmt != null) {
-            statements.push(genStmt);
+            pushStatement(genStmt);
         }
 
         return isLambdaFuncExpr;
@@ -1342,11 +1353,11 @@ public class GastBuilder {
         if (!statements.isEmpty() && statements.peek() instanceof Assignment) {
             Assignment assignment = (Assignment) statements.pop();
             assignment.setLeft(this.classes.peek().getAttributes().get(attributeName));
-            statements.push(assignment);
+            pushStatement(assignment);
         } else if (!statements.isEmpty() && statements.peek() instanceof Expression) {
             Expression expression = (Expression) statements.pop();
             addClassAttributeToAssignment(attributeName);
-            statements.push(expression);
+            pushStatement(expression);
         }
     }
 
@@ -1358,7 +1369,7 @@ public class GastBuilder {
                     assignment.getLeft().getMembers().getFirst() instanceof Variable leftVar) {
                 assignment.setLeft(leftVar);
             }
-            statements.push(assignment);
+            pushStatement(assignment);
         }
     }
 
@@ -1377,8 +1388,8 @@ public class GastBuilder {
             Expression expression = (Expression) statements.pop();
             Assignment assignment = (Assignment) statements.pop();
             assignment.getLeft().setCollection(true);
-            statements.push(assignment);
-            statements.push(expression);
+            pushStatement(assignment);
+            pushStatement(expression);
         }
     }
 
@@ -1394,7 +1405,7 @@ public class GastBuilder {
             Variable var = createNewVariableForAttributes((Variable) assignment.getLeft());
             var.setSelectedAttribute(name);
             assignment.setLeft(var);
-            statements.push(assignment);
+            pushStatement(assignment);
         } else if (statements.peek() instanceof Expression) {
             /* For now, this function will be called when JavaFileListener is in enterPrimary due to "this"
              * variable and its attribute access. */
@@ -1404,7 +1415,7 @@ public class GastBuilder {
             var.setSelectedAttribute(name);
             expression.getMembers().removeLast();
             expression.getMembers().add(var);
-            statements.push(expression);
+            pushStatement(expression);
         } else if (statements.peek() instanceof GenericStatement) {
             /* When there is a statement: (++/-)this.someAttribute(++/--), the GenericStatement
              * will go straight to the variable "this.someAttribute" found in enterPrimary */
@@ -1412,7 +1423,7 @@ public class GastBuilder {
             Variable var = createNewVariableForAttributes((Variable) genericStatement.getStatement());
             var.setSelectedAttribute(name);
             genericStatement.setStatement(var);
-            statements.push(genericStatement);
+            pushStatement(genericStatement);
         }
     }
 
@@ -1435,7 +1446,7 @@ public class GastBuilder {
         } else {
             superFunction.setSuper(true);
         }
-        statements.push(superFunction);
+        pushStatement(superFunction);
     }
 
     /**
@@ -1491,8 +1502,8 @@ public class GastBuilder {
                 methodCall.getMembers().add(functionCall);
                 methodCall.setSource(classExpression);
 
-                statements.push(methodCall);
-                statements.push(functionCall);
+                pushStatement(methodCall);
+                pushStatement(functionCall);
             } else if (statements.peek() instanceof MethodCallExpression && statements.size() >= 2) {
                 /* This part represents the appearance of (new someClass()).someMethodCall()
                  * in the right side of an assignment!
@@ -1502,11 +1513,11 @@ public class GastBuilder {
                 if (!statements.isEmpty() && statements.peek() instanceof Assignment) {
                     Assignment assignment = (Assignment) statements.pop();
                     methodCall.setSource(assignment.getRight().getMembers().removeFirst());
-                    statements.push(assignment);
+                    pushStatement(assignment);
                 }
 
-                statements.push(expression);
-                statements.push(methodCall);
+                pushStatement(expression);
+                pushStatement(methodCall);
             }
         }
     }
@@ -1583,13 +1594,13 @@ public class GastBuilder {
                     ifFalseAssignment.setRight(expression.getMembers().remove(1));
                     ifStatement.getElseBlock().getStatements().add(ifFalseAssignment);
 
-                    statements.push(assignment);
+                    pushStatement(assignment);
                 }
-                statements.push(unneededExpression);
+                pushStatement(unneededExpression);
             }
 
-            statements.push(ifStatement);
-            statements.push(expression);
+            pushStatement(ifStatement);
+            pushStatement(expression);
         }
     }
 
@@ -1604,7 +1615,7 @@ public class GastBuilder {
 
             //conditionalStatement.setExpression(assignment);
 
-            statements.push(conditionalStatement);
+            pushStatement(conditionalStatement);
         }
     }
 
@@ -1625,5 +1636,20 @@ public class GastBuilder {
         } else {
             exitStatementOrExpression();
         }
+    }
+
+    private void pushStatement(Statement stmt) {
+        // Check if statement is not already in some switch
+        for (Switch s : switches) {
+            if (s.getStatements().contains(stmt)) {
+                // Do nothing
+            }
+        }
+
+
+
+        statements.push(stmt);
+
+        // TODO: Later check if the statement is not already in a for-loop
     }
 }

@@ -18,8 +18,13 @@ public class Switch extends Statement{
      * This variable holds a collection of mappings, from expressions to codeBlocks
      * The logic behind it is supposed to help deal with fallthrough cases and is explained in addCase
      */
-    private Stack<Util.Pair<ArrayList<Expression>, CodeBlock>> cases = new Stack<>();
+    private ArrayList<Util.Pair<ArrayList<Expression>, CodeBlock>> cases = new ArrayList<>();
 
+    /**
+     * Auxiliary variable to store all statements so that it is easy to check whether a statement is
+     * present in any case
+     */
+    private ArrayList<Statement> statements = new ArrayList<>();
     private boolean caseExpr = false;
 
     /**
@@ -32,26 +37,28 @@ public class Switch extends Statement{
             ArrayList<Expression> conds = new ArrayList<>();
             conds.add(cond);
             Util.Pair<ArrayList<Expression>, CodeBlock> pair = new Util.Pair<>(conds, new CodeBlock());
-            cases.push(pair);
+            cases.add(pair);
             hadBreak = false;
-        } else if (cases.peek().value() == null) {
+        } else if (cases.getLast().value() == null) {
             // The previous case(s) had no code, so we just add the new condition to the existing list
-            cases.peek().key().add(cond);
-        } else if (cases.peek().value() != null) {
+            cases.getLast().key().add(cond);
+        } else if (cases.getLast().value() != null) {
             // The previous case(s) had some code, so we have to duplicate the list of conditions and add the new one
             // to the list.
-            ArrayList<Expression> conds = new ArrayList<>(cases.peek().key());
+            ArrayList<Expression> conds = new ArrayList<>(cases.getLast().key());
             conds.add(cond);
             Util.Pair<ArrayList<Expression>, CodeBlock> pair = new Util.Pair<>(conds, new CodeBlock());
-            cases.push(pair);
+            cases.add(pair);
         }
         caseExpr = true;
     }
 
     public void addStatement(Statement stmt) {
         // Edge case: adding the main condition expression or the case condition expression
-        if (!cases.empty() && !caseExpr)
-            cases.peek().value().getStatements().add(stmt);
+        if (!cases.isEmpty() && !caseExpr) {
+            cases.getLast().value().getStatements().add(stmt);
+            statements.add(stmt);
+        }
 
         if (caseExpr) {
             caseExpr = false;
