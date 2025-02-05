@@ -6,7 +6,6 @@ import ist.gt.util.Util;
 import lombok.Data;
 
 import java.util.ArrayList;
-import java.util.Stack;
 
 @Data
 public class Switch extends Statement{

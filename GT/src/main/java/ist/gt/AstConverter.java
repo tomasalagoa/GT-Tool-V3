@@ -172,7 +172,7 @@ public class AstConverter {
 
     public static void analyseAndProduceReport(Settings settings) throws Exception {
         AstConverter.clearReport();
-        analyse(settings.getDirectory(), settings);
+        analyse(String.valueOf(settings.getDirectory()), settings);
         writeReport();
     }
 
@@ -181,7 +181,7 @@ public class AstConverter {
      * ASTConverter's main function. Connects a given language parser (and GastBuilder)
      * with the TaintVisitor.
      **/
-    public static void analyse(Path directoryPath, Settings settings) throws IOException {
+    public static void analyse(String directoryPath, Settings settings) throws IOException {
         report = new Report();
         StopWatch sw = new StopWatch();
         setUpAstConverter();
@@ -202,7 +202,7 @@ public class AstConverter {
         }
 
         sw.start();
-        List<File> files = getFilesFromDirectory(directoryPath, settings.getFileExtension());
+        List<File> files = getFilesFromDirectory(Path.of(directoryPath), settings.getFileExtension());
 
         if (isUsingFramework || !settings.getSpecification().getFunctionsToAnalyze().isEmpty()) {
             showEntrypoints();

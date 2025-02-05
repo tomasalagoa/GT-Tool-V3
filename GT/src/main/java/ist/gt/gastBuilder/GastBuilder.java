@@ -5,6 +5,7 @@ import ist.gt.model.*;
 import ist.gt.util.Util;
 import lombok.Data;
 
+import org.antlr.v4.runtime.Parser;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.apache.commons.lang3.NotImplementedException;
 
@@ -582,6 +583,21 @@ public class GastBuilder {
 
         // Add the completed switch as a statement
         pushStatement(completedSwitch);
+    }
+
+    public void exitSwitchBlock() {
+        if (switches.empty()) {
+            throw new RuntimeException("No switch block found");
+        } else {
+            popIfNotEmpty(switches);
+        }
+
+        // At this point, the last statement in the stack should be a switch
+        if (statements.peek() instanceof Switch) {
+            popIfNotEmpty(statements);
+        } else {
+            throw new RuntimeException("Last statement in the stack should be a switch");
+        }
     }
 
     public void addSwitchCase(ParserRuleContext ctx) {
