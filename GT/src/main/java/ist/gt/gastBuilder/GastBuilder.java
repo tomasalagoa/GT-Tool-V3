@@ -5,6 +5,7 @@ import ist.gt.model.*;
 import ist.gt.util.Util;
 import lombok.Data;
 
+import org.antlr.v4.runtime.Parser;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.apache.commons.lang3.NotImplementedException;
 
@@ -17,7 +18,7 @@ public class GastBuilder {
     private Function currentFunction;
     private Stack<CodeBlock> codeBlocks = new Stack<>();
     private Stack<IfStatement> ifStatements = new Stack<>();
-    private Stack<ForLoop> forLoops = new Stack<>();
+    private Stack<Loop> loops = new Stack<>();
     private final File file;
     private final Stack<Class> classes = new Stack<>();
     private HashMap<String, Class> analyzedClasses = new HashMap<>();
@@ -27,10 +28,33 @@ public class GastBuilder {
     private List<String> taintedAttributes = null;
     private boolean isParameter = false;
     private boolean inCollection = false;
+    private Stack<Switch> switches = new Stack<>();
 
-    private <E> void popIfNotEmpty(Stack<E> stack) {
+    /**
+     * This is used to process expressions that represent a case
+     * case 0:
+     * ^ this constant for example
+     */
+    private boolean inSwitchCase = false;
+    private boolean inSwitch = false;
+    private boolean inFor = false;
+
+    public enum language {
+        JAVA,
+        PYTHON,
+        JS,
+        PHP
+    }
+
+
+    private language currentLanguage;
+
+    private <E> E popIfNotEmpty(Stack<E> stack) {
         if (!stack.empty())
-            stack.pop();
+            return stack.pop();
+        else {
+            return null;
+        }
     }
 
     public void addImportedFile(String fileName) {
@@ -38,7 +62,10 @@ public class GastBuilder {
     }
 
     private void processExpression(Expression expression) {
-        if (!statements.empty())
+        if (inSwitchCase) {
+            switches.peek().accept(new ExpressionVisitor(expression));
+            inSwitchCase = false;
+        } else if (!statements.empty())
             statements.peek().accept(new ExpressionVisitor(expression));
     }
 
@@ -49,7 +76,12 @@ public class GastBuilder {
 
     public void exitConditionalStatement() {
         popIfNotEmpty(codeBlocks);
-        popIfNotEmpty(statements);
+        Statement stmt = popIfNotEmpty(statements);
+        if (stmt != null) {
+            if (inSwitch) {
+                switches.peek().addStatement(stmt);
+            }
+        }
     }
 
     public void enterElseStatement(ParserRuleContext ctx) {
@@ -67,17 +99,31 @@ public class GastBuilder {
     }
 
     public void exitStatementOrExpression() {
-        popIfNotEmpty(statements);
+        Statement stmt = popIfNotEmpty(statements);
+        if (stmt instanceof Switch) {
+            pushStatement(stmt);
+        } else {
+            if (inSwitch && !switches.empty()) {
+                switches.peek().addStatement(stmt);
+
+                // Check and remove stmt from codeBlocks
+                for (CodeBlock block : codeBlocks) {
+                    block.getStatements().removeIf(statement ->
+                            System.identityHashCode(statement) == System.identityHashCode(stmt));
+                }
+            }
+        }
     }
 
     public void exitClass() {
         classes.pop();
     }
 
-    public GastBuilder(String filename) {
+    public GastBuilder(String filename, language lang) {
         file = new File(filename);
         currentFunction = file.getRootFunc();
         codeBlocks.push(file.getRootFunc().getCodeBlock());
+        this.currentLanguage = lang;
     }
 
     public void enterCatchBlock() {
@@ -114,7 +160,7 @@ public class GastBuilder {
                 processExpression(functionCall);
             }
         }
-        statements.push(functionCall);
+        pushStatement(functionCall);
         return functionCall;
     }
 
@@ -128,20 +174,20 @@ public class GastBuilder {
                 processExpression(expression);
             }
         }
-        statements.push(expression);
+        pushStatement(expression);
     }
 
 
     public Assignment addAssignment(ParserRuleContext ctx) {
         Assignment assignment = new Assignment(ctx);
         if (currentLambdaFunction == null) {
-            codeBlocks.peek().getStatements().add(assignment);
+            pushStatementToCodeBlock(assignment);
         } else {
             if (!addStatementsToLambdaFunc(assignment)) {
-                codeBlocks.peek().getStatements().add(assignment);
+                pushStatementToCodeBlock(assignment);
             }
         }
-        statements.push(assignment);
+        pushStatement(assignment);
         return assignment;
     }
 
@@ -149,13 +195,13 @@ public class GastBuilder {
     public ReturnStatement addReturnStatement(ParserRuleContext ctx) {
         ReturnStatement stmt = new ReturnStatement(ctx);
         if (currentLambdaFunction == null) {
-            codeBlocks.peek().getStatements().add(stmt);
+            pushStatementToCodeBlock(stmt);
         } else {
             if (!addStatementsToLambdaFunc(stmt)) {
-                codeBlocks.peek().getStatements().add(stmt);
+                pushStatementToCodeBlock(stmt);
             }
         }
-        statements.push(stmt);
+        pushStatement(stmt);
         return stmt;
     }
 
@@ -249,73 +295,82 @@ public class GastBuilder {
     public Constant addConstant(ParserRuleContext ctx, LiteralOptions opts) {
         // Java / Generic Literals
 
-        if (Util.callMethodIfExists(ctx, "BooleanLiteral") != null) {
-            return addConstant(ctx, opts, "boolean");
-        } else if (Util.callMethodIfExists(ctx, "IntegerLiteral") != null) {
-            return addConstant(ctx, opts, "int");
-        } else if (Util.callMethodIfExists(ctx, "FloatingPointLiteral") != null) {
-            return addConstant(ctx, opts, "double");
-        } else if (Util.callMethodIfExists(ctx, "CharacterLiteral") != null) {
-            return addConstant(ctx, opts, "char");
-        } else if (Util.callMethodIfExists(ctx, "StringLiteral") != null) {
-            return addConstant(ctx, opts, "string");
-        } else if (Util.callMethodIfExists(ctx, "NullLiteral") != null) {
-            return addConstant(ctx, opts, "null");
+        switch (currentLanguage) {
+            case JAVA:
+                if (Util.callMethodIfExists(ctx, "BooleanLiteral") != null) {
+                    return addConstant(ctx, opts, "boolean");
+                }
+                if (Util.callMethodIfExists(ctx, "IntegerLiteral") != null) {
+                    return addConstant(ctx, opts, "int");
+                }
+                if (Util.callMethodIfExists(ctx, "FloatingPointLiteral") != null) {
+                    return addConstant(ctx, opts, "double");
+                }
+                if (Util.callMethodIfExists(ctx, "CharacterLiteral") != null) {
+                    return addConstant(ctx, opts, "char");
+                } else if (Util.callMethodIfExists(ctx, "StringLiteral") != null) {
+                    return addConstant(ctx, opts, "string");
+                }
+                if (Util.callMethodIfExists(ctx, "NullLiteral") != null) {
+                    return addConstant(ctx, opts, "null");
+                }
+            case JS:
+                if (Util.callMethodIfExists(ctx, "numericLiteral") != null) {
+                    // Repeat of FloatingPointLiteral, could be refactored to the same case but for clarity will be separated
+                    return addConstant(ctx, opts, "double");
+                }
+                if (Util.callMethodIfExists(ctx, "TemplateStringLiteral") != null || Util.callMethodIfExists(ctx, "RegularExpressionLiteral") != null) {
+                    return addConstant(ctx, opts, "string");
+                }
+            case PHP:
+                if (Util.callMethodIfExists(ctx, "literalConstant") != null) {
+                    if (Util.callMethodIfExists(ctx, "Real") != null) {
+                        return addConstant(ctx, opts, "double");
+                    }
+                    if (Util.callMethodIfExists(ctx, "BooleanConstant") != null) {
+                        return addConstant(ctx, opts, "boolean");
+                    }
+                    if (Util.callMethodIfExists(ctx, "numericConstant") != null) {
+                        return addConstant(ctx, opts, "double");
+                    } else if (Util.callMethodIfExists(ctx, "stringConstant") != null) {
+                        return addConstant(ctx, opts, "string");
+                    }
+                    // Should not happen
+                    return null;
+                }
+                if (Util.callMethodIfExists(ctx, "magicConstant") != null || Util.callMethodIfExists(ctx,
+                        "classConstant") != null || Util.callMethodIfExists(ctx, "qualifiedNamespaceName") != null) {
+                    // TODO not implemented yet
+                    return addConstant(ctx, opts, "string");
+                }
+                if (Util.callMethodIfExists(ctx, "Real") != null) {
+                    return addConstant(ctx, opts, "double");
+                }
+                if (Util.callMethodIfExists(ctx, "BooleanConstant") != null) {
+                    return addConstant(ctx, opts, "boolean");
+                }
+                if (Util.callMethodIfExists(ctx, "numericConstant") != null) {
+                    return addConstant(ctx, opts, "double");
+                }
+                if (Util.callMethodIfExists(ctx, "stringConstant") != null) {
+                    return addConstant(ctx, opts, "string");
+                }
+                if (Util.callMethodIfExists(ctx, "Null") != null) {
+                    return addConstant(ctx, opts, "null");
+                }
         }
-
-        // JS Literals
-
-        else if (Util.callMethodIfExists(ctx, "numericLiteral") != null) {
-            // Repeat of FloatingPointLiteral, could be refactored to the same case but for clarity will be separated
-            return addConstant(ctx, opts, "double");
-        } else if (Util.callMethodIfExists(ctx, "TemplateStringLiteral") != null || Util.callMethodIfExists(ctx, "RegularExpressionLiteral") != null) {
-            return addConstant(ctx, opts, "string");
-        }
-
-        // PHP
-
-        else if (Util.callMethodIfExists(ctx, "literalConstant") != null) {
-            if (Util.callMethodIfExists(ctx, "Real") != null) {
-                return addConstant(ctx, opts, "double");
-            } else if (Util.callMethodIfExists(ctx, "BooleanConstant") != null) {
-                return addConstant(ctx, opts, "boolean");
-            } else if (Util.callMethodIfExists(ctx, "numericConstant") != null) {
-                return addConstant(ctx, opts, "double");
-            } else if (Util.callMethodIfExists(ctx, "stringConstant") != null) {
-                return addConstant(ctx, opts, "string");
-            } else {
-                // Should not happen
-                return null;
-            }
-        } else if (Util.callMethodIfExists(ctx, "magicConstant") != null || Util.callMethodIfExists(ctx,
-                "classConstant") != null || Util.callMethodIfExists(ctx, "qualifiedNamespaceName") != null) {
-            // TODO not implemented yet
-            return addConstant(ctx, opts, "string");
-        }else if (Util.callMethodIfExists(ctx, "Real") != null) {
-            return addConstant(ctx, opts, "double");
-        } else if (Util.callMethodIfExists(ctx, "BooleanConstant") != null) {
-            return addConstant(ctx, opts, "boolean");
-        } else if (Util.callMethodIfExists(ctx, "numericConstant") != null) {
-            return addConstant(ctx, opts, "double");
-        } else if (Util.callMethodIfExists(ctx, "stringConstant") != null) {
-            return addConstant(ctx, opts, "string");
-        } else if (Util.callMethodIfExists(ctx, "Null") != null) {
-            return addConstant(ctx, opts, "null");
-        }
-
-        else {
-            throw new NotImplementedException("Unrecognized data type " + ctx.getText());
-        }
+        throw new NotImplementedException("Unrecognized data type " + ctx.getText());
     }
 
     /**
      * This function creates a new constant based on the context generated by the parser of a specific-language.
      * FileListeners should call the more generic version and add conditionals for their specific cases but some
      * parsers generate specific rules for each data type which would necessitate the calling of this function
-     * @param ctx the context from the FileListener
+     *
+     * @param ctx      the context from the FileListener
      * @param ruleType the type of the constant to be added
-     * @param opts this is an object that contains information on if a number is negative or if a string needs its
-     *             quotes removed
+     * @param opts     this is an object that contains information on if a number is negative or if a string needs its
+     *                 quotes removed
      * @return the constant created
      */
     public Constant addConstant(ParserRuleContext ctx, LiteralOptions opts, String ruleType) {
@@ -399,10 +454,10 @@ public class GastBuilder {
         } else {
             ifStatements.push(ifStatement);
             if (currentLambdaFunction == null) {
-                codeBlocks.peek().getStatements().add(ifStatement);
+                pushStatementToCodeBlock(ifStatement);
             } else {
                 if (!addStatementsToLambdaFunc(ifStatement)) {
-                    codeBlocks.peek().getStatements().add(ifStatement);
+                    pushStatementToCodeBlock(ifStatement);
                 }
             }
         }
@@ -414,47 +469,47 @@ public class GastBuilder {
     public void addConditionalStatement(ParserRuleContext ctx) {
         var conditionalStatement = new ConditionalStatement(ctx);
         if (currentLambdaFunction == null) {
-            codeBlocks.peek().getStatements().add(conditionalStatement);
+            pushStatementToCodeBlock(conditionalStatement);
         } else {
             if (!addStatementsToLambdaFunc(conditionalStatement)) {
-                codeBlocks.peek().getStatements().add(conditionalStatement);
+                pushStatementToCodeBlock(conditionalStatement);
             }
         }
         setConditionalStmt(conditionalStatement);
     }
 
     public void addForLoopStmt(ParserRuleContext ctx) {
-       // TODO
-        forLoops.add(new ForLoop(ctx));
+        // TODO
+        loops.add(new Loop(ctx));
     }
 
     public void exitForLoop() {
-        forLoops.pop();
+        loops.pop();
     }
 
     public GenericStatement addGenericStatement(ParserRuleContext ctx) {
         var statement = new GenericStatement(ctx);
         if (currentLambdaFunction == null) {
-            codeBlocks.peek().getStatements().add(statement);
+            pushStatementToCodeBlock(statement);
         } else {
             if (!addStatementsToLambdaFunc(statement)) {
-                codeBlocks.peek().getStatements().add(statement);
+                pushStatementToCodeBlock(statement);
             }
         }
-        statements.push(statement);
+        pushStatement(statement);
         return statement;
     }
 
     private void setConditionalStmt(ConditionalStatement stmt) {
         codeBlocks.push(stmt.getCodeBlock());
-        statements.push(stmt);
+        pushStatement(stmt);
     }
 
 
     public NewExpression addNewExpression(ParserRuleContext ctx, String className) {
         NewExpression newExpression = new NewExpression(ctx, className);
         processExpression(newExpression);
-        statements.push(newExpression);
+        pushStatement(newExpression);
         return newExpression;
     }
 
@@ -462,7 +517,7 @@ public class GastBuilder {
     public AttributeAccess addAttributeAccess(ParserRuleContext ctx, String identifier) {
         AttributeAccess attributeAccess = new AttributeAccess(ctx, identifier);
         processExpression(attributeAccess);
-        statements.push(attributeAccess);
+        pushStatement(attributeAccess);
         return attributeAccess;
     }
 
@@ -470,22 +525,22 @@ public class GastBuilder {
     public MethodCallExpression addMethodCall(ParserRuleContext ctx) {
         var methodCall = new MethodCallExpression(ctx);
         processExpression(methodCall);
-        statements.push(methodCall);
+        pushStatement(methodCall);
         return methodCall;
     }
 
 
     public ThrowException addThrowException(ParserRuleContext ctx) {
         ThrowException throwException = new ThrowException(ctx);
-        codeBlocks.peek().getStatements().add(throwException);
-        statements.push(throwException);
+        pushStatementToCodeBlock(throwException);
+        pushStatement(throwException);
         return throwException;
     }
 
 
     public TryCatch addTryCatch(ParserRuleContext ctx) {
         var tryCatch = new TryCatch(ctx);
-        codeBlocks.peek().getStatements().add(tryCatch);
+        pushStatementToCodeBlock(tryCatch);
         codeBlocks.push(tryCatch.getTryBlock());
         tryCatches.push(tryCatch);
         return tryCatch;
@@ -508,6 +563,67 @@ public class GastBuilder {
         return attribute;
     }
 
+    public Switch addSwitch(ParserRuleContext ctx) {
+        Switch newSwitch = new Switch();
+        inSwitch = true;
+        statements.add(newSwitch);
+        switches.add(newSwitch);
+        pushStatementToCodeBlock(newSwitch); // TODO needed?
+        return newSwitch;
+    }
+
+    public void exitSwitch() {
+        if (switches.isEmpty() || !inSwitch) {
+            throw new RuntimeException("No switch to exit from.");
+        }
+        // Finalize the switch statement
+        Switch completedSwitch = switches.pop();
+        inSwitch = false;
+        inSwitchCase = false; // Reset case flag as well
+
+        // Add the completed switch as a statement
+        pushStatement(completedSwitch);
+    }
+
+    public void exitSwitchBlock() {
+        if (switches.empty()) {
+            throw new RuntimeException("No switch block found");
+        } else {
+            popIfNotEmpty(switches);
+        }
+
+        // At this point, the last statement in the stack should be a switch
+        if (statements.peek() instanceof Switch) {
+            popIfNotEmpty(statements);
+        } else {
+            throw new RuntimeException("Last statement in the stack should be a switch");
+        }
+    }
+
+    public void addSwitchCase(ParserRuleContext ctx) {
+        if (switches.empty()) {
+            throw new RuntimeException("There shouldn't be a case with no switch declared");
+        }
+        inSwitchCase = true;
+    }
+
+    public void addDefaultCase(ParserRuleContext ctx) {
+        if (switches.empty()) {
+            throw new RuntimeException("There shouldn't be a default case if no switch was declared");
+        }
+        // do nothing
+    }
+
+    public void addBreak() {
+        Break break_stmt = new Break();
+        statements.add(break_stmt);
+        pushStatementToCodeBlock(break_stmt);
+        if (inSwitch) {
+            switches.peek().breakInCase();
+            switches.peek().addStatement(break_stmt);
+        }
+    }
+
     /**
      * @param ctx Creates a new Function to represent a lambda function and gives it to the
      *            Expression that will store it.
@@ -520,7 +636,7 @@ public class GastBuilder {
             expression.setLambdaFunc(lambdaFunc);
             expression.setType("Lambda");
             currentLambdaFunction = lambdaFunc;
-            statements.push(expression);
+            pushStatement(expression);
         }
     }
 
@@ -631,15 +747,15 @@ public class GastBuilder {
         }
 
         if (newExpression != null) {
-            statements.push(newExpression);
+            pushStatement(newExpression);
         }
 
         if (expression != null) {
-            statements.push(expression);
+            pushStatement(expression);
         }
 
         if (functionCall != null) {
-            statements.push(functionCall);
+            pushStatement(functionCall);
         }
     }
 
@@ -752,7 +868,7 @@ public class GastBuilder {
                     assignment.setLeft(var);
                 }
             }
-            statements.push(assignment);
+            pushStatement(assignment);
         }
     }
 
@@ -791,7 +907,7 @@ public class GastBuilder {
                 }
             }
 
-            statements.push(expression);
+            pushStatement(expression);
         }
     }
 
@@ -818,7 +934,7 @@ public class GastBuilder {
                 expression.setOperator(Util.toOperator(operator));
             }
 
-            statements.push(expression);
+            pushStatement(expression);
         }
     }
 
@@ -835,7 +951,7 @@ public class GastBuilder {
         if (statements.peek() instanceof Assignment) {
             Assignment assignment = (Assignment) statements.pop();
             assignment.setOperator(operator);
-            statements.push(assignment);
+            pushStatement(assignment);
         }
     }
 
@@ -851,12 +967,12 @@ public class GastBuilder {
             Assignment assignment = (Assignment) statements.pop();
             if (assignment.getOperator() != null) {
                 if (assignment.getOperator().equals("=")) {
-                    statements.push(assignment);
+                    pushStatement(assignment);
                 } else {
                     Variable variable = (Variable) assignment.getLeft();
                     Expression expression = new Expression();
                     if (statements.empty()) {
-                      expression = assignment.getRight();
+                        expression = assignment.getRight();
                     } else if (statements.peek() instanceof Expression) {
                         expression = assignment.getRight();
                     } else {
@@ -871,16 +987,16 @@ public class GastBuilder {
                         case "/=" -> expression.setOperator(Operator.DIVIDE);
                         case "%=" -> expression.setOperator(Operator.MODULUS);
                         default -> {
-                            statements.push(assignment);
+                            pushStatement(assignment);
                             return;
                         }
                     }
 
                     assignment.setRight(expression);
-                    statements.push(assignment);
+                    pushStatement(assignment);
                 }
             } else {
-                statements.push(assignment);
+                pushStatement(assignment);
             }
         }
     }
@@ -929,7 +1045,7 @@ public class GastBuilder {
                 }
             }
 
-            statements.push(genStmt);
+            pushStatement(genStmt);
         }
     }
 
@@ -985,9 +1101,9 @@ public class GastBuilder {
                 assignmentStack.setRight(expression);
             }
 
-            statements.push(genStmt);
-            statements.push(assignmentStack);
-            statements.push(assignExp);
+            pushStatement(genStmt);
+            pushStatement(assignmentStack);
+            pushStatement(assignExp);
         }
     }
 
@@ -1035,7 +1151,7 @@ public class GastBuilder {
                     assignment.setRight(var);
                 }
             }
-            statements.push(assignment);
+            pushStatement(assignment);
             //Attribute access is on the right side of expression
         } else if (statements.peek() instanceof Expression) {
             Variable var = null, attribute;
@@ -1083,7 +1199,7 @@ public class GastBuilder {
                 expression.getMembers().add(newAttributeAddedIdx, var);
             }
 
-            statements.push(expression);
+            pushStatement(expression);
         } else if (statements.peek() instanceof GenericStatement) {
             GenericStatement genStmt = (GenericStatement) statements.pop();
             Expression expression = (Expression) genStmt.getStatement();
@@ -1092,7 +1208,7 @@ public class GastBuilder {
             var.setSelectedAttribute(attribute.getName());
 
             genStmt.setStatement(var);
-            statements.push(genStmt);
+            pushStatement(genStmt);
         }
     }
 
@@ -1134,8 +1250,8 @@ public class GastBuilder {
             Expression expression = new Expression();
             genStmt.setStatement(expression);
 
-            statements.push(genStmt);
-            statements.push(expression);
+            pushStatement(genStmt);
+            pushStatement(expression);
             return true;
         } else {
             return false;
@@ -1158,18 +1274,18 @@ public class GastBuilder {
         if (statements.peek() instanceof Assignment) {
             Assignment assignment = (Assignment) statements.pop();
 
-            statements.push(genStmt);
-            statements.push(assignment);
-            statements.push(expression);
+            pushStatement(genStmt);
+            pushStatement(assignment);
+            pushStatement(expression);
 
             int idx = this.codeBlocks.peek().getStatements().size();
             genStmt = (GenericStatement) this.codeBlocks.peek().getStatements().remove(idx - 1);
             assignment = (Assignment) this.codeBlocks.peek().getStatements().remove(idx - 2);
-            this.codeBlocks.peek().getStatements().add(genStmt);
-            this.codeBlocks.peek().getStatements().add(assignment);
+            pushStatementToCodeBlock(genStmt);
+            pushStatementToCodeBlock(assignment);
         } else {
-            statements.push(expression);
-            statements.push(genStmt);
+            pushStatement(expression);
+            pushStatement(genStmt);
         }
     }
 
@@ -1186,8 +1302,8 @@ public class GastBuilder {
             genStmt = (GenericStatement) statements.pop();
             expression = (Expression) statements.pop();
 
-            statements.push(genStmt);
-            statements.push(expression);
+            pushStatement(genStmt);
+            pushStatement(expression);
 
         } else {
             expression = (Expression) statements.pop();
@@ -1195,8 +1311,8 @@ public class GastBuilder {
             Variable variable = (Variable) expression.getMembers().getFirst();
             genStmt.setStatement(variable);
 
-            statements.push(expression);
-            statements.push(genStmt);
+            pushStatement(expression);
+            pushStatement(genStmt);
         }
     }
 
@@ -1228,18 +1344,18 @@ public class GastBuilder {
                 expression.getLambdaFunc().getCodeBlock().getStatements().add(statement);
                 isLambdaFuncExpr = true;
             }
-            statements.push(expression);
+            pushStatement(expression);
         }
 
         if (genStmt != null) {
-            statements.push(genStmt);
+            pushStatement(genStmt);
         }
 
         return isLambdaFuncExpr;
     }
 
     /**
-     * @param ctx rule context
+     * @param ctx           rule context
      * @param attributeName In JavaScripParser's case, an Attribute is not immediately recognized as it is only analyzed when
      *                      in the constructor. So, for that, once we verify that we are indeed in the constructor we create
      *                      the attribute so that it can be added to its class.
@@ -1256,11 +1372,11 @@ public class GastBuilder {
         if (!statements.isEmpty() && statements.peek() instanceof Assignment) {
             Assignment assignment = (Assignment) statements.pop();
             assignment.setLeft(this.classes.peek().getAttributes().get(attributeName));
-            statements.push(assignment);
+            pushStatement(assignment);
         } else if (!statements.isEmpty() && statements.peek() instanceof Expression) {
             Expression expression = (Expression) statements.pop();
             addClassAttributeToAssignment(attributeName);
-            statements.push(expression);
+            pushStatement(expression);
         }
     }
 
@@ -1272,7 +1388,7 @@ public class GastBuilder {
                     assignment.getLeft().getMembers().getFirst() instanceof Variable leftVar) {
                 assignment.setLeft(leftVar);
             }
-            statements.push(assignment);
+            pushStatement(assignment);
         }
     }
 
@@ -1291,8 +1407,8 @@ public class GastBuilder {
             Expression expression = (Expression) statements.pop();
             Assignment assignment = (Assignment) statements.pop();
             assignment.getLeft().setCollection(true);
-            statements.push(assignment);
-            statements.push(expression);
+            pushStatement(assignment);
+            pushStatement(expression);
         }
     }
 
@@ -1308,7 +1424,7 @@ public class GastBuilder {
             Variable var = createNewVariableForAttributes((Variable) assignment.getLeft());
             var.setSelectedAttribute(name);
             assignment.setLeft(var);
-            statements.push(assignment);
+            pushStatement(assignment);
         } else if (statements.peek() instanceof Expression) {
             /* For now, this function will be called when JavaFileListener is in enterPrimary due to "this"
              * variable and its attribute access. */
@@ -1318,7 +1434,7 @@ public class GastBuilder {
             var.setSelectedAttribute(name);
             expression.getMembers().removeLast();
             expression.getMembers().add(var);
-            statements.push(expression);
+            pushStatement(expression);
         } else if (statements.peek() instanceof GenericStatement) {
             /* When there is a statement: (++/-)this.someAttribute(++/--), the GenericStatement
              * will go straight to the variable "this.someAttribute" found in enterPrimary */
@@ -1326,18 +1442,17 @@ public class GastBuilder {
             Variable var = createNewVariableForAttributes((Variable) genericStatement.getStatement());
             var.setSelectedAttribute(name);
             genericStatement.setStatement(var);
-            statements.push(genericStatement);
+            pushStatement(genericStatement);
         }
     }
 
     /**
-     * @param ctx rule context
-     * @param functionName name of the function to add
-     * @param isConstructorSuper
-     * Receives the context (so that, for example, line number is known), name of the funtion
-     * and if it is a super() or a "super.". The objective of this function is to transform super calls
-     * into their respective function calls for analysis, distinguishing from super() (used in constructors)
-     * and "super." (used to call super of a given method).
+     * @param ctx                rule context
+     * @param functionName       name of the function to add
+     * @param isConstructorSuper Receives the context (so that, for example, line number is known), name of the funtion
+     *                           and if it is a super() or a "super.". The objective of this function is to transform super calls
+     *                           into their respective function calls for analysis, distinguishing from super() (used in constructors)
+     *                           and "super." (used to call super of a given method).
      * @function addSuperMethodCall
      */
     public void addSuperMethodCall(ParserRuleContext ctx, String functionName, boolean isConstructorSuper) {
@@ -1350,7 +1465,7 @@ public class GastBuilder {
         } else {
             superFunction.setSuper(true);
         }
-        statements.push(superFunction);
+        pushStatement(superFunction);
     }
 
     /**
@@ -1364,7 +1479,7 @@ public class GastBuilder {
     }
 
     /**
-     * @param ctx rule context
+     * @param ctx              rule context
      * @param isSuperStatement Auxiliary function. Receives the context and a boolean to determine if it is analysing a
      *                         super() or this() (used in constructors), so that the appropriate name is provided to the
      *                         addSuperMethodCall function.
@@ -1406,8 +1521,8 @@ public class GastBuilder {
                 methodCall.getMembers().add(functionCall);
                 methodCall.setSource(classExpression);
 
-                statements.push(methodCall);
-                statements.push(functionCall);
+                pushStatement(methodCall);
+                pushStatement(functionCall);
             } else if (statements.peek() instanceof MethodCallExpression && statements.size() >= 2) {
                 /* This part represents the appearance of (new someClass()).someMethodCall()
                  * in the right side of an assignment!
@@ -1417,22 +1532,22 @@ public class GastBuilder {
                 if (!statements.isEmpty() && statements.peek() instanceof Assignment) {
                     Assignment assignment = (Assignment) statements.pop();
                     methodCall.setSource(assignment.getRight().getMembers().removeFirst());
-                    statements.push(assignment);
+                    pushStatement(assignment);
                 }
 
-                statements.push(expression);
-                statements.push(methodCall);
+                pushStatement(expression);
+                pushStatement(methodCall);
             }
         }
     }
 
     /**
      * @param attributeName name of the attribute to add the value to
-     * @param type type of the value to track
-     * @param value value to be tracked
-     * Auxiliary function used in Java context (for now) to initialize a class's
-     * fields/attributes in case primitive data types (or Lists/Maps/Sets/Stacks) are
-     * used. Doesn't support other classes due to the complexity involved!
+     * @param type          type of the value to track
+     * @param value         value to be tracked
+     *                      Auxiliary function used in Java context (for now) to initialize a class's
+     *                      fields/attributes in case primitive data types (or Lists/Maps/Sets/Stacks) are
+     *                      used. Doesn't support other classes due to the complexity involved!
      * @function addAttributeTrackedValue
      */
     public void addAttributeTrackedValue(String attributeName, String type, String value) {
@@ -1450,25 +1565,24 @@ public class GastBuilder {
     }
 
     /**
-     * @param isElseIf Auxiliary function used in Java context (for now) to give a case
-     *                 (from a switch statement) the following expression: switchExpression == caseExpression.
+     * @param ctx the context created by the parser
+     *            Auxiliary function used in Java context (for now) to give a case
+     *            the condition
      * @function finishExpressionForCase
      */
-    public void finishExpressionForCase(boolean isElseIf) {
-        IfStatement ifStatement = (IfStatement) statements.pop();
-        Expression switchExpression = (Expression) statements.pop();
-
-        if (!isElseIf) {
-            ifStatement.getExpression().getMembers().add(switchExpression.getMembers().getFirst());
-            ifStatement.getExpression().setOperator(Util.toOperator("=="));
-        } else {
-            int lastElseIf = ifStatement.getElseIfs().size() - 1;
-            ifStatement.getElseIfs().get(lastElseIf).getExpression().getMembers().add(switchExpression.getMembers().getFirst());
-            ifStatement.getElseIfs().get(lastElseIf).getExpression().setOperator(Util.toOperator("=="));
+    public void finishExpressionForCase(ParserRuleContext ctx) {
+        if (switches.empty()) {
+            throw new RuntimeException("Should not reach this without a switch statement previously declared");
         }
 
-        statements.push(switchExpression);
-        statements.push(ifStatement);
+        if (Util.callMethodIfExists(ctx, "CASE") != null) {
+            // Expression has already been added in processExpression
+            inSwitchCase = false;
+        } else if (Util.callMethodIfExists(ctx, "DEFAULT") != null) {
+            Expression defaultExpr = new Expression(ctx, "true", "boolean");
+            processExpression(defaultExpr);
+            inSwitchCase = false;
+        }
     }
 
     /**
@@ -1500,13 +1614,13 @@ public class GastBuilder {
                     ifFalseAssignment.setRight(expression.getMembers().remove(1));
                     ifStatement.getElseBlock().getStatements().add(ifFalseAssignment);
 
-                    statements.push(assignment);
+                    pushStatement(assignment);
                 }
-                statements.push(unneededExpression);
+                pushStatement(unneededExpression);
             }
 
-            statements.push(ifStatement);
-            statements.push(expression);
+            pushStatement(ifStatement);
+            pushStatement(expression);
         }
     }
 
@@ -1521,13 +1635,13 @@ public class GastBuilder {
 
             //conditionalStatement.setExpression(assignment);
 
-            statements.push(conditionalStatement);
+            pushStatement(conditionalStatement);
         }
     }
 
     public void addClassCreation(ParserRuleContext ctx, String identifier) {
         if (identifier.equals("ArrayList") || identifier.equals("HashSet") || identifier.equals("LinkedList") ||
-            identifier.equals("HashMap") || identifier.equals("Stack")) {
+                identifier.equals("HashMap") || identifier.equals("Stack")) {
             inCollection = true;
         } else {
             addFunctionCall(ctx, identifier);
@@ -1542,5 +1656,39 @@ public class GastBuilder {
         } else {
             exitStatementOrExpression();
         }
+    }
+
+    private void pushStatement(Statement stmt) {
+        // Check if statement is not already in some switch
+        for (Switch s : switches) {
+            for (Statement statement : s.getStatements()) {
+                // We have to explicitly check the object's ID/hash code because .equals() might return
+                // false positives
+                if (System.identityHashCode(statement) == System.identityHashCode(stmt)) {
+                    return;
+                }
+            }
+        }
+
+        statements.push(stmt);
+
+        // TODO: Later check if the statement is not already in a for-loop
+    }
+
+    private void pushStatementToCodeBlock(Statement stmt) {
+        // Check if statement is not already in some switch
+        for (Switch s : switches) {
+            for (Statement statement : s.getStatements()) {
+                // We have to explicitly check the object's ID/hash code because .equals() might return
+                // false positives
+                if (System.identityHashCode(statement) == System.identityHashCode(stmt)) {
+                    return;
+                }
+            }
+        }
+
+        codeBlocks.peek().getStatements().add(stmt);
+
+        // TODO: Later check if the statement is not already in a for-loop
     }
 }

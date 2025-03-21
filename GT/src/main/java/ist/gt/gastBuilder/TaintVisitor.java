@@ -1,7 +1,6 @@
 package ist.gt.gastBuilder;
 
 import ist.gt.AstConverter;
-import ist.gt.exceptions.ReturnFoundException;
 import ist.gt.model.Class;
 import ist.gt.model.*;
 import ist.gt.settings.Settings;
@@ -624,9 +623,9 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
             file.getRootFunc().accept(this);
             return;
         }
-        if (spec.isMethod())
+        if (spec.isMethod()) {
             file.getClasses().get(spec.getFunction().getType()).accept(this);
-        else {
+        }else {
             file.getFunctions().get(spec.getFunction().getName()).accept(this);
         }
     }
@@ -1606,12 +1605,39 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
         }
     }
 
-    public void visit(ForLoop forLoop) {
+    @Override
+    public void visit(Loop forLoop) {
 
     }
 
+    @Override
     public void visit(Switch stmt) {
 
+        // visit main condition
+        visit(stmt.getCondition());
+
+        boolean visit_default = true;
+
+        // visit all relevant cases
+        for (int i = 0; i < stmt.getCases().size() - 1; i++) {
+            var pair = stmt.getCases().get(i);
+            // visit all expressions and check if value is equal to main condition
+           for (var expr: pair.key()) {
+               visit(expr);
+               if (stmt.getCondition().getTrackedValue().equals(expr.getTrackedValue())) {
+                   // evaluate statements in corresponding code block
+                   visit(pair.value());
+                   visit_default = false;
+                   break;
+               }
+           }
+        }
+
+        if (visit_default) {
+            var def_pair = stmt.getCases().getLast();
+            // Visit the code block in the default case
+            visit(def_pair.value());
+        }
     }
 
     // Not used currently. Could be handy in the future

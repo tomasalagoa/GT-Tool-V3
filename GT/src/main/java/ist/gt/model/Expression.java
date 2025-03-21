@@ -3,6 +3,7 @@ package ist.gt.model;
 import ist.gt.gastBuilder.AstBuilderVisitorInterface;
 import ist.gt.gastBuilder.ValueTrackingInterface;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import org.antlr.v4.runtime.ParserRuleContext;
 

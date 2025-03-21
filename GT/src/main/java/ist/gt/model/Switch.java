@@ -1,25 +1,79 @@
 package ist.gt.model;
 
 import ist.gt.gastBuilder.AstBuilderVisitorInterface;
+import ist.gt.gastBuilder.ValueTrackingInterface;
+import ist.gt.util.Util;
 import lombok.Data;
 
-import java.util.HashMap;
+import java.util.ArrayList;
 
 @Data
-public class Switch extends Element{
+public class Switch extends Statement{
 
     private Expression condition;
-    private HashMap<Expression, CodeBlock> cases;
+    private boolean hadBreak = false;
 
-    public void addCase(Expression condition, CodeBlock block) {
-        if (!cases.containsKey(condition)) {
-            cases.put(condition, block);
-        } else {
-            System.err.println("Condition: " + condition + " already exists");
+    /**
+     * This variable holds a collection of mappings, from expressions to codeBlocks
+     * The logic behind it is supposed to help deal with fallthrough cases and is explained in addCase
+     */
+    private ArrayList<Util.Pair<ArrayList<Expression>, CodeBlock>> cases = new ArrayList<>();
+
+    /**
+     * Auxiliary variable to store all statements so that it is easy to check whether a statement is
+     * present in any case
+     */
+    private ArrayList<Statement> statements = new ArrayList<>();
+    private boolean caseExpr = false;
+
+    /**
+     * @param cond the condition for a new case
+     * This function adds a new case to the stack, the logic for fallthrough and breaks is also added here
+     */
+    public void addCase(Expression cond){
+        // First case or had a break in the previous case
+        if (cases.isEmpty() || hadBreak) {
+            ArrayList<Expression> conds = new ArrayList<>();
+            conds.add(cond);
+            Util.Pair<ArrayList<Expression>, CodeBlock> pair = new Util.Pair<>(conds, new CodeBlock());
+            cases.add(pair);
+            hadBreak = false;
+        } else if (cases.getLast().value() == null) {
+            // The previous case(s) had no code, so we just add the new condition to the existing list
+            cases.getLast().key().add(cond);
+        } else if (cases.getLast().value() != null) {
+            // The previous case(s) had some code, so we have to duplicate the list of conditions and add the new one
+            // to the list.
+            ArrayList<Expression> conds = new ArrayList<>(cases.getLast().key());
+            conds.add(cond);
+            Util.Pair<ArrayList<Expression>, CodeBlock> pair = new Util.Pair<>(conds, new CodeBlock());
+            cases.add(pair);
         }
+        caseExpr = true;
+    }
+
+    public void addStatement(Statement stmt) {
+        // Edge case: adding the main condition expression or the case condition expression
+        if (!cases.isEmpty() && !caseExpr) {
+            cases.getLast().value().getStatements().add(stmt);
+            statements.add(stmt);
+        }
+
+        if (caseExpr) {
+            caseExpr = false;
+        }
+    }
+
+    public void breakInCase() {
+        hadBreak = true;
     }
 
     public void accept(AstBuilderVisitorInterface visitor) {
         visitor.visit(this);
+    }
+
+    @Override
+    public void addValue(ValueTrackingInterface tracker) {
+        // Nothing to track
     }
 }

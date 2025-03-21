@@ -4,12 +4,10 @@ import ist.gt.gastBuilder.GastBuilder;
 import ist.gt.gastBuilder.LiteralOptions;
 import ist.gt.languages.java.parser.Java8Parser;
 import ist.gt.languages.java.parser.Java8ParserBaseListener;
-import ist.gt.model.ForLoop;
 import lombok.Data;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
 @Data
 public class JavaFileListener extends Java8ParserBaseListener {
@@ -22,13 +20,12 @@ public class JavaFileListener extends Java8ParserBaseListener {
     private boolean genStmtInserted = false;
     private boolean collectionFound = false;
     private boolean classInMethodCallSource = false;
-    private String switchExpression = "";
     private int totalSwitchCases;
     private int casesBuilt = 0;
     private final GastBuilder gastBuilder;
 
     public JavaFileListener(String filename) {
-        gastBuilder = new GastBuilder(filename);
+        gastBuilder = new GastBuilder(filename, GastBuilder.language.JAVA);
     }
 
     @Override
@@ -430,12 +427,12 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterBasicForStatement(Java8Parser.BasicForStatementContext ctx) {
-        gastBuilder.addForLoopStmt(ctx);
+        gastBuilder.addConditionalStatement(ctx);
     }
 
     @Override
     public void exitBasicForStatement(Java8Parser.BasicForStatementContext ctx) {
-        gastBuilder.exitForLoop();
+        gastBuilder.exitConditionalStatement();
     }
 
     @Override
@@ -559,50 +556,41 @@ public class JavaFileListener extends Java8ParserBaseListener {
     }
 
     /**
-     * Switch case statement here will function like an If-ElseIf-Else statement.
-     * This allows the tool to reuse the model (as a switch case isn't that different
-     * from an if-else) and to also reuse code of a similar logic already implemented!
+     * While switch statements can be very similar to if-statements, the fallthrough cases and breaks require a more
+     * specialized implementation
      */
     @Override
     public void enterSwitchStatement(Java8Parser.SwitchStatementContext ctx) {
-        this.switchExpression = ctx.expression().getText();
-        gastBuilder.addExpression(ctx);
+        gastBuilder.addSwitch(ctx);
     }
 
     @Override
-    public void exitSwitchStatement(Java8Parser.SwitchStatementContext ctx) {
-        gastBuilder.exitElseIfOrElseStatement();
-        while (this.casesBuilt > 1) {
-            gastBuilder.exitElseIfOrElseStatement();
-            this.casesBuilt--;
-        }
-        this.casesBuilt = 0;
-        gastBuilder.exitIfStatement();
-
-        gastBuilder.exitStatementOrExpression();
+    public void exitSwitchBlock(Java8Parser.SwitchBlockContext ctx) {
+        gastBuilder.exitSwitch();
     }
 
     @Override
     public void enterSwitchLabel(Java8Parser.SwitchLabelContext ctx) {
         if (ctx.CASE() != null) {
-            gastBuilder.addIfStatement(ctx, ctx.constantExpression().getText(), this.casesBuilt != 0);
-            this.casesBuilt++;
+            gastBuilder.addSwitchCase(ctx);
         } else if (ctx.DEFAULT() != null) {
-            gastBuilder.enterElseStatement(ctx);
+            gastBuilder.addDefaultCase(ctx);
         }
     }
 
     @Override
     public void exitSwitchLabel(Java8Parser.SwitchLabelContext ctx) {
-        if (ctx.CASE() != null) {
-            if (this.casesBuilt == 1) {
-                //if statement for first case
-                gastBuilder.finishExpressionForCase(false);
-            } else {
-                //else if statement for subsequent cases
-                gastBuilder.finishExpressionForCase(true);
-            }
-        }
+        gastBuilder.finishExpressionForCase(ctx);
+    }
+
+    @Override
+    public void enterBreakStatement(Java8Parser.BreakStatementContext ctx) {
+        gastBuilder.addBreak();
+    }
+
+    @Override
+    public void exitBreakStatement(Java8Parser.BreakStatementContext ctx) {
+        gastBuilder.exitStatementOrExpression();
     }
 
     /*==================================================================*

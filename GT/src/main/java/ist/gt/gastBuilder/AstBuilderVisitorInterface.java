@@ -47,5 +47,5 @@ public interface AstBuilderVisitorInterface {
 
     void visit(Switch stmt);
 
-    void visit(ForLoop forLoop);
+    void visit(Loop forLoop);
 }
