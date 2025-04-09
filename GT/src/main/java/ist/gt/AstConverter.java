@@ -18,6 +18,9 @@ import ist.gt.languages.php.parser.PhpParser;
 import ist.gt.languages.python.listener.PythonFileListener;
 import ist.gt.languages.python.parser.PythonLexer;
 import ist.gt.languages.python.parser.PythonParser;
+import ist.gt.languages.solidity.listener.SolidityFileListener;
+import ist.gt.languages.solidity.parser.SolidityLexer;
+import ist.gt.languages.solidity.parser.SolidityParser;
 import ist.gt.model.File;
 import ist.gt.model.Class;
 import ist.gt.settings.FuncDefinition;
@@ -136,6 +139,13 @@ public class AstConverter {
                 }
                 walker.walk(listener, tree);
                 analyzedClasses = listener.getGastBuilder().getAnalyzedClasses();
+                return listener.getGastBuilder().getFile();
+            }
+            case "sol" -> {
+                CommonTokenStream tokens = new CommonTokenStream(new SolidityLexer(input));
+                var tree = new SolidityParser(tokens).sourceUnit();
+                var listener = new SolidityFileListener(path.getFileName().toString());
+                walker.walk(listener, tree);
                 return listener.getGastBuilder().getFile();
             }
             default -> throw new RuntimeException("File extension not supported");

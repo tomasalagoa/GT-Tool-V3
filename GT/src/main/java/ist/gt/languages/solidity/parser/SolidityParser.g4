@@ -237,6 +237,7 @@ functionDefinition
         | stateMutability
         | modifierInvocation
         | Virtual
+        | Constant
         | overrideSpecifier
     )* (Returns LParen returnParameters = parameterList RParen)? (Semicolon | body = block)
     ;

@@ -43,7 +43,8 @@ public class GastBuilder {
         JAVA,
         PYTHON,
         JS,
-        PHP
+        PHP,
+        SOLIDITY
     }
 
 
@@ -314,6 +315,7 @@ public class GastBuilder {
                 if (Util.callMethodIfExists(ctx, "NullLiteral") != null) {
                     return addConstant(ctx, opts, "null");
                 }
+                // Should not reach here
             case JS:
                 if (Util.callMethodIfExists(ctx, "numericLiteral") != null) {
                     // Repeat of FloatingPointLiteral, could be refactored to the same case but for clarity will be separated
@@ -322,6 +324,7 @@ public class GastBuilder {
                 if (Util.callMethodIfExists(ctx, "TemplateStringLiteral") != null || Util.callMethodIfExists(ctx, "RegularExpressionLiteral") != null) {
                     return addConstant(ctx, opts, "string");
                 }
+                // Should not reach here
             case PHP:
                 if (Util.callMethodIfExists(ctx, "literalConstant") != null) {
                     if (Util.callMethodIfExists(ctx, "Real") != null) {
@@ -358,6 +361,19 @@ public class GastBuilder {
                 if (Util.callMethodIfExists(ctx, "Null") != null) {
                     return addConstant(ctx, opts, "null");
                 }
+                // Should not reach here
+            case SOLIDITY:
+                if (Util.callMethodIfExists(ctx, "stringLiteral") != null) {
+                    return addConstant(ctx, opts, "string");
+                }
+                if (Util.callMethodIfExists(ctx, "numberLiteral") != null) {
+                    return addConstant(ctx, opts, "double");
+                }
+                if (Util.callMethodIfExists(ctx, "boolLiteral") != null) {
+                    return addConstant(ctx, opts, "boolean");
+                }
+                // FIXME solidity has two more types, hexStringLiteral and unicodeStringLiteral but they are not implemented here
+                // Should not reach here
         }
         throw new NotImplementedException("Unrecognized data type " + ctx.getText());
     }
@@ -464,7 +480,6 @@ public class GastBuilder {
         setConditionalStmt(ifStatement);
         return ifStatement;
     }
-
 
     public void addConditionalStatement(ParserRuleContext ctx) {
         var conditionalStatement = new ConditionalStatement(ctx);
