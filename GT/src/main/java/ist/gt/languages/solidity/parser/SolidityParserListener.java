@@ -1,5 +1,6 @@
 package ist.gt.languages.solidity.parser;
-// Generated from SolidityParser.g4 by ANTLR 4.13.2
+
+// Generated from SolidityParser.g4 by ANTLR 4.8
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 
 /**
