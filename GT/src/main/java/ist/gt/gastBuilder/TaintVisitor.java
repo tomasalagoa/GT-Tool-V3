@@ -544,7 +544,7 @@ public class TaintVisitor implements AstBuilderVisitorInterface, ValueTrackingIn
 
 
     @Override
-    public void visit(Constant constant) {
+    public void visit(Literal literal) {
     }
 
 

@@ -92,7 +92,7 @@ Catch
     ;
 
 Constant
-    : 'constant'
+    : 'literal'
     ;
 
 Constructor

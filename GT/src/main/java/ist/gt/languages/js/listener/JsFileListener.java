@@ -40,26 +40,26 @@ public class JsFileListener extends JavaScriptParserBaseListener {
     public void enterLiteral(JavaScriptParser.LiteralContext ctx) {
         /*
         if (ctx.BooleanLiteral() != null) {
-            gastBuilder.addConstant(ctx, ctx.getText(), "boolean");
+            gastBuilder.addLiteral(ctx, ctx.getText(), "boolean");
         } else if (ctx.StringLiteral() != null) {
             //Remove quotes from ctx text due to the appearance of double quotes later on
             String rmvQuotes = ctx.getText().substring(1, ctx.getText().length() - 1).replace("\"\"", "\"");
-            gastBuilder.addConstant(ctx, rmvQuotes, "string");
+            gastBuilder.addLiteral(ctx, rmvQuotes, "string");
         } else if (ctx.NullLiteral() != null) {
-            gastBuilder.addConstant(ctx, ctx.getText(), "null");
+            gastBuilder.addLiteral(ctx, ctx.getText(), "null");
         } else if (ctx.numericLiteral() != null) {
             if (negativeNumberFound) {
-                gastBuilder.addConstant(ctx, "-" + ctx.getText(), "double");
+                gastBuilder.addLiteral(ctx, "-" + ctx.getText(), "double");
                 negativeNumberFound = false;
             } else {
-                gastBuilder.addConstant(ctx, ctx.getText(), "double");
+                gastBuilder.addLiteral(ctx, ctx.getText(), "double");
             }
         } else if (ctx.TemplateStringLiteral() != null || ctx.RegularExpressionLiteral() != null) {
             String rmvQuotes = ctx.getText().substring(1, ctx.getText().length() - 1).replace("\"\"", "\"");
-            gastBuilder.addConstant(ctx, rmvQuotes, "string");
+            gastBuilder.addLiteral(ctx, rmvQuotes, "string");
         }
          */
-        gastBuilder.addConstant(ctx, new LiteralOptions(this.negativeNumberFound, true));
+        gastBuilder.addLiteral(ctx, new LiteralOptions(this.negativeNumberFound, true));
     }
 
     @Override

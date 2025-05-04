@@ -11,7 +11,7 @@ null
 'bytes'
 'calldata'
 'catch'
-'constant'
+'literal'
 'constructor'
 null
 'contract'

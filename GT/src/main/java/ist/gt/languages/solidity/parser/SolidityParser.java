@@ -141,7 +141,7 @@ public class SolidityParser extends Parser {
 	private static String[] makeSymbolicNames() {
 		return new String[] {
 			null, "ReservedKeywords", "Abstract", "Address", "Anonymous", "As", "Assembly", 
-			"Bool", "Break", "Bytes", "Calldata", "Catch", "Constant", "Constructor", 
+			"Bool", "Break", "Bytes", "Calldata", "Catch", "Literal", "Constructor",
 			"Continue", "Contract", "Delete", "Do", "Else", "Emit", "Enum", "Error", 
 			"Event", "External", "Fallback", "FalseLiteral", "Fixed", "FixedBytes", 
 			"For", "From", "Function", "Global", "Hex", "If", "Immutable", "Import", 

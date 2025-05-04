@@ -77,6 +77,6 @@ public class SolidityFileListener extends SolidityParserBaseListener {
 
     @Override
     public void enterLiteral(SolidityParser.LiteralContext ctx) {
-        gastBuilder.addConstant(ctx, new LiteralOptions(this.negativeNumber, false)); //FIXME não sei se é preciso tirar quotes ou não
+        gastBuilder.addLiteral(ctx, new LiteralOptions(this.negativeNumber, false)); //FIXME não sei se é preciso tirar quotes ou não
     }
 }

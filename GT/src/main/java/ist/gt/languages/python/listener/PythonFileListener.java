@@ -221,17 +221,17 @@ public class PythonFileListener extends PythonParserBaseListener {
 
     @Override
     public void enterTrue_false(PythonParser.True_falseContext ctx) {
-        gastBuilder.addConstant(ctx, new LiteralOptions(false, false), "boolean");
+        gastBuilder.addLiteral(ctx, new LiteralOptions(false, false), "boolean");
     }
 
     @Override
     public void enterString_literal(PythonParser.String_literalContext ctx) {
-        gastBuilder.addConstant(ctx, new LiteralOptions(false, true), "string");
+        gastBuilder.addLiteral(ctx, new LiteralOptions(false, true), "string");
     }
 
     @Override
     public void enterNumber(PythonParser.NumberContext ctx) {
-        gastBuilder.addConstant(ctx, new LiteralOptions(this.negativeNumberFound, false), "double");
+        gastBuilder.addLiteral(ctx, new LiteralOptions(this.negativeNumberFound, false), "double");
     }
 
     @Override

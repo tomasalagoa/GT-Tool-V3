@@ -17,7 +17,7 @@ public interface AstBuilderVisitorInterface {
 
     void visit(Parameter param);
 
-    void visit(Constant constant);
+    void visit(Literal literal);
 
     void visit(Function function);
 

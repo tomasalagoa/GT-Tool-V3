@@ -44,7 +44,7 @@ public class ExpressionVisitor implements AstBuilderVisitorInterface {
     }
 
     @Override
-    public void visit(Constant constant) {
+    public void visit(Literal literal) {
     }
 
     @Override

@@ -470,7 +470,7 @@ expression
     | Print expression
 
     | chain
-    | constant
+    | literal
     | string
     | Label
 
@@ -635,7 +635,7 @@ actualArgument
     ;
 
 constantInititalizer
-    : constant
+    : literal
     | string
     | Array '(' (constantArrayItemList ','?)? ')'
     | '[' (constantArrayItemList ','?)? ']'
@@ -650,7 +650,7 @@ constantArrayItem
     : constantInititalizer ('=>' constantInititalizer)?
     ;
 
-constant
+literal
     : Null
     | literalConstant
     | magicConstant

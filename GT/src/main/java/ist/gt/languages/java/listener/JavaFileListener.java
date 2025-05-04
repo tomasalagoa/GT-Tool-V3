@@ -60,7 +60,7 @@ public class JavaFileListener extends Java8ParserBaseListener {
 
     @Override
     public void enterLiteral(Java8Parser.LiteralContext ctx) {
-        gastBuilder.addConstant(ctx, new LiteralOptions(this.negativeNumberFound, true));
+        gastBuilder.addLiteral(ctx, new LiteralOptions(this.negativeNumberFound, true));
     }
 
     /**

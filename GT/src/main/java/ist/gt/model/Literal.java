@@ -7,8 +7,8 @@ import org.antlr.v4.runtime.ParserRuleContext;
 
 @Data
 @NoArgsConstructor
-public class Constant extends Expression {
-    public Constant(ParserRuleContext ctx, Object value, String type) {
+public class Literal extends Expression {
+    public Literal(ParserRuleContext ctx, Object value, String type) {
         super(ctx, value.toString(), type);
         this.value = value;
         this.trackedValue = value.toString();

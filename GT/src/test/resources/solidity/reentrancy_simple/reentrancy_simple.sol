@@ -9,7 +9,7 @@
  contract Reentrance {
      mapping (address => uint) userBalance;
 
-     function getBalance(address u) constant returns(uint){
+     function getBalance(address u) literal returns(uint){
          return userBalance[u];
      }
 

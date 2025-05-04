@@ -123,7 +123,7 @@ inheritanceSpecifier
  * Declarations that can be used in contracts, interfaces and libraries.
  *
  * Note that interfaces and libraries may not contain constructors, interfaces may not contain state variables
- * and libraries may not contain fallback, receive functions nor non-constant state variables.
+ * and libraries may not contain fallback, receive functions nor non-literal state variables.
  */
 contractBodyElement
     : constructorDefinition
@@ -324,7 +324,7 @@ stateVariableDeclaration
     ;
 
 /**
- * The declaration of a constant variable.
+ * The declaration of a literal variable.
  */
 constantVariableDeclaration
     : type = typeName Constant name = identifier Assign initialValue = expression Semicolon

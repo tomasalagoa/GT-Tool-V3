@@ -588,7 +588,7 @@ actualArgument
 constantInititalizer
 constantArrayItemList
 constantArrayItem
-constant
+literal
 literalConstant
 numericConstant
 classConstant
