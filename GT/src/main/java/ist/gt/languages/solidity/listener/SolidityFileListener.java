@@ -2,6 +2,7 @@ package ist.gt.languages.solidity.listener;
 
 import ist.gt.gastBuilder.GastBuilder;
 import ist.gt.gastBuilder.LiteralOptions;
+import ist.gt.languages.java.parser.Java8Parser;
 import ist.gt.languages.solidity.parser.SolidityParser;
 import ist.gt.languages.solidity.parser.SolidityParserBaseListener;
 import lombok.Data;
@@ -36,14 +37,42 @@ public class SolidityFileListener extends SolidityParserBaseListener {
     }
 
     @Override
-    public void enterAssignOp(SolidityParser.AssignOpContext ctx) {
-        gastBuilder.addAssignmentOperator(ctx.getText());
+    public void enterAssignment(SolidityParser.AssignmentContext ctx) {
+        gastBuilder.addAssignment(ctx);
     }
 
     @Override
-    public void exitAssignOp(SolidityParser.AssignOpContext ctx) {
+    public void exitAssignment(SolidityParser.AssignmentContext ctx) {
+        gastBuilder.trackLeftVariableValue();
+        //Used in situations where assignment has +=, -=, *=, /=, %=
         gastBuilder.modifyAssignmentWithOperator();
+        gastBuilder.exitStatementOrExpression();
     }
+
+    /**
+     * @function exitAssignOp
+     *
+     * Checks the operator associated with the current Assignment being analyzed.
+     * The operators supported are: +=, -=, *=, /=, %= and =.
+     */
+    @Override
+    public void exitAssignOp(SolidityParser.AssignOpContext ctx) {
+        if (ctx.Assign() != null) {
+            gastBuilder.addAssignmentOperator("=");
+        } else if (ctx.AssignAdd() != null) {
+            gastBuilder.addAssignmentOperator("+=");
+        } else if (ctx.AssignSub() != null) {
+            gastBuilder.addAssignmentOperator("-=");
+        } else if (ctx.AssignMul() != null) {
+            gastBuilder.addAssignmentOperator("*=");
+        } else if (ctx.AssignDiv() != null) {
+            gastBuilder.addAssignmentOperator("/=");
+        } else if (ctx.AssignMod() != null) {
+            gastBuilder.addAssignmentOperator("%=");
+        }
+    }
+
+
 
     @Override
     public void enterFunctionDefinition(SolidityParser.FunctionDefinitionContext ctx) {
@@ -78,5 +107,18 @@ public class SolidityFileListener extends SolidityParserBaseListener {
     @Override
     public void enterLiteral(SolidityParser.LiteralContext ctx) {
         gastBuilder.addLiteral(ctx, new LiteralOptions(this.negativeNumber, false)); //FIXME não sei se é preciso tirar quotes ou não
+    }
+
+    @Override
+    public void enterExpressionStatement(SolidityParser.ExpressionStatementContext ctx) {
+        gastBuilder.addExpression(ctx);
+    }
+
+    @Override
+    public void exitExpressionStatement(SolidityParser.ExpressionStatementContext ctx) {
+        if (!gastBuilder.getStatements().isEmpty()) {
+            gastBuilder.trackExpressionValue();
+            gastBuilder.exitStatementOrExpression();
+        }
     }
 }
